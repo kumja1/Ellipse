@@ -1,2 +1,0 @@
-# Ellipse
-Created with StackBlitz ⚡️
