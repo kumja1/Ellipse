@@ -1,12 +1,11 @@
-using Newtonsoft.Json;
 
 namespace Ellipse.Models;
 
-public struct Coordinate(double Lat, double Lng)
+public struct PointInfo
 {
-    [JsonProperty("lon")]
-    public double Lng { get; set; } = Lng;
-
-    [JsonProperty("lat")]
-    public double Lat { get; set; } = Lat;
+    public double Average { get; set; }
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public string Name { get; set; }
 }
+
