@@ -1,9 +1,11 @@
+using Ellipse;
+using Ellipse.Services;
+using Mapbox.AspNetCore.DependencyInjection;
+using Mapbox.AspNetCore.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Syncfusion.Blazor;
-using Ellipse.Services;
-using Ellipse;
-using Syncfusion.Licensing;
+using MudBlazor.Services;
+
 
 partial class Program
 {
@@ -26,17 +28,17 @@ partial class Program
 
     public static void ConfigureServices(WebAssemblyHostBuilder builder)
     {
-        builder.Services.AddHttpClient<MapService>(client =>
+        builder.Services
+        .AddMudServices()
+        .AddMapBoxServices(options => options.UseApiKey("pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA"))
+        .AddScoped<MapBoxService>()
+        .AddHttpClient<MapService>(client =>
         {
             client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
         });
-        
-        builder.Services.AddSyncfusionBlazor();
-        SyncfusionLicenseProvider.RegisterLicense("ORg4AjUWIQA/Gnt2UlhhQlVMfV5AQmBIYVp/TGpJfl96cVxMZVVBJAtUQF1hTX9SdERjUHtXc3RXQWVY;MzU4OTM4NkAzMjM3MmUzMDJlMzBkS3JYbVdjVzRZdjlOTFVORVdJdXVyWHNwSXBIQ0JQTzU2STBxSDFVSG9ZPQ==;MzU4OTM4N0AzMjM3MmUzMDJlMzBMM1IvWVBQa2JIaTBlNlU2OHkxcEc4eW9kdVBVYTJFTHpqSGowNjFZaXQwPQ==");
+    
+
         // builder.Services.AddSingleton<IMarkerFactory>();
     }
 }
-
-
-
 

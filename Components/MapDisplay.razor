@@ -1,26 +1,5 @@
-@using Syncfusion.Blazor.Maps;
-@using Ellipse.Models;
-
 @namespace Ellipse.Components
 
 
-<SfMaps>
-    <MapsZoomSettings Enable="true">
-        <MapsZoomToolbarSettings>
-            <MapsZoomToolbarButton ToolbarItems="new List<ToolbarItem>() { ToolbarItem.Zoom, ToolbarItem.ZoomIn, ToolbarItem.ZoomOut,
-            ToolbarItem.Pan, ToolbarItem.Reset }"></MapsZoomToolbarButton>
-        </MapsZoomToolbarSettings>
-    </MapsZoomSettings>
-    <MapsLayers>
-        <MapsLayer TValue="string"
-            UrlTemplate="https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/level/tileX/tileY?access_token=pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA">
-            <MapsMarkerSettings>
-                <MapsMarker Visible="true" TValue="PointInfo" LatitudeValuePath="Latitude" LongitudeValuePath="Longitude" DataSource="@(Markers as IEnumerable<object>)" Height="15" Width="15">
-                     <MapsMarkerTooltipSettings Visible="true" ValuePath="Average" Format="County Location: ${Latitude},${Longitude}\nAverage Distance:${Average}">
-                        <MapsMarkerTooltipTextStyle FontFamily="inherit"></MapsMarkerTooltipTextStyle>
-                    </MapsMarkerTooltipSettings>
-                </MapsMarker>
-            </MapsMarkerSettings>
-        </MapsLayer>
-    </MapsLayers>
-</SfMaps>
+<OpenStreetMap @ref="_map" FullScreenControl="true" ZoomControl="false" Style="height:800px; width: 800px;"
+    InitialCenter="new (-78,37)" OnMarkerClick="OnMarkerClick" />
