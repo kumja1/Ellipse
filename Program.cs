@@ -1,9 +1,11 @@
+using Ellipse;
+using Ellipse.Services;
+using Mapbox.AspNetCore.DependencyInjection;
+using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using dotnet80_example;
-using dymaptic.GeoBlazor.Core;
-using dymaptic.GeoBlazor.Core.Model;
-using Microsoft.Extensions.DependencyInjection;
+using MudBlazor.Services;
+
 
 partial class Program
 {
@@ -26,17 +28,19 @@ partial class Program
 
     public static void ConfigureServices(WebAssemblyHostBuilder builder)
     {
-        builder.Services.AddHttpClient<MapService>(client =>
+        builder.Services
+        .AddMudServices()
+        .AddMapBoxServices(options => options.UseApiKey("pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA"))
+        .AddScoped<MapboxGeocoder>()
+        .AddScoped<MapboxClient>()
+        .AddScoped<BusHubLocator>()
+        .AddHttpClient<SiteFinder>(client =>
         {
             client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
         });
 
-        builder.Services.AddGeoBlazor(builder.Configuration);
-        
+
         // builder.Services.AddSingleton<IMarkerFactory>();
     }
 }
-
-
-
 

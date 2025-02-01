@@ -1,8 +1,19 @@
 ﻿@page "/"
-@using Ellipse.Components;
-
-@namespace dotnet80_example.Pages
+@using Ellipse.Components
+@namespace Ellipse.Pages
 
 <PageTitle>Home</PageTitle>
 
-<MapDisplay Markers="@_markers"/>
+<div class="bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200">
+    <!-- Sidebar -->
+    <div class="z-10">
+        @if (_selectedMarker != null)
+        {
+            <Menu CurrentMarker="_selectedMarker" DrawerOpen="_drawerOpen" OnButtonClick="GoToLandSearch" />
+        }
+    </div>
+
+        <div class="w-screen h-screen absolute inset-0">
+            <MapDisplay Markers="_markers" OnMarkerClick="OnMarkerItemClick" />
+        </div>
+</div>

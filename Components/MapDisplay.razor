@@ -1,9 +1,6 @@
-@using dymaptic.GeoBlazor.Core
 @namespace Ellipse.Components
 
-<MapView OnDrag="OnDrag" Latitude="_latitude" Longitude="_longitude" Zoom="_zoom" OnMouseWheel="OnZoom"
-    Style="height: 400px; width: 100%;">
-    <Map>
-        <GraphicsLayer @ref="_graphics" />
-    </Map>
-</MapView>
+
+<OpenStreetMap
+ @ref="_map" FullScreenControl="true" ZoomControl="false" Style="height:800px; width: 800px;"
+    InitialCenter="new (-78,37)" OnMarkerClick="OnMarkerClick" />
