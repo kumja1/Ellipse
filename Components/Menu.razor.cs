@@ -18,11 +18,9 @@ partial class Menu : ComponentBase
     [Parameter] public Action OnButtonClick { get; set; }
 
 
-
-    private string SelectedDistanceMode { get; set; } = "Median Distance";
+    private string SelectedDistanceMode { get; set; } = "Average Distance";
 
     private Dictionary<string, (double Distance, string Duration)> SelectedMarkerDistances => CurrentMarker.Properties["Distances"];
-
     
 
     public void CloseDrawer() => DrawerOpen = false;

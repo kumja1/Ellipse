@@ -6,10 +6,10 @@ namespace Ellipse.Pages;
 
 partial class Home : ComponentBase
 {
-    private IEnumerable<Marker> _markers;
+    private IAsyncEnumerable<Marker> _markers;
 
     [Inject]
-    private MapService MapService { get; set; }
+    private SiteFinder SchoolSiteFinder { get; set; }
 
 
     [Inject]
@@ -22,7 +22,7 @@ partial class Home : ComponentBase
 
     protected override async Task OnInitializedAsync()
     {
-        _markers = await MapService.GetAverageDistances();
+        _markers = SchoolSiteFinder.GetMarkers();
         await base.OnInitializedAsync();
     }
 

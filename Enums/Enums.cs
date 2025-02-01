@@ -70,3 +70,32 @@ public enum Approach
     Unrestricted,
     Curb
 }
+
+
+public enum PlaceType
+{
+    Country,
+    Region,
+    Postcode,
+    District,
+    Place,
+    Locality,
+    Neighborhood,
+    Address
+}
+
+public enum Accuracy
+{
+    Rooftop,
+    Parcel,
+    Point,
+    Interpolated,
+    Intersection,
+    Approximate,
+    Street
+}
+
+public enum GeocodingGeometryType
+{
+    Point
+}
