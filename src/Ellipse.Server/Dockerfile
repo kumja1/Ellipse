@@ -21,6 +21,6 @@ COPY --from=build /app/publish /app
 
 RUN ls -la /app
 
-EXPOSE 8000
+EXPOSE 8080
 
 CMD [ "./Ellipse.Server" ]
