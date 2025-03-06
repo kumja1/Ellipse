@@ -23,4 +23,4 @@ RUN ls -la /app
 
 EXPOSE 8000
 
-ENTRYPOINT ["dotnet", "Ellipse.Server.dll"]
+CMD [ "./Ellipse.Server" ]
