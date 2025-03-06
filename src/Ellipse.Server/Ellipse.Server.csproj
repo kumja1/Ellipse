@@ -7,15 +7,31 @@
   </PropertyGroup>
 
 
-  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <!-- Build optimizations -->
     <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
     <Optimize>true</Optimize>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    
+    <!-- AOT/Trimming configurations -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    
+    <!-- Single-file executable -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    
+    <!-- Runtime performance -->
     <TieredCompilation>true</TieredCompilation>
     <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
     <ServerGarbageCollection>true</ServerGarbageCollection>
-    <PublishSingleFile>true</PublishSingleFile>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    
+    <!-- AOT compilation -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunShowWarnings>true</PublishReadyToRunShowWarnings>
   </PropertyGroup>
 
   <ItemGroup>
