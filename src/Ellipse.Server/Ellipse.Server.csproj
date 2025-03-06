@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.74" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ellipse.Common\Ellipse.Common.csproj" />
+  </ItemGroup>
+
+
+</Project>
