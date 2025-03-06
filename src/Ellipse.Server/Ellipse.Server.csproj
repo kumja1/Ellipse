@@ -15,6 +15,7 @@
     <TieredCompilation>true</TieredCompilation>
     <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
     <ServerGarbageCollection>true</ServerGarbageCollection>
+    <PublishSingleFile>true</PublishSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
