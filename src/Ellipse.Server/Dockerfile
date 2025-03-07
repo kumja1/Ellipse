@@ -19,8 +19,6 @@ WORKDIR /app
 # Copy the published output from build stage
 COPY --from=build /app/publish /app
 
-RUN ls -la /app
-
 EXPOSE 8080
 
 CMD [ "./Ellipse.Server" ]
