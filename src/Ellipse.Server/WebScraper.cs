@@ -1,6 +1,7 @@
 using HtmlAgilityPack;
 using System.Text.Json;
 using System.Net;
+using System.Collections.Concurrent;
 using Ellipse.Common.Models;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -14,25 +15,37 @@ public sealed class WebScraper(int divisionCode)
     private static readonly SemaphoreSlim _semaphore = new(20, 20);
     private static readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
+    private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
+
     private readonly int _divisionCode = divisionCode;
 
-  
+
     public static async Task<string> StartNewAsync(int divisionCode)
     {
-        if (!_cache.TryGetValue(divisionCode, out string? cachedData))
+        if (_cache.TryGetValue(divisionCode, out string? cachedData))
         {
-            var scraper = new WebScraper(divisionCode);
-            cachedData = await scraper.ScrapeAsync();
-
-            var cacheEntryOptions = new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30)
-            };
-
-            _cache.Set(divisionCode, cachedData, cacheEntryOptions);
+            return cachedData!;
         }
 
-        return cachedData!;
+        return await _scrapingTasks.GetOrAdd(divisionCode, async _ =>
+        {
+            try
+            {
+                var scraper = new WebScraper(divisionCode);
+                string result = await scraper.ScrapeAsync();
+
+                var cacheEntryOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30)
+                };
+                _cache.Set(divisionCode, result, cacheEntryOptions);
+                return result;
+            }
+            finally
+            {
+                _scrapingTasks.TryRemove(divisionCode, out var _);
+            }
+        });
     }
 
     public async Task<string> ScrapeAsync()
@@ -42,10 +55,25 @@ public sealed class WebScraper(int divisionCode)
 
         if (totalPages > 1)
         {
-            var remainingTasks = Enumerable.Range(2, totalPages)
-                .Select(ProcessPageAsync);
-            var remainingResults = await Task.WhenAll(remainingTasks);
-            allSchools.AddRange(remainingResults.SelectMany(r => r.Schools));
+            var tasks = Enumerable.Range(2, totalPages)
+                .Select(async page =>
+                {
+                    await _semaphore.WaitAsync();
+                    try
+                    {
+                        var (schools, _) = await ProcessPageAsync(page);
+                        foreach (var school in schools)
+                        {
+                            allSchools.Add(school);
+                        }
+                    }
+                    finally
+                    {
+                        _semaphore.Release();
+                    }
+
+                });
+            await Task.WhenAll(tasks);
         }
 
         return JsonSerializer.Serialize(allSchools);
@@ -110,35 +138,28 @@ public sealed class WebScraper(int divisionCode)
 
     private static async Task<string> FetchPage(string url)
     {
-        await _semaphore.WaitAsync();
-        try
-        {
-            const int maxRetries = 3;
-            int retryDelay = 1000;
+        const int maxRetries = 3;
+        int retryDelay = 1000;
 
-            for (int i = 0; i < maxRetries; i++)
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
             {
-                try
-                {
-                    using var response = await _httpClient.GetAsync(url);
-                    if (response.IsSuccessStatusCode)
-                        return await response.Content.ReadAsStringAsync();
+                using var response = await _httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                    return await response.Content.ReadAsStringAsync();
 
-                    if ((int)response.StatusCode >= 500)
-                        await Task.Delay(retryDelay);
-                }
-                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-                {
-                    if (i == maxRetries - 1) break;
+                if ((int)response.StatusCode >= 500)
                     await Task.Delay(retryDelay);
-                    retryDelay *= 2;
-                }
             }
-            return string.Empty;
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                if (i == maxRetries - 1) break;
+                await Task.Delay(retryDelay);
+                retryDelay *= 2;
+            }
         }
-        finally
-        {
-            _semaphore.Release();
-        }
+        return string.Empty;
+
     }
 }
