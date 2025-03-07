@@ -1,27 +1,43 @@
-using HtmlAgilityPack;
+using AngleSharp;
+using AngleSharp.Dom;
 using System.Text.Json;
 using System.Net;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Ellipse.Common.Models;
 using Microsoft.Extensions.Caching.Memory;
+using AngleSharp.Io;
 
 namespace Ellipse.Server;
 
-public sealed class WebScraper(int divisionCode)
+public sealed class WebScraper
 {
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
-    private static readonly HttpClient _httpClient = new(new HttpClientHandler { MaxConnectionsPerServer = 20 });
-    private static readonly SemaphoreSlim _semaphore = new(20, 20);
+
     private static readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
-    private readonly int _divisionCode = divisionCode;
+    private readonly int _divisionCode;
+    private readonly IBrowsingContext _browsingContext;
+
+    public WebScraper(int divisionCode)
+    {
+        _divisionCode = divisionCode;
+
+        _browsingContext = BrowsingContext.New(
+            Configuration
+            .Default
+            .WithDefaultLoader()
+        );
+    }
 
     public static async Task<string> StartNewAsync(int divisionCode)
     {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Starting scrape for division {divisionCode}");
         if (_cache.TryGetValue(divisionCode, out string? cachedData))
         {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Cache hit for division {divisionCode}");
             return cachedData!;
         }
 
@@ -29,19 +45,23 @@ public sealed class WebScraper(int divisionCode)
         {
             try
             {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] No cache; creating new scraper instance for division {divisionCode}");
                 var scraper = new WebScraper(divisionCode);
                 string result = await scraper.ScrapeAsync().ConfigureAwait(false);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Scrape completed for division {divisionCode}");
 
                 var cacheEntryOptions = new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30)
                 };
                 _cache.Set(divisionCode, result, cacheEntryOptions);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Result cached for division {divisionCode}");
                 return result;
             }
             finally
             {
                 _scrapingTasks.TryRemove(divisionCode, out var _);
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Removed division {divisionCode} from active tasks");
             }
         }).ConfigureAwait(false);
     }
@@ -49,116 +69,98 @@ public sealed class WebScraper(int divisionCode)
     public async Task<string> ScrapeAsync()
     {
         var (firstPageSchools, totalPages) = await ProcessPageAsync(1).ConfigureAwait(false);
-        var allSchools = new List<SchoolData>(firstPageSchools);
+        var queue = new ConcurrentQueue<SchoolData>(firstPageSchools);
 
         if (totalPages > 1)
         {
-            var pageTasks = Enumerable.Range(2, totalPages - 1)
-                .Select(async page =>
-                {
-                    await _semaphore.WaitAsync().ConfigureAwait(false);
-                    try
-                    {
-                        var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
-                        return schools;
-                    }
-                    finally
-                    {
-                        _semaphore.Release();
-                    }
-                });
-
-            var results = await Task.WhenAll(pageTasks).ConfigureAwait(false);
-            foreach (var pageSchools in results)
+            var pages = Enumerable.Range(2, totalPages - 1);
+            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 30 }, async (page, token) =>
             {
-                allSchools.AddRange(pageSchools);
-            }
+                var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
+                foreach (var school in schools)
+                {
+                    queue.Enqueue(school);
+                }
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Processed page {page}, found {schools.Count} schools");
+            }).ConfigureAwait(false);
         }
 
+        var allSchools = queue.ToList();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Total schools scraped: {allSchools.Count}");
         return JsonSerializer.Serialize(allSchools);
     }
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ProcessPageAsync(int page)
     {
-        var url = $"{BaseUrl}/page/{page}?division={_divisionCode}&filter=";
-        var html = await FetchPage(url).ConfigureAwait(false);
-        var doc = new HtmlDocument();
-        doc.LoadHtml(html);
+        var pageSw = Stopwatch.StartNew();
+        var url = $"{BaseUrl}/page/{page}?division={_divisionCode}";
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url}");
 
-        var schools = await ExtractSchoolData(doc).ConfigureAwait(false);
-        var totalPages = ParseTotalPages(doc);
-        return (schools, totalPages);
-    }
+        var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetched HTML for page {page}");
 
-    private async Task<List<SchoolData>> ExtractSchoolData(HtmlDocument doc)
-    {
-        var rows = doc.DocumentNode.SelectNodes("//table/tbody/tr") ?? new HtmlNodeCollection(null);
-        var tasks = rows.Select(ProcessRowAsync).ToList();
+        var rows = document.QuerySelectorAll("table > tbody > tr");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ExtractSchoolData] Found {rows.Length} rows in table");
+
+        var tasks = rows.Select(ProcessRowAsync);
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-        return results.Where(s => s != null).Cast<SchoolData>().ToList();
+        var schoolList = results.Where(s => s != null).Cast<SchoolData>().ToList();
+
+        int totalPages = ParseTotalPages(document);
+        pageSw.Stop();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Page {page}: Processed in {pageSw.ElapsedMilliseconds} ms, Found {schoolList.Count} schools; Total pages: {totalPages}");
+        return (schoolList, totalPages);
     }
 
-    private async Task<SchoolData?> ProcessRowAsync(HtmlNode row)
+    private async Task<SchoolData?> ProcessRowAsync(IElement row)
     {
-        var nameCell = row.SelectSingleNode("td[1]");
-        if (nameCell == null) return null;
+        var nameCell = row.QuerySelector("td:nth-of-type(1)");
+        if (nameCell == null)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] No name cell found; skipping row");
+            return null;
+        }
 
-        var name = WebUtility.HtmlDecode(nameCell.InnerText).Trim();
+        var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
         var cleanedName = name.ToLower().Replace(" ", "-");
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Processing school: {name} (cleaned: {cleanedName})");
 
-        var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
+        var addressTask = FetchAddressAsync(cleanedName).ConfigureAwait(false);
+
+        var cell2 = row.QuerySelector("td:nth-of-type(2)")?.TextContent.Trim() ?? "";
+        var cell3 = row.QuerySelector("td:nth-of-type(3)")?.TextContent.Trim() ?? "";
 
         return new SchoolData(
             name,
-            row.SelectSingleNode("td[2]")?.InnerText.Trim() ?? "",
-            row.SelectSingleNode("td[3]")?.InnerText.Trim() ?? "",
-            address,
+            cell2,
+            cell3,
+            await addressTask,
             GeoPoint2d.Zero
         );
     }
 
     private async Task<string> FetchAddressAsync(string cleanedName)
     {
-        var infoHtml = await FetchPage($"{SchoolInfoUrl}/{cleanedName}").ConfigureAwait(false);
-        var infoDoc = new HtmlDocument();
-        infoDoc.LoadHtml(infoHtml);
-        var address = infoDoc.DocumentNode
-            .SelectSingleNode("//span[@itemprop='streetAddress']")?.InnerText.Trim() ?? "";
+        var url = $"{SchoolInfoUrl}/{cleanedName}";
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetching address from URL: {url}");
 
+        var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetched address HTML for {cleanedName} ");
+
+        var addressElement = document.QuerySelector("span[itemprop='streetAddress']");
+        var address = addressElement?.TextContent.Trim() ?? "";
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Parsed address: {address}");
         return address;
     }
 
-    private static int ParseTotalPages(HtmlDocument doc)
+    private static int ParseTotalPages(IDocument document)
     {
-        var paginationNodes = doc.DocumentNode.SelectNodes("//a[contains(@class, 'page-numbers')]");
-        return paginationNodes?.Select(n => int.TryParse(n.InnerText, out var page) ? page : 0)
+        var paginationElements = document.QuerySelectorAll("a.page-numbers");
+        int totalPages = paginationElements
+            .Select(e => int.TryParse(e.TextContent, out var p) ? p : 0)
             .DefaultIfEmpty(1)
-            .Max() ?? 1;
-    }
-
-    private static async Task<string> FetchPage(string url)
-    {
-        const int maxRetries = 3;
-        int retryDelay = 1000;
-
-        for (int i = 0; i < maxRetries; i++)
-        {
-            try
-            {
-                using var response = await _httpClient.GetAsync(url).ConfigureAwait(false);
-                if (response.IsSuccessStatusCode)
-                    return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                if ((int)response.StatusCode >= 500)
-                    await Task.Delay(retryDelay).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-            {
-                if (i == maxRetries - 1) break;
-                await Task.Delay(retryDelay).ConfigureAwait(false);
-                retryDelay *= 2;
-            }
-        }
-        return string.Empty;
+            .Max();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ParseTotalPages] Total pages determined: {totalPages}");
+        return totalPages;
     }
 }
