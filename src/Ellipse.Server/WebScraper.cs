@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Ellipse.Common.Models;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text.RegularExpressions;
 
 namespace Ellipse.Server;
 
@@ -121,7 +122,8 @@ public sealed class WebScraper
         }
 
         var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
-        var cleanedName = name.ToLower().Replace(" ", "-");
+        var cleanedName = Regex.Replace(name.ToLower(), @"[.\s]+", "-", RegexOptions.Compiled);
+
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Processing school: {name} (cleaned: {cleanedName})");
 
         var addressTask = FetchAddressAsync(cleanedName).ConfigureAwait(false);

@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ellipse.Server.Controllers;
 
 [ApiController]
+[EnableCors("AllowAll")]
 [Route("api/[controller]")]
 public class SchoolsController : ControllerBase
 {

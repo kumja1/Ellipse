@@ -15,11 +15,12 @@ public static class Program
             app.UseSwaggerUI();
         }
 
+
+        app.UseRouting();
+
         app.UseCors("AllowAll");
         app.UseHttpsRedirection();
-
         app.MapControllers();
-
         app.Run();
     }
 
@@ -31,7 +32,8 @@ public static class Program
                     {
                         policy.AllowAnyOrigin()
                               .AllowAnyMethod()  
-                              .AllowAnyHeader();
+                              .AllowAnyHeader()
+                              .Build();
                     });
                 }); builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
