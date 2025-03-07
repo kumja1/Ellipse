@@ -32,6 +32,7 @@ partial class Program
         .AddMudServices()
         .AddMapBoxServices(options => options.UseApiKey("pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA"))
         .AddScoped<MapboxGeocoder>()
+        .AddScoped<GeoService>()
         .AddScoped<MapboxClient>()
         .AddScoped<SiteFinderService>()
         .AddHttpClient<SchoolLocatorService>(client =>

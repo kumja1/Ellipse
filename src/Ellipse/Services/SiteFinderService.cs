@@ -21,7 +21,7 @@ public class SiteFinderService(GeoService geocoder, MapboxClient mapboxService, 
         if (schools.Count == 0)
             yield break;
 
-        var latLngs = schools.Select(school => school.LatLng).ToList();
+        var latLngs = schools.Select(school => school.LatLng);
         var boundingBox = new BoundingBox(latLngs);
 
         foreach (var batch in GenerateGrid(boundingBox).Chunk(5))
@@ -35,10 +35,11 @@ public class SiteFinderService(GeoService geocoder, MapboxClient mapboxService, 
         }
     }
 
-    async Task<Marker?> GetMarker(List<SchoolData> schools, List<GeoPoint2d> latLngs, (double x, double y) point)
+    async Task<Marker?> GetMarker(List<SchoolData> schools, IEnumerable<GeoPoint2d> latLngs, (double x, double y) point)
     {
         var (x, y) = point;
-        var distances = await GetDistances(schools, latLngs, x, y);
+        var distances = await GetDistances(schools, latLngs, x, y).ConfigureAwait(false);
+        var addressTask =  _geocoder.GetAddressCached(x, y);
         if (distances.Count == 0)
             return null;
 
@@ -50,7 +51,7 @@ public class SiteFinderService(GeoService geocoder, MapboxClient mapboxService, 
         {
             Properties =
                 {
-                    ["Name"] = await _geocoder.GetAddressCached(x, y),
+                    ["Name"] = await addressTask.ConfigureAwait(false),
                     ["Distances"] = distances,
                 },
             Scale = 0.1,
@@ -87,7 +88,7 @@ public class SiteFinderService(GeoService geocoder, MapboxClient mapboxService, 
                 yield return (x, y);
     }
 
-    private async Task<Dictionary<string, (double Distance, string Duration)>> GetDistances(List<SchoolData> schools, List<GeoPoint2d> destinations, double sourceX, double sourceY)
+    private async Task<Dictionary<string, (double Distance, string Duration)>> GetDistances(List<SchoolData> schools, IEnumerable<GeoPoint2d> destinations, double sourceX, double sourceY)
     {
         try
         {
@@ -107,8 +108,6 @@ public class SiteFinderService(GeoService geocoder, MapboxClient mapboxService, 
                 request.Waypoints = [destination, sourceGeoPoint];
                 var response = await _mapboxService.GetDirectionsAsync(request);
                 if (response == null) return;
-                if (response.Routes.Count > 1)
-                    response.Routes.Sort((r1, r2) => r1.Duration.CompareTo(r2.Duration));
                 var route = response.Routes[0];
                 distances[schools[i].Name] = (MetersToMiles(route.Distance), $"{route.Duration}|{FormatTimeSpan(TimeSpan.FromSeconds(route.Duration))}");
             });
@@ -133,9 +132,9 @@ public record BoundingBox
     public double MinLng { get; }
     public double MaxLng { get; }
 
-    public BoundingBox(List<GeoPoint2d> latLngs)
+    public BoundingBox(IEnumerable<GeoPoint2d> latLngs)
     {
-        if (latLngs.Count == 0)
+        if (latLngs.Any())
             throw new ArgumentException("LatLngs list cannot be empty", nameof(latLngs));
 
         MinLat = latLngs.Min(latLng => latLng.Lat);

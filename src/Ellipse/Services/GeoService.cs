@@ -2,9 +2,11 @@ using Ellipse.Common.Models;
 using Mapbox.AspNetCore.Models;
 using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
 
-public class GeoService
+namespace Ellipse.Services;
+
+public class GeoService(MapboxGeocoder geocoder)
 {
-    private readonly MapboxGeocoder _geocoder;
+    private readonly MapboxGeocoder _geocoder = geocoder;
 
     private readonly Dictionary<GeoPoint2d, string> _addressCache = new();
 

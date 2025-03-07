@@ -8,7 +8,6 @@ public sealed class SchoolLocatorService : IDisposable
 {
     private readonly GeoService _geoService;
     private readonly HttpClient _httpClient;
-    private readonly SemaphoreSlim _semaphore = new(5);
 
     private readonly Dictionary<string, int> _divisionCodes = new()
     {
@@ -34,10 +33,6 @@ public sealed class SchoolLocatorService : IDisposable
         _geoService = geoService;
         _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromMinutes(3);
-        _httpClient.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
-        _httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
-        _httpClient.DefaultRequestHeaders.Add("Sec-Fetch-Mode", "navigate");
-        _httpClient.DefaultRequestHeaders.Add("Sec-Fetch-Site", "same-origin");
     }
 
     private async Task<GeoPoint2d> FetchGeoLocation(string name)
@@ -77,23 +72,16 @@ public sealed class SchoolLocatorService : IDisposable
 
     private async Task<IAsyncEnumerable<SchoolData>> ProcessDivision(string name, int code)
     {
-        await _semaphore.WaitAsync();
-        try
-        {
-            Console.WriteLine($"[ProcessDivision] Starting {name}");
 
-            var result = await _httpClient.PostAsync("", new FormUrlEncodedContent([
-                new KeyValuePair<string, string>("divisionCode", code.ToString())
-            ]));
+        Console.WriteLine($"[ProcessDivision] Starting {name}");
 
-            var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>() ?? [];
+        var result = await _httpClient.PostAsync("https://changing-kayley-lum-studios-c585327d.koyeb.app/api/schools/get-schools", new FormUrlEncodedContent([
+            new KeyValuePair<string, string>("divisionCode", code.ToString())
+        ]));
 
-            return FetchGeoLocations(schools);
-        }
-        finally
-        {
-            _semaphore.Release();
-        }
+        var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>() ?? [];
+
+        return FetchGeoLocations(schools);
     }
 
     private async IAsyncEnumerable<SchoolData> FetchGeoLocations(List<SchoolData> schools)
@@ -105,9 +93,5 @@ public sealed class SchoolLocatorService : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _httpClient.Dispose();
-        _semaphore.Dispose();
-    }
+    public void Dispose() => _httpClient.Dispose();
 }
