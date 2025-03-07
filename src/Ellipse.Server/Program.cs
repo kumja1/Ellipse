@@ -15,6 +15,7 @@ public static class Program
             app.UseSwaggerUI();
         }
 
+        app.UseCors();
         app.UseHttpsRedirection();
 
         app.MapControllers();
@@ -24,6 +25,7 @@ public static class Program
 
     public static void ConfigureServices(WebApplicationBuilder builder)
     {
+        builder.Services.AddCors();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
         builder.Services.AddSwaggerGen();

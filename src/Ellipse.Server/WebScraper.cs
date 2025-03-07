@@ -6,7 +6,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Ellipse.Common.Models;
 using Microsoft.Extensions.Caching.Memory;
-using AngleSharp.Io;
 
 namespace Ellipse.Server;
 
