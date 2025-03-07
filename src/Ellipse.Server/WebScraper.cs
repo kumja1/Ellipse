@@ -12,7 +12,6 @@ public sealed class WebScraper(int divisionCode)
     private static readonly HttpClient _httpClient = new();
     private static readonly Dictionary<int, string> _cache = [];
 
-    private static readonly SemaphoreSlim _semaphore = new(5, 20);
     private readonly int _divisionCode = divisionCode;
 
     public static async Task<string> StartNewAsync(int divisionCode)
@@ -72,8 +71,6 @@ public sealed class WebScraper(int divisionCode)
 
         var tasks = rows.Select(async row =>
         {
-              try {
-                await _semaphore.WaitAsync();
                 var name = row.SelectSingleNode("td[1]")?.InnerText.Trim() ?? "";
                 var detailUrl = $"{SchoolInfoUrl}/{name.Replace(' ', '-').ToLower()}";
                 var schoolInfoDoc = new HtmlDocument();
@@ -88,9 +85,7 @@ public sealed class WebScraper(int divisionCode)
                     row.SelectSingleNode("td[3]")?.InnerText.Trim() ?? "",
                     address,
                     GeoPoint2d.Zero
-                );} finally {
-                    _semaphore.Release();
-                }
+                );
         }).ToList();
 
         schools.AddRange(await Task.WhenAll(tasks));
