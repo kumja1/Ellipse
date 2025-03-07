@@ -13,11 +13,6 @@
     <DebugSymbols>false</DebugSymbols>
     <Optimize>true</Optimize>
 
-    <!-- AOT/Trimming configurations -->
-    <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>partial</TrimMode>
-    <TrimmerDefaultAction>link</TrimmerDefaultAction>
-
     <!-- Single-file executable -->
     <PublishSingleFile>true</PublishSingleFile>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
