@@ -1,7 +1,12 @@
 using HtmlAgilityPack;
 using System.Text;
 using System.Text.Json;
+using System.Net;
 using Ellipse.Common.Models;
+using Ellipse.Server.Extensions;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using System.Buffers;
 
 namespace Ellipse.Server;
 
@@ -9,123 +14,117 @@ public sealed class WebScraper(int divisionCode)
 {
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
-    private static readonly HttpClient _httpClient = new();
-    private static readonly Dictionary<int, string> _cache = [];
+    private static readonly HttpClient _httpClient = new(new HttpClientHandler { MaxConnectionsPerServer = 20 });
+    private static readonly ConcurrentDictionary<int, string> _cache = [];
 
     private readonly int _divisionCode = divisionCode;
 
     public static async Task<string> StartNewAsync(int divisionCode)
     {
-        if (!_cache.TryGetValue(divisionCode, out var results))
+        return await _cache.GetOrAddAsync(divisionCode, async code =>
         {
-            var scraper = new WebScraper(divisionCode);
-            results = await scraper.ScrapeAsync();
-        }
-
-        Console.WriteLine("Using Cached Result");
-        return results;
+            var scraper = new WebScraper(code);
+            return await scraper.ScrapeAsync();
+        });
     }
 
     public async Task<string> ScrapeAsync()
     {
-        using var memoryStream = new MemoryStream();
-        await using var writer = new Utf8JsonWriter(memoryStream);
+        var (schools, totalPages) = await ProcessPageAsync(1);
+        var allSchools = new List<SchoolData>(schools);
 
-        writer.WriteStartArray();
-        var results = new List<SchoolData>();
-
-        int page = 1, totalPages = 1;
-        var pageTasks = new List<Task<(List<SchoolData> Schools, int TotalPages)>>();
-
-        do
+        if (totalPages > 1)
         {
-            pageTasks.Add(ProcessPageAsync(page));
-            page++;
-        } while (page <= totalPages);
-
-        var pageResults = await Task.WhenAll(pageTasks);
-        foreach (var schools in pageResults.SelectMany(s => s.Schools))
-        {
-            JsonSerializer.Serialize(writer, schools);
+            var remainingTasks = Enumerable.Range(2, totalPages - 1)
+                .Select(ProcessPageAsync);
+            var remainingResults = await Task.WhenAll(remainingTasks);
+            allSchools.AddRange(remainingResults.SelectMany(r => r.Schools));
         }
 
-        writer.WriteEndArray(); 
-        await writer.FlushAsync();
-        var jsonString = Encoding.UTF8.GetString(memoryStream.ToArray());
-        _cache[_divisionCode] = jsonString;
-        return jsonString;
+        return JsonSerializer.Serialize(allSchools);
     }
+
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ProcessPageAsync(int page)
     {
         var url = $"{BaseUrl}/page/{page}?division={_divisionCode}&filter=";
+        var html = await FetchPage(url);
         var doc = new HtmlDocument();
-        doc.LoadHtml(await FetchPage(url));
-        return (Schools: await ExtractSchoolData(doc), TotalPages: ParseTotalPages(doc));
+        doc.LoadHtml(html);
+
+        var schools = await ExtractSchoolData(doc);
+        var totalPages = ParseTotalPages(doc);
+        return (schools, totalPages);
     }
 
     private async Task<List<SchoolData>> ExtractSchoolData(HtmlDocument doc)
     {
-        var schools = new List<SchoolData>();
         var rows = doc.DocumentNode.SelectNodes("//table/tbody/tr") ?? new HtmlNodeCollection(null);
-
-        var tasks = rows.Select(async row =>
-        {
-                var name = row.SelectSingleNode("td[1]")?.InnerText.Trim() ?? "";
-                var detailUrl = $"{SchoolInfoUrl}/{name.Replace(' ', '-').ToLower()}";
-                var schoolInfoDoc = new HtmlDocument();
-                schoolInfoDoc.LoadHtml(await FetchPage(detailUrl));
-
-                var address = schoolInfoDoc.DocumentNode
-                    .SelectSingleNode("//span[@itemprop='streetAddress']")?.InnerText.Trim() ?? "";
-
-                return new SchoolData(
-                    name,
-                    row.SelectSingleNode("td[2]")?.InnerText.Trim() ?? "",
-                    row.SelectSingleNode("td[3]")?.InnerText.Trim() ?? "",
-                    address,
-                    GeoPoint2d.Zero
-                );
-        }).ToList();
-
-        schools.AddRange(await Task.WhenAll(tasks));
-        return schools;
+        var tasks = rows.Select(ProcessRowAsync).ToList();
+        var results = await Task.WhenAll(tasks);
+        return results.Where(s => s != null).Cast<SchoolData>().ToList();
     }
 
-    private int ParseTotalPages(HtmlDocument doc)
+    private async Task<SchoolData?> ProcessRowAsync(HtmlNode row)
     {
-        var pageNodes = doc.DocumentNode.SelectNodes("//div[contains(@class, 'pagination')]//a[@class='page-numbers']");
-        if (pageNodes == null) return 1;
+        var nameCell = row.SelectSingleNode("td[1]");
+        if (nameCell == null) return null;
 
-        return pageNodes
-            .Select(node => int.TryParse(node.InnerText, out var pageNumber) ? pageNumber : 0)
+        var name = WebUtility.HtmlDecode(nameCell.InnerText).Trim();
+        var cleanedName = name.ToLower().Replace(" ", "-");
+
+        var address = await FetchAddressAsync(cleanedName);
+
+        return new SchoolData(
+            name,
+            row.SelectSingleNode("td[2]")?.InnerText.Trim() ?? "",
+            row.SelectSingleNode("td[3]")?.InnerText.Trim() ?? "",
+            address,
+            GeoPoint2d.Zero
+        );
+    }
+
+    private async Task<string> FetchAddressAsync(string cleanedName)
+    {
+        var infoDoc = new HtmlDocument();
+        infoDoc.LoadHtml(await FetchPage($"{SchoolInfoUrl}/{cleanedName}"));
+        var address = infoDoc.DocumentNode
+            .SelectSingleNode("//span[@itemprop='streetAddress']")?.InnerText.Trim() ?? "";
+
+        return address;
+    }
+
+    private static int ParseTotalPages(HtmlDocument doc)
+    {
+        var paginationNodes = doc.DocumentNode.SelectNodes("//a[contains(@class, 'page-numbers')]");
+        return paginationNodes?.Select(n => int.TryParse(n.InnerText, out var page) ? page : 0)
             .DefaultIfEmpty(1)
-            .Max();
+            .Max() ?? 1;
     }
 
     private static async Task<string> FetchPage(string url)
     {
-        try
+        const int maxRetries = 3;
+        int retryDelay = 1000;
+
+        for (int i = 0; i < maxRetries; i++)
         {
-            using var response = await _httpClient.GetAsync(url);
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                Console.WriteLine($"Failed to fetch {url}: {response.StatusCode}");
-                return "";
+                using var response = await _httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                    return await response.Content.ReadAsStringAsync();
+
+                if ((int)response.StatusCode >= 500)
+                    await Task.Delay(retryDelay);
             }
-            return await response.Content.ReadAsStringAsync();
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                if (i == maxRetries - 1) break;
+                await Task.Delay(retryDelay);
+                retryDelay *= 2;
+            }
         }
-        catch (HttpRequestException e)
-        {
-            Console.WriteLine($"Network error while fetching {url}: {e.Message}");
-        }
-        catch (TaskCanceledException)
-        {
-            Console.WriteLine($"Timeout while fetching {url}");
-        }
-        return "";
+        return string.Empty;
     }
-
-
-
 }
