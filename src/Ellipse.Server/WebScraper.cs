@@ -14,11 +14,9 @@ public sealed class WebScraper(int divisionCode)
     private static readonly HttpClient _httpClient = new(new HttpClientHandler { MaxConnectionsPerServer = 20 });
     private static readonly SemaphoreSlim _semaphore = new(20, 20);
     private static readonly MemoryCache _cache = new(new MemoryCacheOptions());
-
     private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
     private readonly int _divisionCode = divisionCode;
-
 
     public static async Task<string> StartNewAsync(int divisionCode)
     {
@@ -32,7 +30,7 @@ public sealed class WebScraper(int divisionCode)
             try
             {
                 var scraper = new WebScraper(divisionCode);
-                string result = await scraper.ScrapeAsync();
+                string result = await scraper.ScrapeAsync().ConfigureAwait(false);
 
                 var cacheEntryOptions = new MemoryCacheEntryOptions
                 {
@@ -45,35 +43,36 @@ public sealed class WebScraper(int divisionCode)
             {
                 _scrapingTasks.TryRemove(divisionCode, out var _);
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     public async Task<string> ScrapeAsync()
     {
-        var (schools, totalPages) = await ProcessPageAsync(1);
-        var allSchools = new List<SchoolData>(schools);
+        var (firstPageSchools, totalPages) = await ProcessPageAsync(1).ConfigureAwait(false);
+        var allSchools = new List<SchoolData>(firstPageSchools);
 
         if (totalPages > 1)
         {
-            var tasks = Enumerable.Range(2, totalPages)
+            var pageTasks = Enumerable.Range(2, totalPages - 1)
                 .Select(async page =>
                 {
-                    await _semaphore.WaitAsync();
+                    await _semaphore.WaitAsync().ConfigureAwait(false);
                     try
                     {
-                        var (schools, _) = await ProcessPageAsync(page);
-                        foreach (var school in schools)
-                        {
-                            allSchools.Add(school);
-                        }
+                        var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
+                        return schools;
                     }
                     finally
                     {
                         _semaphore.Release();
                     }
-
                 });
-            await Task.WhenAll(tasks);
+
+            var results = await Task.WhenAll(pageTasks).ConfigureAwait(false);
+            foreach (var pageSchools in results)
+            {
+                allSchools.AddRange(pageSchools);
+            }
         }
 
         return JsonSerializer.Serialize(allSchools);
@@ -82,11 +81,11 @@ public sealed class WebScraper(int divisionCode)
     private async Task<(List<SchoolData> Schools, int TotalPages)> ProcessPageAsync(int page)
     {
         var url = $"{BaseUrl}/page/{page}?division={_divisionCode}&filter=";
-        var html = await FetchPage(url);
+        var html = await FetchPage(url).ConfigureAwait(false);
         var doc = new HtmlDocument();
         doc.LoadHtml(html);
 
-        var schools = await ExtractSchoolData(doc);
+        var schools = await ExtractSchoolData(doc).ConfigureAwait(false);
         var totalPages = ParseTotalPages(doc);
         return (schools, totalPages);
     }
@@ -95,7 +94,7 @@ public sealed class WebScraper(int divisionCode)
     {
         var rows = doc.DocumentNode.SelectNodes("//table/tbody/tr") ?? new HtmlNodeCollection(null);
         var tasks = rows.Select(ProcessRowAsync).ToList();
-        var results = await Task.WhenAll(tasks);
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
         return results.Where(s => s != null).Cast<SchoolData>().ToList();
     }
 
@@ -107,7 +106,7 @@ public sealed class WebScraper(int divisionCode)
         var name = WebUtility.HtmlDecode(nameCell.InnerText).Trim();
         var cleanedName = name.ToLower().Replace(" ", "-");
 
-        var address = await FetchAddressAsync(cleanedName);
+        var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
 
         return new SchoolData(
             name,
@@ -120,8 +119,9 @@ public sealed class WebScraper(int divisionCode)
 
     private async Task<string> FetchAddressAsync(string cleanedName)
     {
+        var infoHtml = await FetchPage($"{SchoolInfoUrl}/{cleanedName}").ConfigureAwait(false);
         var infoDoc = new HtmlDocument();
-        infoDoc.LoadHtml(await FetchPage($"{SchoolInfoUrl}/{cleanedName}"));
+        infoDoc.LoadHtml(infoHtml);
         var address = infoDoc.DocumentNode
             .SelectSingleNode("//span[@itemprop='streetAddress']")?.InnerText.Trim() ?? "";
 
@@ -145,21 +145,20 @@ public sealed class WebScraper(int divisionCode)
         {
             try
             {
-                using var response = await _httpClient.GetAsync(url);
+                using var response = await _httpClient.GetAsync(url).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
-                    return await response.Content.ReadAsStringAsync();
+                    return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
                 if ((int)response.StatusCode >= 500)
-                    await Task.Delay(retryDelay);
+                    await Task.Delay(retryDelay).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 if (i == maxRetries - 1) break;
-                await Task.Delay(retryDelay);
+                await Task.Delay(retryDelay).ConfigureAwait(false);
                 retryDelay *= 2;
             }
         }
         return string.Empty;
-
     }
 }
