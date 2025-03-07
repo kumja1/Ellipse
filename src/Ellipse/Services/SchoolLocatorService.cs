@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Collections.Concurrent;
 using Ellipse.Common.Models;
 
 namespace Ellipse.Services;
@@ -49,28 +48,14 @@ public sealed class SchoolLocatorService : IDisposable
             .Select(kvp => ProcessDivision(kvp.Key, kvp.Value))
             .ToList();
 
-        var schools = new List<SchoolData>();
-        var queue = new ConcurrentQueue<IAsyncEnumerable<SchoolData>>();
-
-        foreach (var task in tasks)
-        {
-            queue.Enqueue(await task);
-        }
-
-        while (queue.TryDequeue(out var divisionResults))
-        {
-            await foreach (var school in divisionResults)
-            {
-                schools.Add(school);
-            }
-        }
+        var schools = (await Task.WhenAll(tasks).ConfigureAwait(false)).SelectMany(e => e);
 
         Console.WriteLine("[GetSchools] Completed.");
-        return schools;
+        return schools.ToList();
     }
 
 
-    private async Task<IAsyncEnumerable<SchoolData>> ProcessDivision(string name, int code)
+    private async Task<List<SchoolData>> ProcessDivision(string name, int code)
     {
 
         Console.WriteLine($"[ProcessDivision] Starting {name}");
@@ -80,17 +65,14 @@ public sealed class SchoolLocatorService : IDisposable
         ]));
 
         var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>() ?? [];
+        var tasks = schools.Select(school => FetchGeoLocation(school.Address)).ToList();
 
-        return FetchGeoLocations(schools);
-    }
-
-    private async IAsyncEnumerable<SchoolData> FetchGeoLocations(List<SchoolData> schools)
-    {
-        foreach (var school in schools)
+        for (int i = 0; i < tasks.Count; i++)
         {
-            var latLng = await FetchGeoLocation(school.Address);
-            yield return school with { LatLng = latLng };
+            schools[i] = schools[i] with { LatLng = await tasks[i] };
         }
+
+        return schools;
     }
 
     public void Dispose() => _httpClient.Dispose();

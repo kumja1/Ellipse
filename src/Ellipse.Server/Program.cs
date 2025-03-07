@@ -15,7 +15,7 @@ public static class Program
             app.UseSwaggerUI();
         }
 
-        app.UseCors();
+        app.UseCors("AllowAll");
         app.UseHttpsRedirection();
 
         app.MapControllers();
@@ -25,8 +25,15 @@ public static class Program
 
     public static void ConfigureServices(WebApplicationBuilder builder)
     {
-        builder.Services.AddCors();
-        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddCors(options =>
+                {
+                    options.AddPolicy("AllowAll", policy =>
+                    {
+                        policy.AllowAnyOrigin()
+                              .AllowAnyMethod()  
+                              .AllowAnyHeader();
+                    });
+                }); builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
         builder.Services.AddSwaggerGen();
     }

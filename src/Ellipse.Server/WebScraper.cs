@@ -146,7 +146,7 @@ public sealed class WebScraper
         var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetched address HTML for {cleanedName} ");
 
-        var addressElement = document.QuerySelector("[itemprop='address'] span[itemprop='streetAddress'], span[itemtype='http://schema.org/PostalAddress'] span");
+        var addressElement = document.QuerySelector("span[itemprop='streetAddress'], span[itemtype='http://schema.org/PostalAddress'] span");
         var address = addressElement?.TextContent.Trim() ?? "";
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Parsed address: {address}");
         return address;
