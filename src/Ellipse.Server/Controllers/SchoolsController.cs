@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ellipse.Server.Controllers;
@@ -6,6 +7,7 @@ namespace Ellipse.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequestTimeout("ResponseTimeout")]
 public class SchoolsController : ControllerBase
 {
     // POST api/schools/get-schools
