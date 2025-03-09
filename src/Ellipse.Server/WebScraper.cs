@@ -32,10 +32,10 @@ public sealed class WebScraper
         );
     }
 
-    public static async Task<string> StartNewAsync(int divisionCode)
+    public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Starting scrape for division {divisionCode}");
-        if (_cache.TryGetValue(divisionCode, out string? cachedData))
+        if (_cache.TryGetValue(divisionCode, out string? cachedData) && !overrideCache)
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Cache hit for division {divisionCode}");
             return cachedData!;
@@ -148,7 +148,7 @@ public sealed class WebScraper
         var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetched address HTML for {cleanedName} ");
 
-        var addressElement = document.QuerySelector("span[itemprop='streetAddress'], span[itemtype='http://schema.org/PostalAddress'] span");
+        var addressElement = document.QuerySelector("span[itemprop='address'] span[itemprop='streetAddress'],  span[itemprop='streetAddress'], span[itemtype='http://schema.org/PostalAddress'] span");
         var address = addressElement?.TextContent.Trim() ?? "";
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Parsed address: {address}");
         return address;

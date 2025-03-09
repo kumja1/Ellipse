@@ -5,7 +5,7 @@ using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
-
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 
 partial class Program
 {
@@ -39,6 +39,7 @@ partial class Program
         {
             client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
         });
+
 
 
         // builder.Services.AddSingleton<IMarkerFactory>();

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Ellipse.Common.Models;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 
 namespace Ellipse.Services;
 
@@ -31,7 +32,7 @@ public sealed class SchoolLocatorService : IDisposable
     {
         _geoService = geoService;
         _httpClient = httpClient;
-        _httpClient.Timeout = TimeSpan.FromMinutes(3);
+        _httpClient.Timeout = TimeSpan.FromMinutes(6);
     }
 
     private async Task<GeoPoint2d> FetchGeoLocation(string name)
@@ -59,10 +60,13 @@ public sealed class SchoolLocatorService : IDisposable
     {
 
         Console.WriteLine($"[ProcessDivision] Starting {name}");
-
-        var result = await _httpClient.PostAsync("https://changing-kayley-lum-studios-c585327d.koyeb.app/api/schools/get-schools", new FormUrlEncodedContent([
-            new KeyValuePair<string, string>("divisionCode", code.ToString())
-        ]));
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://changing-kayley-lum-studios-c585327d.koyeb.app/api/schools/get-schools");
+        
+        request.SetBrowserRequestMode(BrowserRequestMode.NoCors);
+        request.Content = new FormUrlEncodedContent([
+          new KeyValuePair<string, string>("divisionCode", code.ToString())
+      ]);
+        var result = await _httpClient.SendAsync(request);
 
         var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>() ?? [];
         var tasks = schools.Select(school => FetchGeoLocation(school.Address)).ToList();
