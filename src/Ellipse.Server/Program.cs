@@ -11,6 +11,7 @@ public static class Program
 
 
         app.UseRouting();
+        app.UseCors("DynamicCors");
         app.UseRequestTimeouts();
         app.MapControllers();
         app.Run();
@@ -20,6 +21,15 @@ public static class Program
     public static void ConfigureServices(WebApplicationBuilder builder)
     {
         builder.Services.AddRouting();
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("DynamicCors", policy =>
+            {
+                policy.WithOrigins("https://kumja2-ellipse-twl8-code-redirect-2.apps.rm2.thpm.p1.openshiftapps.com")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+            });
+        });
         builder.Services.AddRequestTimeouts(options => options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5)));
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();

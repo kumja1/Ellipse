@@ -7,6 +7,7 @@ namespace Ellipse.Services;
 
 public sealed class SchoolLocatorService : IDisposable
 {
+    private const string BaseUrl = "https://changing-kayley-lum-studios-c585327d.koyeb.app";
     private readonly GeoService _geoService;
     private readonly HttpClient _httpClient;
 
@@ -34,11 +35,17 @@ public sealed class SchoolLocatorService : IDisposable
         _geoService = geoService;
         _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromMinutes(6);
+        _httpClient.PostAsync($"{BaseUrl}/api/cors/add-origin", new StringContent(_httpClient.BaseAddress.AbsoluteUri));
+
     }
 
     private async Task<GeoPoint2d> FetchGeoLocation(string name)
     {
-        if (string.IsNullOrEmpty(name)) return default;
+        if (string.IsNullOrEmpty(name))
+        {
+            Console.WriteLine($"{name} address is missing. Skipping...");
+            return default;
+        }
         return await _geoService.GetLatLngCached(name);
     }
 
@@ -61,7 +68,7 @@ public sealed class SchoolLocatorService : IDisposable
     {
 
         Console.WriteLine($"[ProcessDivision] Starting {name}");
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://changing-kayley-lum-studios-c585327d.koyeb.app/api/schools/get-schools");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/schools/get-schools");
 
         request.SetBrowserRequestMode(BrowserRequestMode.NoCors);
         request.Content = new FormUrlEncodedContent([
@@ -69,7 +76,8 @@ public sealed class SchoolLocatorService : IDisposable
       ]);
 
         var result = await _httpClient.SendAsync(request).ConfigureAwait(false);
-        var schools = JsonSerializer.Deserialize<List<SchoolData>>(await result.Content.ReadAsStringAsync().ConfigureAwait(false) ?? "[]");
+        Console.WriteLine(await result.Content.ReadAsStringAsync().ConfigureAwait(false) ?? "[]");
+        var schools = JsonSerializer.Deserialize<List<SchoolData>>(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
         var tasks = schools.Select(school => FetchGeoLocation(school.Address)).ToList();
 
         for (int i = 0; i < tasks.Count; i++)

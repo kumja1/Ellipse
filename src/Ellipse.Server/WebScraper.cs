@@ -11,7 +11,7 @@ using AngleSharp.XPath;
 
 namespace Ellipse.Server;
 
-public sealed partial class WebScraper
+public sealed partial class WebScraper(int divisionCode)
 {
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
@@ -23,15 +23,9 @@ public sealed partial class WebScraper
     [GeneratedRegex(@"[.\s/]+")]
     private static partial Regex CleanNameRegex();
 
-    private readonly int _divisionCode;
-    private readonly IBrowsingContext _browsingContext;
+    private readonly int _divisionCode = divisionCode;
+    private readonly IBrowsingContext _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
     private readonly Dictionary<string, string> _addressCache = [];
-
-    public WebScraper(int divisionCode)
-    {
-        _divisionCode = divisionCode;
-        _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
-    }
 
     public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache)
     {
@@ -74,7 +68,7 @@ public sealed partial class WebScraper
         if (totalPages > 1)
         {
             var pages = Enumerable.Range(2, totalPages - 1);
-            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 27 }, async (page, _) =>
+            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 30 }, async (page, _) =>
             {
                 var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
                 foreach (var school in schools)
@@ -152,7 +146,7 @@ public sealed partial class WebScraper
 
             addressElement ??= document.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}, School: {cleanedName}");
 
             var address = addressElement?.TextContent.Trim() ?? "";
             _addressCache[cleanedName] = address;
