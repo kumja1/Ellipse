@@ -30,7 +30,7 @@ public sealed partial class WebScraper
     public WebScraper(int divisionCode)
     {
         _divisionCode = divisionCode;
-        _browsingContext = BrowsingContext.New(Configuration.Default.WithXPath());
+        _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
     }
 
     public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache)
