@@ -150,7 +150,7 @@ public sealed partial class WebScraper(int divisionCode)
 
             addressElement ??= document?.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}, School: {cleanedName}, Url: {url}"
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}, School: {cleanedName}, Url: {url}");
 
             var address = addressElement?.TextContent.Trim() ?? "";
             _addressCache[cleanedName] = address;
