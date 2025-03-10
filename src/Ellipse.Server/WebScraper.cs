@@ -25,7 +25,7 @@ public sealed partial class WebScraper(int divisionCode)
 
     private readonly int _divisionCode = divisionCode;
     private readonly IBrowsingContext _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
-    private readonly Dictionary<string, string> _addressCache = [];
+    private readonly ConcurrentDictionary<string, string> _addressCache = [];
 
     public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache)
     {
@@ -36,28 +36,30 @@ public sealed partial class WebScraper(int divisionCode)
             return cachedData!;
         }
 
-        return await _scrapingTasks.GetOrAdd(divisionCode, async _ =>
-        {
-            try
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] No cache; creating new scraper instance for division {divisionCode}");
-                var scraper = new WebScraper(divisionCode);
-                string result = await scraper.ScrapeAsync().ConfigureAwait(false);
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Scrape completed for division {divisionCode}");
+        return await  _scrapingTasks.GetOrAdd(divisionCode, _ => StartScraperAsync(divisionCode)).ConfigureAwait(false);
+    }
 
-                _cache.Set(divisionCode, result, new MemoryCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30)
-                });
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Result cached for division {divisionCode}");
-                return result;
-            }
-            finally
+    private static async Task<string> StartScraperAsync(int divisionCode)
+    {
+        try
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] No cache; creating new scraper instance for division {divisionCode}");
+            var scraper = new WebScraper(divisionCode);
+            string result = await scraper.ScrapeAsync().ConfigureAwait(false);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Scrape completed for division {divisionCode}");
+
+            _cache.Set(divisionCode, result, new MemoryCacheEntryOptions
             {
-                _scrapingTasks.TryRemove(divisionCode, out var _);
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Removed division {divisionCode} from active tasks");
-            }
-        }).ConfigureAwait(false);
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30)
+            });
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Result cached for division {divisionCode}");
+            return result;
+        }
+        finally
+        {
+            _scrapingTasks.TryRemove(divisionCode, out var _);
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Removed division {divisionCode} from active tasks");
+        }
     }
 
     public async Task<string> ScrapeAsync()
@@ -130,37 +132,61 @@ public sealed partial class WebScraper(int divisionCode)
             return cachedAddress;
         }
 
-        await _addressSemaphore.WaitAsync().ConfigureAwait(false);
-        try
+        const int maxAttempts = 3;
+        int attempt = 0;
+        string address = "";
+
+        while (attempt < maxAttempts && string.IsNullOrWhiteSpace(address))
         {
-            var url = $"{SchoolInfoUrl}/{cleanedName}";
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetching address from {url}");
-
-            var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-            if (document == null)
+            attempt++;
+            await _addressSemaphore.WaitAsync().ConfigureAwait(false);
+            try
             {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Html document is null. Url: {url}. ");
+                var url = $"{SchoolInfoUrl}/{cleanedName}";
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetching address from {url} (Attempt {attempt})");
+
+                var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+                if (document == null)
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Html document is null. Url: {url}");
+
+                var addressElement = document?.QuerySelector(
+                    "span[itemprop='streetAddress'], " +
+                    "[itemtype='http://schema.org/PostalAddress'] [itemprop='streetAddress'], " +
+                    "span[itemprop='address'] > span, " +
+                    "[itemtype='http://schema.org/PostalAddress']"
+                );
+
+                addressElement ??= document?.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
+
+                address = addressElement?.TextContent.Trim() ?? "";
+
+                if (string.IsNullOrWhiteSpace(address))
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Empty address fetched for {cleanedName}. Retrying...");
+                else
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetched address: {address} for {cleanedName}");
             }
-            var addressElement = document?.QuerySelector(
-                "span[itemprop='streetAddress'], " +
-                "[itemtype='http://schema.org/PostalAddress'] [itemprop='streetAddress'], " +
-                "span[itemprop='address'] > span, " +
-                "[itemtype='http://schema.org/PostalAddress']"
- );
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Exception occurred for {cleanedName}: {ex.Message}. Retrying...");
+            }
+            finally
+            {
+                _addressSemaphore.Release();
+            }
 
-            addressElement ??= document?.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
+            if (string.IsNullOrWhiteSpace(address) && attempt < maxAttempts)
+                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+        }
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}, School: {cleanedName}, Url: {url}");
-
-            var address = addressElement?.TextContent.Trim() ?? "";
+        if (!string.IsNullOrWhiteSpace(address))
+        {
             _addressCache[cleanedName] = address;
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Cached address for {cleanedName}");
-            return address;
         }
-        finally
-        {
-            _addressSemaphore.Release();
-        }
+        else
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Failed to fetch address for {cleanedName} after {maxAttempts} attempts.");
+
+        return address;
     }
 
     private static int ParseTotalPages(IDocument document)

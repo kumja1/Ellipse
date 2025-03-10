@@ -78,7 +78,6 @@ public sealed class SchoolLocatorService : IDisposable
       ]);
 
         var result = await _httpClient.SendAsync(request).ConfigureAwait(false);
-        Console.WriteLine(await result.Content.ReadAsStringAsync().ConfigureAwait(false) ?? "[]");
         var schools = JsonSerializer.Deserialize<List<SchoolData>>(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
         var tasks = schools.Select(school => FetchGeoLocation(school.Address)).ToList();
 
