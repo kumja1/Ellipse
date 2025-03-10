@@ -73,7 +73,7 @@ public sealed partial class WebScraper
         if (totalPages > 1)
         {
             var pages = Enumerable.Range(2, totalPages - 1);
-            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 10 }, async (page, _) =>
+            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 27 }, async (page, _) =>
             {
                 var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
                 foreach (var school in schools)
@@ -147,6 +147,8 @@ public sealed partial class WebScraper
                 "span[itemprop='streetAddress'], " +
                 "span[itemtype='http://schema.org/PostalAddress'] span"
             );
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement.TextContent}");
 
             var address = addressElement?.TextContent.Trim() ?? "";
             _addressCache[cleanedName] = address;
