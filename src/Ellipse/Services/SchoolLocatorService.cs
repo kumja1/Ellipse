@@ -35,6 +35,8 @@ public sealed class SchoolLocatorService : IDisposable
         _geoService = geoService;
         _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromMinutes(6);
+
+        _httpClient.DefaultRequestHeaders.Add("Origin", _httpClient.BaseAddress.AbsoluteUri);
         _httpClient.PostAsync($"{BaseUrl}/api/cors/add-origin", new StringContent(_httpClient.BaseAddress.AbsoluteUri));
 
     }
@@ -70,7 +72,7 @@ public sealed class SchoolLocatorService : IDisposable
         Console.WriteLine($"[ProcessDivision] Starting {name}");
         var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/schools/get-schools");
 
-        request.SetBrowserRequestMode(BrowserRequestMode.NoCors);
+        request.SetBrowserRequestMode(BrowserRequestMode.Cors);
         request.Content = new FormUrlEncodedContent([
           new KeyValuePair<string, string>("divisionCode", code.ToString())
       ]);

@@ -137,16 +137,20 @@ public sealed partial class WebScraper(int divisionCode)
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetching address from {url}");
 
             var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-            var addressElement = document.QuerySelector(
+            if (document == null)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Html document is null. Url: {url}. ");
+            }
+            var addressElement = document?.QuerySelector(
                 "span[itemprop='streetAddress'], " +
                 "[itemtype='http://schema.org/PostalAddress'] [itemprop='streetAddress'], " +
                 "span[itemprop='address'] > span, " +
                 "[itemtype='http://schema.org/PostalAddress']"
  );
 
-            addressElement ??= document.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
+            addressElement ??= document?.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}, School: {cleanedName}");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}, School: {cleanedName}, Url: {url}"
 
             var address = addressElement?.TextContent.Trim() ?? "";
             _addressCache[cleanedName] = address;
