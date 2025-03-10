@@ -150,7 +150,7 @@ public sealed partial class WebScraper
  );
 
             addressElement ??= document.QuerySelector(
-                "//strong[contains(text(),'Address')]/following-sibling::*[1][self::span or self::div]"
+                "*[xpath>'//strong[contains(text(),'Address')]/following-sibling::*[1][self::span or self::div]']"
             );
 
 
