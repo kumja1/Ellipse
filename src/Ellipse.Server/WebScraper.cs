@@ -29,7 +29,7 @@ public sealed partial class WebScraper
     public WebScraper(int divisionCode)
     {
         _divisionCode = divisionCode;
-        _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader());
+        _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
     }
 
     public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache)
@@ -73,7 +73,7 @@ public sealed partial class WebScraper
         if (totalPages > 1)
         {
             var pages = Enumerable.Range(2, totalPages - 1);
-            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 27 }, async (page, _) =>
+            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 30 }, async (page, _) =>
             {
                 var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
                 foreach (var school in schools)
@@ -143,12 +143,18 @@ public sealed partial class WebScraper
 
             var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
             var addressElement = document.QuerySelector(
-                "span[itemprop='address'] span[itemprop='streetAddress'], " +
                 "span[itemprop='streetAddress'], " +
-                "span[itemtype='http://schema.org/PostalAddress'] span"
+                "[itemtype='http://schema.org/PostalAddress'] [itemprop='streetAddress'], " +
+                "span[itemprop='address'] > span, " +
+                "[itemtype='http://schema.org/PostalAddress']"
+ );
+
+            addressElement ??= document.QuerySelector(
+                "//strong[contains(text(),'Address')]/following-sibling::*[1][self::span or self::div]"
             );
 
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement.TextContent}");
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}");
 
             var address = addressElement?.TextContent.Trim() ?? "";
             _addressCache[cleanedName] = address;
