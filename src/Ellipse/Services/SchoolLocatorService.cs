@@ -60,7 +60,7 @@ public sealed class SchoolLocatorService : IDisposable
     {
 
         Console.WriteLine($"[ProcessDivision] Starting {name}");
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://changing-kayley-lum-studios-c585327d.koyeb.app/api/schools/get-schools");
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://kumja2-ellipse-twl8-code-redirect-3.apps.rm2.thpm.p1.openshiftapps.com/api/schools/get-schools");
         
         request.SetBrowserRequestMode(BrowserRequestMode.NoCors);
         request.Content = new FormUrlEncodedContent([
