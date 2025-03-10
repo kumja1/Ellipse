@@ -150,8 +150,7 @@ public sealed partial class WebScraper
                 "[itemtype='http://schema.org/PostalAddress']"
  );
 
-            addressElement ??= (IElement)document.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1][self::span or self::div]");
-
+            addressElement ??= document.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::span/span", true) as IElement;
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}");
 
