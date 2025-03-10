@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Ellipse.Common.Models;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.RegularExpressions;
+using AngleSharp.XPath;
 
 namespace Ellipse.Server;
 
@@ -149,9 +150,7 @@ public sealed partial class WebScraper
                 "[itemtype='http://schema.org/PostalAddress']"
  );
 
-            addressElement ??= document.QuerySelector(
-                "*[xpath>'//strong[contains(text(),'Address')]/following-sibling::*[1][self::span or self::div]']"
-            );
+            addressElement ??= (IElement)document.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1][self::span or self::div]");
 
 
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Address Element: {addressElement?.TextContent}");
