@@ -20,7 +20,7 @@ public sealed partial class WebScraper
     private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
     private static readonly SemaphoreSlim _addressSemaphore = new(20, 20);
 
-    [GeneratedRegex(@"[.\s]+")]
+    [GeneratedRegex(@"[.\s/]+")]
     private static partial Regex CleanNameRegex();
 
     private readonly int _divisionCode;
@@ -118,12 +118,6 @@ public sealed partial class WebScraper
 
         var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
         var cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
-
-        if (cleanedName.Contains('/'))
-        {
-            var names = cleanedName.Split('/');
-            cleanedName = names[0] + names[^-1].Split("-")[1];
-        }
 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Processing school: {name}");
 
