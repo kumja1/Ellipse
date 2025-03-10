@@ -1,6 +1,7 @@
-using System.Net.Http.Json;
+using System.Text.Json;
 using Ellipse.Common.Models;
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
+using System.Net;
 
 namespace Ellipse.Services;
 
@@ -60,15 +61,15 @@ public sealed class SchoolLocatorService : IDisposable
     {
 
         Console.WriteLine($"[ProcessDivision] Starting {name}");
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://kumja2-ellipse-twl8-code-redirect-3.apps.rm2.thpm.p1.openshiftapps.com/api/schools/get-schools");
-        
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://changing-kayley-lum-studios-c585327d.koyeb.app/api/schools/get-schools");
+
         request.SetBrowserRequestMode(BrowserRequestMode.NoCors);
         request.Content = new FormUrlEncodedContent([
           new KeyValuePair<string, string>("divisionCode", code.ToString())
       ]);
-        var result = await _httpClient.SendAsync(request);
 
-        var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>() ?? [];
+        var result = await _httpClient.SendAsync(request).ConfigureAwait(false);
+        var schools = JsonSerializer.Deserialize<List<SchoolData>>(await result.Content.ReadAsStringAsync().ConfigureAwait(false) ?? "[]");
         var tasks = schools.Select(school => FetchGeoLocation(school.Address)).ToList();
 
         for (int i = 0; i < tasks.Count; i++)

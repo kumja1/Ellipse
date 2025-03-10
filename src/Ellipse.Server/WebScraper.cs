@@ -119,6 +119,12 @@ public sealed partial class WebScraper
         var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
         var cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
 
+        if (cleanedName.Contains('/'))
+        {
+            var names = cleanedName.Split('/');
+            cleanedName = names[0] + names[^-1].Split("-")[1];
+        }
+
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Processing school: {name}");
 
         var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
