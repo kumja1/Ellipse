@@ -2,13 +2,13 @@ using System.Text.Json;
 using Ellipse.Common.Models;
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using System.Net;
+using System.Net.Http.Json;
+using System.Text;
 
 namespace Ellipse.Services;
 
 public sealed class SchoolLocatorService : IDisposable
 {
-    private const string BaseUrl = "https://changing-kayley-lum-studios-c585327d.koyeb.app";
-    private readonly GeoService _geoService;
     private readonly HttpClient _httpClient;
 
     private readonly Dictionary<string, int> _divisionCodes = new()
@@ -30,25 +30,13 @@ public sealed class SchoolLocatorService : IDisposable
         ["Sussex County"] = 91
     };
 
-    public SchoolLocatorService(GeoService geoService, HttpClient httpClient)
+    public SchoolLocatorService(HttpClient httpClient)
     {
-        _geoService = geoService;
         _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromMinutes(6);
 
-        _httpClient.DefaultRequestHeaders.Add("Origin", _httpClient.BaseAddress.AbsoluteUri);
-        _httpClient.PostAsync($"{BaseUrl}/api/cors/add-origin", new StringContent(_httpClient.BaseAddress.AbsoluteUri));
+        // _httpClient.PostAsync($"{BaseUrl}cors/add-origin", new StringContent(@$"{{""origin"": ""{_httpClient.BaseAddress.AbsoluteUri}""}}", Encoding.UTF8, "application/json"));
 
-    }
-
-    private async Task<GeoPoint2d> FetchGeoLocation(string name)
-    {
-        if (string.IsNullOrEmpty(name))
-        {
-            Console.WriteLine($"{name} address is missing. Skipping...");
-            return default;
-        }
-        return await _geoService.GetLatLngCached(name);
     }
 
     public async Task<List<SchoolData>> GetSchools()
@@ -70,7 +58,7 @@ public sealed class SchoolLocatorService : IDisposable
     {
 
         Console.WriteLine($"[ProcessDivision] Starting {name}");
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/schools/get-schools");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{Settings.ServerUrl}schools/get-schools");
 
         request.SetBrowserRequestMode(BrowserRequestMode.Cors);
         request.Content = new FormUrlEncodedContent([
@@ -78,13 +66,7 @@ public sealed class SchoolLocatorService : IDisposable
       ]);
 
         var result = await _httpClient.SendAsync(request).ConfigureAwait(false);
-        var schools = JsonSerializer.Deserialize<List<SchoolData>>(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
-        var tasks = schools.Select(school => FetchGeoLocation(school.Address)).ToList();
-
-        for (int i = 0; i < tasks.Count; i++)
-        {
-            schools[i] = schools[i] with { LatLng = await tasks[i] };
-        }
+        var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>().ConfigureAwait(false)!;
 
         return schools;
     }

@@ -21,7 +21,7 @@ partial class Menu : ComponentBase
     private string SelectedDistanceMode { get; set; } = "Average Distance";
 
     private Dictionary<string, (double Distance, string Duration)> SelectedMarkerDistances => CurrentMarker.Properties["Distances"];
-    
+
 
     public void CloseDrawer() => DrawerOpen = false;
 
@@ -31,5 +31,5 @@ partial class Menu : ComponentBase
         _ => duration
     };
 
-
+    private static string FormatTimeSpan(TimeSpan timeSpan) => $"{timeSpan.Hours}h {timeSpan.Minutes}m {timeSpan.Seconds}s";
 }

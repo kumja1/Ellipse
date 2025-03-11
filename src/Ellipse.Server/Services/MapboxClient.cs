@@ -1,6 +1,5 @@
 using System.Text;
 using System.Net;
-using Ellipse.Common.Models;
 using Ellipse.Extensions;
 using System.Text.Json;
 using Ellipse.Common.Enums.Directions;
@@ -8,17 +7,17 @@ using Ellipse.Common.Models.Directions;
 using Ellipse.Common.Models.Matrix;
 
 
-namespace Ellipse.Services;
+namespace Ellipse.Server.Services;
 
-public class MapboxClient(HttpClient httpClient)
+public class MapboxClient
 {
     private const string MatrixApiUrl = "https://api.mapbox.com/directions-matrix/v1/mapbox/";
 
     private const string DirectionsApiUrl = "https://api.mapbox.com/directions/v5/mapbox/";
 
-    private readonly HttpClient HttpService = httpClient;
+    private readonly HttpClient _httpClient;
 
-    private readonly SemaphoreSlim _rateLimiter = new(10, 60);
+    private readonly SemaphoreSlim _rateLimiter = new(60, 60);
 
     private readonly JsonSerializerOptions _jsonSerializerOptions = new()
     {
@@ -27,9 +26,16 @@ public class MapboxClient(HttpClient httpClient)
 
     private readonly int _delay = 1000;
 
+
+    public MapboxClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+        _httpClient.DefaultRequestHeaders.Add("x-cors-api-key", "temp_dc20228c1569da237e3bc9ac79cd36ac");
+    }
+
     public async Task<MatrixResponse?> GetMatrixAsync(MatrixRequest request)
     {
-        await _rateLimiter.WaitAsync(_delay);
+        await _rateLimiter.WaitAsync(_delay).ConfigureAwait(true);
         try
         {
             if (request.Sources.Count == 0 || request.Destinations.Count == 0)
@@ -38,7 +44,7 @@ public class MapboxClient(HttpClient httpClient)
             }
 
             var requestUrl = GetRequestUrl(request);
-            var response = await HttpService.GetAsync(requestUrl);
+            var response = await _httpClient.GetAsync(requestUrl);
 
             if (response.StatusCode == HttpStatusCode.OK)
             {
@@ -62,16 +68,16 @@ public class MapboxClient(HttpClient httpClient)
 
     public async Task<DirectionsResponse> GetDirectionsAsync(DirectionsRequest request)
     {
-        await _rateLimiter.WaitAsync(_delay);
+        await _rateLimiter.WaitAsync(_delay).ConfigureAwait(false);
         try
         {
             // Console.WriteLine($"Waypoints:{string.Join(";", request.Waypoints.Select(d => $"{d.Lon},{d.Lat}"))}");
             var requestUrl = GetRequestUrl(request);
-            var response = await HttpService.GetAsync(requestUrl);
+            var response = await _httpClient.GetAsync(requestUrl).ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.OK)
             {
-                var directionsResponse = JsonSerializer.Deserialize<DirectionsResponse>(await response.Content.ReadAsStringAsync(), _jsonSerializerOptions);
+                var directionsResponse = await response.Content.ReadFromJsonAsync<DirectionsResponse?>(_jsonSerializerOptions).ConfigureAwait(false);
                 ArgumentNullException.ThrowIfNull(directionsResponse);
                 return directionsResponse;
             }
@@ -86,9 +92,8 @@ public class MapboxClient(HttpClient httpClient)
         }
     }
 
-    private string GetRequestUrl(object request)
+    private static string GetRequestUrl(object request)
     {
-
         return request switch
         {
             DirectionsRequest directionsRequest => GetDirectionsRequestUrl(directionsRequest),
@@ -97,7 +102,7 @@ public class MapboxClient(HttpClient httpClient)
         };
     }
 
-    private string GetDirectionsRequestUrl(DirectionsRequest request)
+    private static string GetDirectionsRequestUrl(DirectionsRequest request)
     {
         var stringBuilder = new StringBuilder($"{DirectionsApiUrl}{request.Profile.ToStringValue().ToLower()}/{string.Join(";", request.Waypoints.Select(d => $"{d.Lon},{d.Lat}"))}");
         stringBuilder.Append($"?access_token={request.AccessToken}");
@@ -163,7 +168,7 @@ public class MapboxClient(HttpClient httpClient)
         return stringBuilder.ToString();
     }
 
-    private string GetMatrixRequestUrl(MatrixRequest request)
+    private static string GetMatrixRequestUrl(MatrixRequest request)
     {
         var stringBuilder = new StringBuilder($"{MatrixApiUrl}{request.Profile.ToStringValue().ToLower()}/{string.Join(";", request.Sources.Select(s => $"{s.Lon},{s.Lat}"))};{string.Join(";", request.Destinations.Select(d => $"{d.Lon},{d.Lat}"))}");
         stringBuilder.Append($"?access_token={request.AccessToken}");

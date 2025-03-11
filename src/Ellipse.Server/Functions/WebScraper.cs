@@ -8,10 +8,11 @@ using Ellipse.Common.Models;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.RegularExpressions;
 using AngleSharp.XPath;
+using Ellipse.Server.Services;
 
-namespace Ellipse.Server;
+namespace Ellipse.Server.Functions;
 
-public sealed partial class WebScraper(int divisionCode)
+public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 {
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
@@ -24,10 +25,13 @@ public sealed partial class WebScraper(int divisionCode)
     private static partial Regex CleanNameRegex();
 
     private readonly int _divisionCode = divisionCode;
+    private readonly GeoService _geoService = geoService;
+
     private readonly IBrowsingContext _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
+
     private readonly ConcurrentDictionary<string, string> _addressCache = [];
 
-    public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache)
+    public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache, GeoService geoService)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Starting scrape for division {divisionCode}");
         if (_cache.TryGetValue(divisionCode, out string? cachedData) && !overrideCache)
@@ -36,15 +40,15 @@ public sealed partial class WebScraper(int divisionCode)
             return cachedData!;
         }
 
-        return await  _scrapingTasks.GetOrAdd(divisionCode, _ => StartScraperAsync(divisionCode)).ConfigureAwait(false);
+        return await _scrapingTasks.GetOrAdd(divisionCode, _ => StartScraperAsync(divisionCode, geoService)).ConfigureAwait(false);
     }
 
-    private static async Task<string> StartScraperAsync(int divisionCode)
+    private static async Task<string> StartScraperAsync(int divisionCode, GeoService geoService)
     {
         try
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] No cache; creating new scraper instance for division {divisionCode}");
-            var scraper = new WebScraper(divisionCode);
+            var scraper = new WebScraper(divisionCode, geoService);
             string result = await scraper.ScrapeAsync().ConfigureAwait(false);
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Scrape completed for division {divisionCode}");
 
@@ -117,11 +121,12 @@ public sealed partial class WebScraper(int divisionCode)
 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Processing school: {name}");
 
-        var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
         var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
         var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
+        var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
+        var geoLocation = _geoService.GetLatLngCached(address);
 
-        return new SchoolData(name, cell2, cell3, address, GeoPoint2d.Zero);
+        return new SchoolData(name, cell2, cell3, address, await geoLocation);
     }
 
     private async Task<string> FetchAddressAsync(string cleanedName)

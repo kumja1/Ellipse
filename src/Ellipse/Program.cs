@@ -1,7 +1,5 @@
 using Ellipse;
 using Ellipse.Services;
-using Mapbox.AspNetCore.DependencyInjection;
-using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
@@ -29,10 +27,6 @@ partial class Program
     {
         builder.Services
         .AddMudServices()
-        .AddMapBoxServices(options => options.UseApiKey("pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA"))
-        .AddScoped<MapboxGeocoder>()
-        .AddScoped<GeoService>()
-        .AddScoped<MapboxClient>()
         .AddScoped<SiteFinderService>()
         .AddHttpClient<SchoolLocatorService>(client =>
         {

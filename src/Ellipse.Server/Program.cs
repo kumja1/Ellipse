@@ -1,3 +1,7 @@
+using Ellipse.Server.Services;
+using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
+
+
 namespace Ellipse.Server;
 
 public static class Program
@@ -30,9 +34,14 @@ public static class Program
                 .AllowAnyMethod();
             });
         });
+        
         builder.Services.AddRequestTimeouts(options => options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5)));
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
         builder.Services.AddSwaggerGen();
+
+        builder.Services.AddSingleton<GeoService>();
+        builder.Services.AddSingleton<MapboxClient>();
+        builder.Services.AddSingleton<MapboxGeocoder>();
     }
 }

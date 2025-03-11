@@ -2,7 +2,7 @@ using Ellipse.Common.Models;
 using Mapbox.AspNetCore.Models;
 using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
 
-namespace Ellipse.Services;
+namespace Ellipse.Server.Services;
 
 public class GeoService(MapboxGeocoder geocoder)
 {
@@ -46,13 +46,13 @@ public class GeoService(MapboxGeocoder geocoder)
 
     public async Task<GeoPoint2d> GetLatLngCached(string address)
     {
-        GeoPoint2d? latLng = _addressCache.FirstOrDefault(kvp => kvp.Value == address).Key;
-        if (latLng.HasValue)
-            return latLng.Value;
+        GeoPoint2d latLng = _addressCache.FirstOrDefault(kvp => kvp.Value == address, new KeyValuePair<GeoPoint2d, string>(GeoPoint2d.Zero, "")).Key;
+        if (latLng != GeoPoint2d.Zero)
+            return latLng;
 
-        latLng = await GetLatLng(address);
-        _addressCache[latLng.Value] = address;
-        return latLng.Value;
+         latLng = await GetLatLng(address);
+        _addressCache[latLng] = address;
+        return latLng;
     }
 
     private async Task<GeoPoint2d> GetLatLng(string address)
