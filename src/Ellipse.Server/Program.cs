@@ -42,6 +42,6 @@ public static class Program
 
         builder.Services.AddSingleton<GeoService>();
         builder.Services.AddSingleton<MapboxClient>();
-        builder.Services.AddSingleton<MapboxGeocoder>();
+        builder.Services.AddHttpClient<MapboxGeocoder>();
     }
 }

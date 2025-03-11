@@ -33,8 +33,6 @@ partial class Program
             client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
         });
 
-
-
         // builder.Services.AddSingleton<IMarkerFactory>();
     }
 }
