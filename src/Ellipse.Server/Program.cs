@@ -1,6 +1,6 @@
 using Ellipse.Server.Services;
 using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
-
+using Mapbox.AspNetCore.DependencyInjection;
 
 namespace Ellipse.Server;
 
@@ -40,8 +40,9 @@ public static class Program
         builder.Services.AddControllers();
         builder.Services.AddSwaggerGen();
 
-        builder.Services.AddSingleton<GeoService>();
-        builder.Services.AddSingleton<MapboxClient>();
-        builder.Services.AddHttpClient<MapboxGeocoder>();
+        builder.Services.AddSingleton<GeoService>()
+        .AddSingleton<MapboxClient>()
+        .AddMapBoxServices(options => options.UseApiKey("pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA"))
+        .AddHttpClient<MapboxGeocoder>();
     }
 }
