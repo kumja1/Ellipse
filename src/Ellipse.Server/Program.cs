@@ -29,18 +29,20 @@ public static class Program
         {
             options.AddPolicy("DynamicCors", policy =>
             {
-                policy.WithOrigins("https://kumja2-ellipse-twl8-code-redirect-2.apps.rm2.thpm.p1.openshiftapps.com")
-                .AllowAnyHeader()
-                .AllowAnyMethod();
+                policy.SetIsOriginAllowed(origin =>
+                     origin.StartsWith("https://kumja2-ellipse-twl8-code-redirect-"))
+                     .AllowAnyHeader()
+                     .AllowAnyMethod();
             });
         });
-        
+
         builder.Services.AddRequestTimeouts(options => options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5)));
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
         builder.Services.AddSwaggerGen();
 
-        builder.Services.AddSingleton<GeoService>()
+        builder.Services
+        .AddSingleton<GeoService>()
         .AddSingleton<MapboxClient>()
         .AddMapBoxServices(options => options.UseApiKey("pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA"))
         .AddHttpClient<MapboxGeocoder>();
