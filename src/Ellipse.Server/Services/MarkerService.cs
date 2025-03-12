@@ -32,7 +32,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService)
         {
             _cache.Set(request.Point, JsonSerializer.Serialize(markerResponse), new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(10)
             });
         }
 
