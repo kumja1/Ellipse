@@ -93,14 +93,20 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var sw = Stopwatch.StartNew();
         var url = $"{BaseUrl}/page/{page}?division={_divisionCode}";
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url}");
+       
+        IDocument document = null;
+        var rows = await RetryIfInvalid<List<IElement>>(l => l.Count == 0, async (_) =>
+        {
+            document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+            return document.QuerySelectorAll("table > tbody > tr").ToList();
+        }, []);
 
-        var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-        var rows = document.QuerySelectorAll("table > tbody > tr").ToList();
+        
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Found {rows.Count} rows on page {page}");
-
         var tasks = rows.Select(ProcessRowAsync);
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
         var schools = results.Where(s => s != null).Cast<SchoolData>().ToList();
+
 
         sw.Stop();
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Page {page} processed in {sw.ElapsedMilliseconds}ms");
@@ -137,51 +143,46 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
             return cachedAddress;
         }
 
-        const int maxAttempts = 3;
-        int attempt = 0;
-        string address = "";
+        var address = await RetryIfInvalid<string>(s => string.IsNullOrWhiteSpace(s), async (attempt) =>
+         {
+             string address = "";
+             await _addressSemaphore.WaitAsync().ConfigureAwait(false);
+             try
+             {
+                 var url = $"{SchoolInfoUrl}/{cleanedName}";
+                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetching address from {url} (Attempt {attempt})");
 
-        while (attempt < maxAttempts && string.IsNullOrWhiteSpace(address))
-        {
-            attempt++;
-            await _addressSemaphore.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                var url = $"{SchoolInfoUrl}/{cleanedName}";
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetching address from {url} (Attempt {attempt})");
+                 var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+                 if (document == null)
+                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Html document is null. Url: {url}");
 
-                var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-                if (document == null)
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Html document is null. Url: {url}");
+                 var addressElement = document?.QuerySelector(
+                     "span[itemprop='streetAddress'], " +
+                     "[itemtype='http://schema.org/PostalAddress'] [itemprop='streetAddress'], " +
+                     "span[itemprop='address'] > span, " +
+                     "[itemtype='http://schema.org/PostalAddress']"
+                 );
 
-                var addressElement = document?.QuerySelector(
-                    "span[itemprop='streetAddress'], " +
-                    "[itemtype='http://schema.org/PostalAddress'] [itemprop='streetAddress'], " +
-                    "span[itemprop='address'] > span, " +
-                    "[itemtype='http://schema.org/PostalAddress']"
-                );
 
-                addressElement ??= document?.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
+                 addressElement ??= document?.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
 
-                address = addressElement?.TextContent.Trim() ?? "";
+                 address = addressElement?.TextContent.Trim() ?? "";
 
-                if (string.IsNullOrWhiteSpace(address))
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Empty address fetched for {cleanedName}. Retrying...");
-                else
-                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetched address: {address} for {cleanedName}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Exception occurred for {cleanedName}: {ex.Message}. Retrying...");
-            }
-            finally
-            {
-                _addressSemaphore.Release();
-            }
-
-            if (string.IsNullOrWhiteSpace(address) && attempt < maxAttempts)
-                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-        }
+                 if (string.IsNullOrWhiteSpace(address))
+                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Empty address fetched for {cleanedName}. Retrying...");
+                 else
+                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fetched address: {address} for {cleanedName}");
+             }
+             catch (Exception ex)
+             {
+                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Exception occurred for {cleanedName}: {ex.Message}. Retrying...");
+             }
+             finally
+             {
+                 _addressSemaphore.Release();
+             }
+             return address;
+         }, "");
 
         if (!string.IsNullOrWhiteSpace(address))
         {
@@ -189,7 +190,9 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Cached address for {cleanedName}");
         }
         else
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Failed to fetch address for {cleanedName} after {maxAttempts} attempts.");
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Failed to get address for {cleanedName}");
+        }
 
         return address;
     }
@@ -203,5 +206,19 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ParseTotalPages] Found {pages} total pages");
         return pages;
+    }
+
+    private static async Task<TResult> RetryIfInvalid<TResult>(Func<TResult, bool> condition, Func<int, Task<TResult>> action, TResult defaultValue, int maxAttempts = 3, int delay = 2)
+    {
+        TResult result = defaultValue;
+        int attempts = 0;
+
+        while (attempts < maxAttempts && !condition(result))
+        {
+            result = await action(attempts);
+            if (condition(result))
+                await Task.Delay(TimeSpan.FromSeconds(delay)).ConfigureAwait(false);
+        }
+        return result;
     }
 }
