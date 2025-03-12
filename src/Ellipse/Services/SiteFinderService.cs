@@ -47,7 +47,7 @@ public class SiteFinderService
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync($"{Settings.ServerUrl}api/marker/get-markers", new MarkerRequest(schools,new GeoPoint2d(x,y))).ConfigureAwait(false);
+            var response = await _httpClient.PostAsJsonAsync($"{Settings.ServerUrl}marker/get-markers", new MarkerRequest(schools,new GeoPoint2d(x,y))).ConfigureAwait(false);
             var markerResponse = await response.Content.ReadFromJsonAsync<MarkerResponse>().ConfigureAwait(false);
 
             return markerResponse;

@@ -10,12 +10,12 @@ partial class Program
     public static async Task Main(string[] args)
     {
         var builder = WebAssemblyHostBuilder.CreateDefault(args);
-        Init(builder);
+        Initialize(builder);
         await builder.Build().RunAsync();
     }
 
 
-    public static void Init(WebAssemblyHostBuilder builder)
+    public static void Initialize(WebAssemblyHostBuilder builder)
     {
         builder.RootComponents.Add<App>("#app");
         builder.RootComponents.Add<HeadOutlet>("head::after");
