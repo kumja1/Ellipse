@@ -95,7 +95,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url}");
        
         IDocument document = null;
-        var rows = await RetryIfInvalid<List<IElement>>(l => l.Count == 0, async (_) =>
+        var rows = await RetryIfInvalid<List<IElement>>(l => l.Count > 0, async (_) =>
         {
             document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
             return document.QuerySelectorAll("table > tbody > tr").ToList();
@@ -143,7 +143,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
             return cachedAddress;
         }
 
-        var address = await RetryIfInvalid<string>(s => string.IsNullOrWhiteSpace(s), async (attempt) =>
+        var address = await RetryIfInvalid<string>(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
          {
              string address = "";
              await _addressSemaphore.WaitAsync().ConfigureAwait(false);
@@ -208,15 +208,15 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         return pages;
     }
 
-    private static async Task<TResult> RetryIfInvalid<TResult>(Func<TResult, bool> condition, Func<int, Task<TResult>> action, TResult defaultValue, int maxAttempts = 3, int delay = 2)
+    private static async Task<TResult> RetryIfInvalid<TResult>(Func<TResult, bool> isValid, Func<int, Task<TResult>> action, TResult defaultValue, int maxAttempts = 3, int delay = 2)
     {
         TResult result = defaultValue;
         int attempts = 0;
 
-        while (attempts < maxAttempts && condition(result))
+        while (attempts < maxAttempts && !isValid(result))
         {
             result = await action(attempts);
-            if (condition(result))
+            if (!isValid(result))
                 await Task.Delay(TimeSpan.FromSeconds(delay)).ConfigureAwait(false);
         }
         return result;
