@@ -213,7 +213,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         TResult result = defaultValue;
         int attempts = 0;
 
-        while (attempts < maxAttempts && !condition(result))
+        while (attempts < maxAttempts && condition(result))
         {
             result = await action(attempts);
             if (condition(result))
