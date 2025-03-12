@@ -11,12 +11,14 @@ using System.Text.Json;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeoService geocoder, MapboxClient mapboxService)
+public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : IDisposable
 {
     private readonly GeoService _geocoder = geocoder;
     private readonly MapboxClient _mapboxService = mapboxService;
 
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+
+    private readonly SemaphoreSlim _semaphore = new(40);
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = new();
 
     private const string MapboxAccessToken = "pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA";
@@ -64,33 +66,42 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService)
     }
 
     private async Task<Dictionary<string, Route>> GetDistances(
-        List<SchoolData> schools, List<GeoPoint2d> destinations, double sourceX, double sourceY)
+     List<SchoolData> schools, List<GeoPoint2d> destinations, double sourceX, double sourceY)
     {
         var sourceGeoPoint = new GeoPoint2d(sourceX, sourceY);
         var distances = new ConcurrentDictionary<string, Route>();
 
-        await Parallel.ForEachAsync(Enumerable.Range(0, destinations.Count), async (i, ct) =>
+        var tasks = Enumerable.Range(0, destinations.Count).Select(async i =>
         {
-            var destination = destinations[i];
-            var request = new DirectionsRequest
+            await _semaphore.WaitAsync().ConfigureAwait(false);
+            try
             {
-                Annotations = [DirectionsAnnotationType.Distance, DirectionsAnnotationType.Duration],
-                Profile = RoutingProfile.Driving,
-                Overview = OverviewType.Full,
-                Alternatives = true,
-                AccessToken = MapboxAccessToken,
-                Waypoints = [destination, sourceGeoPoint]
-            };
+                var destination = destinations[i];
+                var request = new DirectionsRequest
+                {
+                    Annotations = [DirectionsAnnotationType.Distance, DirectionsAnnotationType.Duration],
+                    Profile = RoutingProfile.Driving,
+                    Overview = OverviewType.Full,
+                    Alternatives = true,
+                    AccessToken = MapboxAccessToken,
+                    Waypoints = [destination, sourceGeoPoint]
+                };
 
-            var response = await _mapboxService.GetDirectionsAsync(request).ConfigureAwait(false);
-            if (response is { Routes.Count: > 0 })
-            {
-                var route = response.Routes[0];
-                route.Distance = MetersToMiles(route.Distance);
-                distances[schools[i].Name] = route;
+                var response = await _mapboxService.GetDirectionsAsync(request).ConfigureAwait(false);
+                if (response is { Routes.Count: > 0 })
+                {
+                    var route = response.Routes[0];
+                    route.Distance = MetersToMiles(route.Distance);
+                    distances[schools[i].Name] = route;
+                }
             }
-        }).ConfigureAwait(false);
+            finally
+            {
+                _semaphore.Release();
+            }
+        });
 
+        await Task.WhenAll(tasks).ConfigureAwait(false);
         return distances.ToDictionary(kv => kv.Key, kv => kv.Value);
     }
 
@@ -116,4 +127,9 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService)
     }
 
     private static double MetersToMiles(double meters) => meters / 1609.34;
+
+    public void Dispose(){
+        GC.SuppressFinalize(this);
+        _semaphore.Dispose();
+    }
 }
