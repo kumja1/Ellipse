@@ -95,8 +95,8 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url}");
 
         var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-        var rows = document.QuerySelectorAll("table > tbody > tr");
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Found {rows.Length} rows on page {page}");
+        var rows = document.QuerySelectorAll("table > tbody > tr").ToList();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Found {rows.Count} rows on page {page}");
 
         var tasks = rows.Select(ProcessRowAsync);
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
