@@ -17,77 +17,81 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService)
     private readonly MapboxClient _mapboxService = mapboxService;
 
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
+    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = new();
 
-    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse>> _currentTasks = [];
+    private const string MapboxAccessToken = "";
 
-    public async Task<MarkerResponse> GetMarkerByLocation(MarkerRequest request)
+    public async Task<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
     {
-
         if (_cache.TryGetValue(request.Point, out string? cachedData))
             return JsonSerializer.Deserialize<MarkerResponse>(cachedData)!;
 
-        return await _currentTasks.GetOrAdd(request.Point, _ => Task.Run(async () =>
-         {
-             var schools = request.Schools;
-             var loc = request.Point;
-             if (schools.Count == 0)
-                 return null;
+        var markerResponse = await _currentTasks.GetOrAdd(request.Point, _ => ProcessMarkerRequestAsync(request))!.ConfigureAwait(false);
 
-             var latLngs = schools.Select(s => s.LatLng).ToList();
-             var distances = await GetDistances(schools, latLngs, loc.Lat, loc.Lon).ConfigureAwait(false);
-             var addressTask = _geocoder.GetAddressCached(loc.Lat, loc.Lon).ConfigureAwait(false);
+        if (markerResponse != null)
+        {
+            _cache.Set(request.Point, JsonSerializer.Serialize(markerResponse), new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
+            });
+        }
 
-             if (distances.Count == 0)
-                 return null;
+        return markerResponse;
+    }
 
-             var triemeanDistance = Trimean(distances.Values.Select(d => d.Distance).ToList());
-             var triemeanDuration = TimeSpan.FromSeconds(
-                 Trimean(distances.Values.Select(d => d.Duration).ToList())
-             );
+    private async Task<MarkerResponse?> ProcessMarkerRequestAsync(MarkerRequest request)
+    {
+        var schools = request.Schools;
+        if (schools.Count == 0)
+            return null;
 
-             return new MarkerResponse(await addressTask, distances);
-         })!).ConfigureAwait(false);
+        var latLngs = schools.Select(s => s.LatLng).ToList();
 
+        var distanceTask = GetDistances(schools, latLngs, request.Point.Lat, request.Point.Lon);
+        var addressTask = _geocoder.GetAddressCached(request.Point.Lat, request.Point.Lon);
+
+        await Task.WhenAll(distanceTask, addressTask).ConfigureAwait(false);
+        var distances = distanceTask.Result;
+        if (distances.Count == 0)
+            return null;
+
+        var triemeanDistance = Trimean(distances.Values.Select(d => d.Distance).ToList());
+        var triemeanDuration = TimeSpan.FromSeconds(
+            Trimean(distances.Values.Select(d => d.Duration).ToList())
+        );
+
+        return new MarkerResponse(await addressTask, distances);
     }
 
     private async Task<Dictionary<string, Route>> GetDistances(
         List<SchoolData> schools, List<GeoPoint2d> destinations, double sourceX, double sourceY)
     {
-        try
-        {
-            var sourceGeoPoint = new GeoPoint2d(sourceX, sourceY);
-            var distances = new ConcurrentDictionary<string, Route>();
+        var sourceGeoPoint = new GeoPoint2d(sourceX, sourceY);
+        var distances = new ConcurrentDictionary<string, Route>();
 
-            await Parallel.ForEachAsync(Enumerable.Range(0, destinations.Count), async (index, _) =>
+        await Parallel.ForEachAsync(Enumerable.Range(0, destinations.Count), async (i, ct) =>
+        {
+            var destination = destinations[i];
+            var request = new DirectionsRequest
             {
-                var destination = destinations[index];
+                Annotations = [DirectionsAnnotationType.Distance, DirectionsAnnotationType.Duration],
+                Profile = RoutingProfile.Driving,
+                Overview = OverviewType.Full,
+                Alternatives = true,
+                AccessToken = MapboxAccessToken,
+                Waypoints = [destination, sourceGeoPoint]
+            };
 
-                var request = new DirectionsRequest
-                {
-                    Annotations = [DirectionsAnnotationType.Distance, DirectionsAnnotationType.Duration],
-                    Profile = RoutingProfile.Driving,
-                    Overview = OverviewType.Full,
-                    Alternatives = true,
-                    AccessToken = "pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA",
-                    Waypoints = [destination, sourceGeoPoint]
-                };
+            var response = await _mapboxService.GetDirectionsAsync(request).ConfigureAwait(false);
+            if (response is { Routes.Count: > 0 })
+            {
+                var route = response.Routes[0];
+                route.Distance = MetersToMiles(route.Distance);
+                distances[schools[i].Name] = route;
+            }
+        }).ConfigureAwait(false);
 
-                var response = await _mapboxService.GetDirectionsAsync(request).ConfigureAwait(false);
-                if (response is { Routes.Count: > 0 })
-                {
-                    var route = response.Routes[0];
-                    route.Distance = MetersToMiles(route.Distance);
-                    distances[schools[index].Name] = route;
-                }
-            }).ConfigureAwait(false);
-
-            return distances.ToDictionary(kv => kv.Key, kv => kv.Value);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error in GetDistances: {ex.Message}");
-            return [];
-        }
+        return distances.ToDictionary(kv => kv.Key, kv => kv.Value);
     }
 
     static double Trimean(List<double> data)
