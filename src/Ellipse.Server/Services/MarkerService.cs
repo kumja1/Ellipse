@@ -11,20 +11,14 @@ using System.Text.Json;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService
+public class MarkerService(GeoService geocoder, MapboxClient mapboxService)
 {
-    private readonly GeoService _geocoder;
-    private readonly MapboxClient _mapboxService;
+    private readonly GeoService _geocoder = geocoder;
+    private readonly MapboxClient _mapboxService = mapboxService;
 
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse>> _currentTasks = [];
-
-    public MarkerService(GeoService geocoder, MapboxClient mapboxService)
-    {
-        _geocoder = geocoder;
-        _mapboxService = mapboxService;
-    }
 
     public async Task<MarkerResponse> GetMarkerByLocation(MarkerRequest request)
     {
@@ -74,7 +68,7 @@ public class MarkerService
                     Profile = RoutingProfile.Driving,
                     Overview = OverviewType.Full,
                     Alternatives = true,
-                    AccessToken = "your_mapbox_access_token",
+                    AccessToken = "pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA",
                     Waypoints = [destination, sourceGeoPoint]
                 };
 
@@ -92,7 +86,7 @@ public class MarkerService
         catch (Exception ex)
         {
             Console.WriteLine($"Error in GetDistances: {ex.Message}");
-            return new Dictionary<string, Route>();
+            return [];
         }
     }
 

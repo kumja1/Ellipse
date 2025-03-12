@@ -30,7 +30,7 @@ public static class Program
             options.AddPolicy("DynamicCors", policy =>
             {
                 policy.SetIsOriginAllowed(origin =>
-                     origin.StartsWith("https://kumja2-ellipse-"))
+                     origin.Contains("https://kumja2-ellipse-"))
                      .AllowAnyHeader()
                      .AllowAnyMethod();
             });
