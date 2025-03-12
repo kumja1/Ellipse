@@ -30,7 +30,7 @@ public static class Program
             options.AddPolicy("DynamicCors", policy =>
             {
                 policy.SetIsOriginAllowed(origin =>
-                     origin.StartsWith("https://kumja2-ellipse-twl8-code-redirect-"))
+                     origin.StartsWith("https://kumja2-ellipse-"))
                      .AllowAnyHeader()
                      .AllowAnyMethod();
             });
@@ -39,7 +39,6 @@ public static class Program
         builder.Services.AddRequestTimeouts(options => options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5)));
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
-        builder.Services.AddSwaggerGen();
 
         builder.Services
         .AddSingleton<GeoService>()
