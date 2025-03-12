@@ -19,7 +19,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService)
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = new();
 
-    private const string MapboxAccessToken = "";
+    private const string MapboxAccessToken = "pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA";
 
     public async Task<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
     {
