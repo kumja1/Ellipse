@@ -46,11 +46,14 @@ public class GeoService(MapboxGeocoder geocoder)
 
     public async Task<GeoPoint2d> GetLatLngCached(string address)
     {
+        if (string.IsNullOrWhiteSpace(address))
+            return GeoPoint2d.Zero;
+
         GeoPoint2d latLng = _addressCache.FirstOrDefault(kvp => kvp.Value == address, new KeyValuePair<GeoPoint2d, string>(GeoPoint2d.Zero, "")).Key;
         if (latLng != GeoPoint2d.Zero)
             return latLng;
 
-         latLng = await GetLatLng(address);
+        latLng = await GetLatLng(address);
         _addressCache[latLng] = address;
         return latLng;
     }

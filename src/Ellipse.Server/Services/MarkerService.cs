@@ -119,6 +119,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
         GeoPoint2d source,
         List<GeoPoint2d> destinations)
     {
+
         var request = new MatrixRequest
         {
             Sources = [source],
@@ -128,11 +129,13 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
             AccessToken = MapboxAccessToken
         };
 
-        var response = await _mapboxService.GetMatrixAsync(request);
+  
 
-        if (response?.Durations == null || response.Distances == null)
-            throw new InvalidOperationException("Invalid matrix response");
+            var response = await _mapboxService.GetMatrixAsync(request);
 
+            if (response?.Durations == null || response.Distances == null)
+                throw new InvalidOperationException("Invalid matrix response");
+    
         return response;
     }
     static double Trimean(List<double> data)

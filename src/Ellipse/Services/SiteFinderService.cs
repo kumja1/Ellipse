@@ -31,6 +31,7 @@ public class SiteFinderService
 
         foreach (var (x, y) in gridPoints)
         {
+            Console.WriteLine($"X:{x}, Y:${y}");
             var marker = await GetMarkerFromServer(x, y, schools).ConfigureAwait(false);
             if (marker != null)
                 yield return new Marker(MarkerType.MarkerAwesome, new Coordinate(x, y), marker.Address, PinColor.Red)
