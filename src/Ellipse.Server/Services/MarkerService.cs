@@ -1,110 +1,140 @@
 using Ellipse.Common.Models;
 using Ellipse.Common.Enums;
-using Ellipse.Common.Enums.Directions;
-using DirectionsRequest = Ellipse.Common.Models.Directions.DirectionsRequest;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
 using Ellipse.Common.Models.Markers;
 using Route = Ellipse.Common.Models.Directions.Route;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
+using Ellipse.Common.Models.Matrix;
+using Ellipse.Common.Enums.Matrix;
 
 namespace Ellipse.Server.Services;
 
 public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : IDisposable
 {
+    private const int MAX_CONCURRENT_BATCHES = 4;
+    private const int MAX_RETRIES = 2;
+    private const int MATRIX_BATCH_SIZE = 25;
+
     private readonly GeoService _geocoder = geocoder;
     private readonly MapboxClient _mapboxService = mapboxService;
-
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
-
-    private readonly SemaphoreSlim _semaphore = new(40);
-    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = new();
+    private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
+    private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks = new();
 
     private const string MapboxAccessToken = "pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA";
 
-    public async Task<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
+
+    public async ValueTask<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
     {
         if (_cache.TryGetValue(request.Point, out string? cachedData))
             return JsonSerializer.Deserialize<MarkerResponse>(cachedData)!;
 
-        var markerResponse = await _currentTasks.GetOrAdd(request.Point, _ => ProcessMarkerRequestAsync(request))!.ConfigureAwait(false);
+        var markerResponse = await _currentTasks.GetOrAdd(
+            request.Point,
+            _ => ProcessMarkerRequestAsync(request)
+        ).ConfigureAwait(false);
 
         if (markerResponse != null)
         {
-            _cache.Set(request.Point, JsonSerializer.Serialize(markerResponse), new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(10)
-            });
+            _cache.Set(request.Point, JsonSerializer.Serialize(markerResponse),
+                new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(10) });
         }
 
         return markerResponse;
     }
 
-    private async Task<MarkerResponse?> ProcessMarkerRequestAsync(MarkerRequest request)
+    private async ValueTask<MarkerResponse?> ProcessMarkerRequestAsync(MarkerRequest request)
     {
-        var schools = request.Schools;
-        if (schools.Count == 0)
-            return null;
+        if (request.Schools.Count == 0) return null;
 
-        var latLngs = schools.Select(s => s.LatLng).ToList();
-
-        var distanceTask = GetDistances(schools, latLngs, request.Point.Lat, request.Point.Lon);
         var addressTask = _geocoder.GetAddressCached(request.Point.Lat, request.Point.Lon);
-
-        await Task.WhenAll(distanceTask, addressTask).ConfigureAwait(false);
-        var distances = distanceTask.Result;
-        if (distances.Count == 0)
-            return null;
-
-        var triemeanDistance = Trimean(distances.Values.Select(d => d.Distance).ToList());
-        var triemeanDuration = TimeSpan.FromSeconds(
-            Trimean(distances.Values.Select(d => d.Duration).ToList())
+        var routesTask = GetMatrixRoutes(request.Point, request.Schools);
+        await Task.WhenAll(
+          addressTask,
+          routesTask
         );
 
-        return new MarkerResponse(await addressTask, distances);
+        var routes = routesTask.Result;
+        var address = addressTask.Result;
+
+        routes["Average Distance"] = new Route
+        {
+
+            Distance = Trimean(routes.Values.Select(r => r.Distance).ToList()),
+            Duration = Trimean(routes.Values.Select(r => r.Duration).ToList())
+        };
+
+        return routesTask.Result.Count == 0 ? null : new MarkerResponse(
+            Address: address,
+            Distances: routes
+        );
     }
 
-    private async Task<Dictionary<string, Route>> GetDistances(
-     List<SchoolData> schools, List<GeoPoint2d> destinations, double sourceX, double sourceY)
+    private async Task<Dictionary<string, Route>> GetMatrixRoutes(
+        GeoPoint2d source, List<SchoolData> schools)
     {
-        var sourceGeoPoint = new GeoPoint2d(sourceX, sourceY);
-        var distances = new ConcurrentDictionary<string, Route>();
+        var results = new ConcurrentDictionary<string, Route>();
+        var batches = schools.Chunk(MATRIX_BATCH_SIZE);
 
-        var tasks = Enumerable.Range(0, destinations.Count).Select(async i =>
+        var batchTasks = batches.Select(async batch =>
         {
-            await _semaphore.WaitAsync().ConfigureAwait(false);
-            try
+            for (int retry = 0; retry <= MAX_RETRIES; retry++)
             {
-                var destination = destinations[i];
-                var request = new DirectionsRequest
+                try
                 {
-                    Annotations = [DirectionsAnnotationType.Distance, DirectionsAnnotationType.Duration],
-                    Profile = RoutingProfile.Driving,
-                    Overview = OverviewType.Full,
-                    Alternatives = true,
-                    AccessToken = MapboxAccessToken,
-                    Waypoints = [destination, sourceGeoPoint]
-                };
+                    await _semaphore.WaitAsync();
+                    var response = await GetMatrixBatch(
+                        source,
+                        batch.Select(s => s.LatLng).ToList());
 
-                var response = await _mapboxService.GetDirectionsAsync(request).ConfigureAwait(false);
-                if (response is { Routes.Count: > 0 })
-                {
-                    var route = response.Routes[0];
-                    route.Distance = MetersToMiles(route.Distance);
-                    distances[schools[i].Name] = route;
+                    foreach (var school in batch)
+                    {
+                        var idx = Array.IndexOf(batch, school);
+                        results[school.Name] = new Route
+                        {
+                            Distance = MetersToMiles(response.Distances[0][idx]),
+                            Duration = response.Durations[0][idx]
+                        };
+                    }
+                    return;
                 }
-            }
-            finally
-            {
-                _semaphore.Release();
+                catch (Exception ex) when (retry < MAX_RETRIES)
+                {
+                    await Task.Delay(500 * (int)Math.Pow(2, retry));
+                }
+                finally
+                {
+                    _semaphore.Release();
+                }
             }
         });
 
-        await Task.WhenAll(tasks).ConfigureAwait(false);
-        return distances.ToDictionary(kv => kv.Key, kv => kv.Value);
+        await Task.WhenAll(batchTasks);
+        return results.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     }
 
+    private async Task<MatrixResponse> GetMatrixBatch(
+        GeoPoint2d source,
+        List<GeoPoint2d> destinations)
+    {
+        var request = new MatrixRequest
+        {
+            Sources = [source],
+            Destinations = destinations,
+            Profile = RoutingProfile.Driving,
+            Annotations = [MatrixAnnotationType.Distance, MatrixAnnotationType.Duration],
+            AccessToken = MapboxAccessToken
+        };
+
+        var response = await _mapboxService.GetMatrixAsync(request);
+
+        if (response?.Durations == null || response.Distances == null)
+            throw new InvalidOperationException("Invalid matrix response");
+
+        return response;
+    }
     static double Trimean(List<double> data)
     {
         var sorted = data.OrderBy(x => x).ToList();
@@ -128,7 +158,8 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
 
     private static double MetersToMiles(double meters) => meters / 1609.34;
 
-    public void Dispose(){
+    public void Dispose()
+    {
         GC.SuppressFinalize(this);
         _semaphore.Dispose();
     }

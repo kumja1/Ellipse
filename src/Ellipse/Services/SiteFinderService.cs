@@ -33,10 +33,10 @@ public class SiteFinderService
         {
             var marker = await GetMarkerFromServer(x, y, schools).ConfigureAwait(false);
             if (marker != null)
-                yield return new Marker(MarkerType.MarkerAwesome, new Coordinate(x, y), marker.PointName, PinColor.Red)
+                yield return new Marker(MarkerType.MarkerAwesome, new Coordinate(x, y), marker.Address, PinColor.Red)
                 {
                     Properties = {
-                      ["Name"] = marker.PointName,
+                      ["Name"] = marker.Address,
                       ["Distances"] = marker.Distances,
                     }
                 };
