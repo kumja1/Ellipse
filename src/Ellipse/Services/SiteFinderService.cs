@@ -32,7 +32,7 @@ public class SiteFinderService
         foreach (var (x, y) in gridPoints)
         {
             Console.WriteLine($"X:{x}, Y:${y}");
-            var marker = await GetMarkerFromServer(x, y, schools).ConfigureAwait(false);
+            var marker = await GetMarker(x, y, schools).ConfigureAwait(false);
             if (marker != null)
                 yield return new Marker(MarkerType.MarkerAwesome, new Coordinate(x, y), marker.Address, PinColor.Red)
                 {
@@ -44,7 +44,7 @@ public class SiteFinderService
         }
     }
 
-    private async Task<MarkerResponse?> GetMarkerFromServer(double x, double y, List<SchoolData> schools)
+    private async Task<MarkerResponse?> GetMarker(double x, double y, List<SchoolData> schools)
     {
         try
         {

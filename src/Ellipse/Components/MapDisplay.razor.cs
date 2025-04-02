@@ -17,22 +17,30 @@ public partial class MapDisplay
         await base.OnInitializedAsync();
         if (Markers != null)
         {
-            Marker? lastMarker = null;
+            Marker? closestMarker = null;
             await foreach (var marker in Markers)
             {
-                var distance = marker.Properties["Distances"]["Average Distance"].Distance;
-                if (lastMarker != null && marker.Properties["Distances"]["Average Distance"].Distance < lastMarker.Properties["Distances"]["Average Distance"].Distance)
+                double markerDistance = marker.Properties["Distances"]["Average Distance"].Distance;
+
+                if (closestMarker == null)
                 {
-                    lastMarker.PinColor = PinColor.Blue;
+                    closestMarker = marker;
+                    marker.PinColor = PinColor.Blue;
                 }
-                lastMarker = marker;
-                marker.PinColor = PinColor.Red;
+                else
+                {
+                    double closestDistance = closestMarker.Properties["Distances"]["Average Distance"].Distance;
+                    if (markerDistance < closestDistance)
+                    {
+                        closestMarker.PinColor = PinColor.Red;
+                        marker.PinColor = PinColor.Blue;
+                        closestMarker = marker;
+                        continue;
+                    }
+                    marker.PinColor = PinColor.Red;
+                }
                 _map.MarkersList.Add(marker);
             }
-            await InvokeAsync(StateHasChanged);
         }
     }
-
-
-
 }

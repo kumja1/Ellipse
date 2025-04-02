@@ -7,13 +7,13 @@ partial class MarkerMenu : ComponentBase
 {
     [Parameter] public bool DrawerOpen { get; set; }
     [Parameter] public EventCallback<bool> DrawerOpenChanged { get; set; }
-    [Parameter] public List<Marker> Markers { get; set; }
-    [Parameter] public Action OnButtonClick { get; set; }
+    [Parameter] public List<Marker>? Markers { get; set; }
+    [Parameter] public Action? OnButtonClick { get; set; }
     [Parameter] public bool IsListMode { get; set; }
 
     private string SelectedRouteName = "Average Distance";
 
-    private Marker CurrentMarker { get; set; }
+    private Marker? CurrentMarker { get; set; }
 
     private Dictionary<string, (double Distance, string Duration)>? Routes =>
         CurrentMarker?.Properties["Routes"] as Dictionary<string, (double Distance, string Duration)>;

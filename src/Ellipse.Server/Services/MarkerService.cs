@@ -13,8 +13,8 @@ namespace Ellipse.Server.Services;
 
 public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : IDisposable
 {
-    private const int MAX_CONCURRENT_BATCHES = 4;
-    private const int MAX_RETRIES = 2;
+    private const int MAX_CONCURRENT_BATCHES = 2;
+    private const int MAX_RETRIES = 3;
     private const int MATRIX_BATCH_SIZE = 25;
 
     private readonly GeoService _geocoder = geocoder;
@@ -23,8 +23,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
     private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
     private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks = new();
 
-    private readonly string MapboxAccessToken = Environment.GetEnvironmentVariable("MAPBOX_API_KEY");
-
+    private readonly string? _mapboxAccessToken = Environment.GetEnvironmentVariable("MAPBOX_API_KEY");
 
     public async ValueTask<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
     {
@@ -51,25 +50,20 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
 
         var addressTask = _geocoder.GetAddressCached(request.Point.Lat, request.Point.Lon);
         var routesTask = GetMatrixRoutes(request.Point, request.Schools);
-        await Task.WhenAll(
-          addressTask,
-          routesTask
-        );
 
-        var routes = routesTask.Result;
-        var address = addressTask.Result;
+        var address = await addressTask.ConfigureAwait(false);
+        var routes = await routesTask.ConfigureAwait(false);
 
-        routes["Average Distance"] = new Route
+        if (routes.Count > 0)
         {
+            routes["Average Distance"] = new Route
+            {
+                Distance = Trimean(routes.Values.Select(r => r.Distance).ToList()),
+                Duration = Trimean(routes.Values.Select(r => r.Duration).ToList())
+            };
+        }
 
-            Distance = Trimean(routes.Values.Select(r => r.Distance).ToList()),
-            Duration = Trimean(routes.Values.Select(r => r.Duration).ToList())
-        };
-
-        return routesTask.Result.Count == 0 ? null : new MarkerResponse(
-            Address: address,
-            Routes: routes
-        );
+        return routes.Count == 0 ? null : new MarkerResponse(address, routes);
     }
 
     private async Task<Dictionary<string, Route>> GetMatrixRoutes(
@@ -82,26 +76,25 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
         {
             for (int retry = 0; retry <= MAX_RETRIES; retry++)
             {
+                await _semaphore.WaitAsync(1000);
                 try
                 {
-                    await _semaphore.WaitAsync();
-                    var response = await GetMatrixBatch(
-                        source,
-                        batch.Select(s => s.LatLng).ToList());
+                    var response = await GetMatrixBatch(source, batch.Select(s => s.LatLng).ToList());
 
-                    foreach (var school in batch)
+                    for (int i = 0; i < batch.Length; i++)
                     {
-                        var idx = Array.IndexOf(batch, school);
+                        var school = batch[i];
                         results[school.Name] = new Route
                         {
-                            Distance = MetersToMiles(response.Distances[0][idx]),
-                            Duration = response.Durations[0][idx]
+                            Distance = MetersToMiles(response.Distances[0][i]),
+                            Duration = response.Durations[0][i]
                         };
                     }
                     return;
                 }
                 catch (Exception ex) when (retry < MAX_RETRIES)
                 {
+                    Console.Error.WriteLine($"Matrix API call failed on attempt {retry + 1}: {ex.Message}");
                     await Task.Delay(500 * (int)Math.Pow(2, retry));
                 }
                 finally
@@ -112,13 +105,15 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
         });
 
         await Task.WhenAll(batchTasks);
-        return results.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        return new Dictionary<string, Route>(results);
     }
 
     private async Task<MatrixResponse> GetMatrixBatch(
         GeoPoint2d source,
         List<GeoPoint2d> destinations)
     {
+        if (string.IsNullOrWhiteSpace(_mapboxAccessToken))
+            throw new InvalidOperationException("MAPBOX_API_KEY environment variable is missing or empty.");
 
         var request = new MatrixRequest
         {
@@ -126,10 +121,8 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
             Destinations = destinations,
             Profile = RoutingProfile.Driving,
             Annotations = [MatrixAnnotationType.Distance, MatrixAnnotationType.Duration],
-            AccessToken = MapboxAccessToken
+            AccessToken = _mapboxAccessToken
         };
-
-
 
         var response = await _mapboxService.GetMatrixAsync(request);
 
@@ -138,7 +131,8 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
 
         return response;
     }
-    static double Trimean(List<double> data)
+
+    private static double Trimean(List<double> data)
     {
         var sorted = data.OrderBy(x => x).ToList();
         double q1 = WeightedPercentile(sorted, 0.25);
@@ -147,11 +141,12 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
         return (q1 + 2 * median + q3) / 4.0;
     }
 
-    static double WeightedPercentile(List<double> sorted, double percentile)
+    private static double WeightedPercentile(List<double> sorted, double percentile)
     {
         double rank = percentile * (sorted.Count - 1);
         int lowerIndex = (int)Math.Floor(rank);
         int upperIndex = (int)Math.Ceiling(rank);
+
         if (lowerIndex == upperIndex)
             return sorted[lowerIndex];
 
