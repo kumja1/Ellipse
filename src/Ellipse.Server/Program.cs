@@ -44,7 +44,7 @@ public static class Program
         .AddSingleton<GeoService>()
         .AddSingleton<MapboxClient>()
         .AddSingleton<MarkerService>()
-        .AddMapBoxServices(options => options.UseApiKey("pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA"))
+        .AddMapBoxServices(options => options.UseApiKey(Environment.GetEnvironmentVariable("MAPBOX_API_KEY")))
         .AddHttpClient<MapboxGeocoder>();
     }
 }
