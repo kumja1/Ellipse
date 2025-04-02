@@ -12,21 +12,23 @@ public partial class MapDisplay
 
     private OpenStreetMap _map { get; set; }
 
-
-
     protected async override Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-
         if (Markers != null)
         {
+            Marker? lastMarker = null;
             await foreach (var marker in Markers)
             {
+                var distance = marker.Properties["Distances"]["Average Distance"].Distance;
+                if (lastMarker != null && marker.Properties["Distances"]["Average Distance"].Distance < lastMarker.Properties["Distances"]["Average Distance"].Distance)
+                {
+                    lastMarker.PinColor = PinColor.Blue;
+                }
+                lastMarker = marker;
+                marker.PinColor = PinColor.Red;
                 _map.MarkersList.Add(marker);
             }
-
-            _map.MarkersList.Sort((x, y) => (((double Distance, string Duration))x.Properties["Distances"]["Average Distance"]).Distance.CompareTo((((double Distance, string Duration))y.Properties["Distances"]["Average Distance"]).Distance));
-            ((Marker)_map.MarkersList[0]).PinColor = PinColor.Red;
             await InvokeAsync(StateHasChanged);
         }
     }

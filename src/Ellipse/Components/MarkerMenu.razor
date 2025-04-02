@@ -1,0 +1,96 @@
+@namespace Ellipse.Components
+
+<MudDrawer @bind-Open="DrawerOpen" Anchor="Anchor.Left" Elevation="8"
+    Class="h-full shadow-2xl bg-white text-gray-800 rounded-r-lg overflow-auto"
+    Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
+    <!-- Drawer Header -->
+    <MudDrawerHeader
+        Class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-t-lg shadow">
+        <MudText Typo="Typo.h5" Class="font-bold tracking-wide">
+            Location Details
+        </MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Close" @onclick="CloseDrawer" Edge="Edge.End"
+            Class="text-white hover:text-gray-300 transition-colors duration-200" />
+
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="ToggleList" Edge="Edge.Start"
+            Class="text-white hover:text-gray-300 transition-colors duration-200" />
+    </MudDrawerHeader>
+
+
+    @if (IsListMode)
+    {
+        <MudList T="Marker">
+            @foreach (var marker in Markers)
+            {
+                <MudListItem>
+                    <MudCard>
+                        <MudCardHeader>
+                            <CardHeaderActions>
+                                <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                    OnClick="@(()=>SelectMarker(marker))" />
+                            </CardHeaderActions>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h3" Color="Color.Dark" Align="Align.Start">@marker.Text</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+
+                            <div class="text-grey-400">
+                                <MudText>
+                                    Distance: @marker.Properties["Routes"]["Average Distance"].Distance
+                                </MudText>
+                                <MudText>
+                                    Duration: @marker.Properties["Routes"]["Average Distance"].Duration
+                                </MudText>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                </MudListItem>
+            }
+        </MudList>
+    }
+    <!-- Drawer Content -->
+    <MudStack Class="p-6 space-y-4">
+        <!-- Marker Name -->
+        <MudText Typo="Typo.h6" Class="font-semibold text-blue-700 text-xl">
+            @((string)CurrentMarker.Properties["Name"])
+        </MudText>
+
+        <MudDivider />
+
+        <!-- Actions -->
+        <MudStack Justify="Justify.FlexStart" Row Spacing="2">
+             <MudButton Variant="Variant.Filled"
+                 Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg"
+                 OnClick="OnButtonClick">
+                 Open in LandSearch
+             </MudButton>
+         </MudStack>
+         <MudDivider />
+         <MudSelect Label="Select Mode" Dense Outlined @bind-Value="SelectedRouteName"
+             Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
+             @if (Routes != null)
+            {
+                @foreach (var (k, _) in Routes)
+                {
+                    <MudSelectItem Value="k">@k</MudSelectItem>
+                }
+            }
+        </MudSelect>
+
+        <MudStack Spacing="2" Class="text-gray-600">
+            <MudText Typo="Typo.body1" Class="font-medium">
+                Distance:
+                <span class="font-normal text-blue-600">
+                    @(Math.Round(SelectedMarkerProps.Distance)) miles
+                </span>
+            </MudText>
+            <MudText Typo="Typo.body1" Class="font-medium">
+                Duration:
+                <span class="font-normal text-blue-600">
+                    @(SelectedMarkerProps.Duration)
+                </span>
+            </MudText>
+        </MudStack>
+    </MudStack>
+</MudDrawer>

@@ -23,7 +23,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
     private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
     private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks = new();
 
-    private const string MapboxAccessToken = "pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtMmRoenRsaDEzY3cyam9uZDA1cThzeDIifQ.twiBonW5YmTeLXjMEBhccA";
+    private readonly string MapboxAccessToken = Environment.GetEnvironmentVariable("MAPBOX_API_KEY");
 
 
     public async ValueTask<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
@@ -68,7 +68,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
 
         return routesTask.Result.Count == 0 ? null : new MarkerResponse(
             Address: address,
-            Distances: routes
+            Routes: routes
         );
     }
 
@@ -129,13 +129,13 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
             AccessToken = MapboxAccessToken
         };
 
-  
 
-            var response = await _mapboxService.GetMatrixAsync(request);
 
-            if (response?.Durations == null || response.Distances == null)
-                throw new InvalidOperationException("Invalid matrix response");
-    
+        var response = await _mapboxService.GetMatrixAsync(request);
+
+        if (response?.Durations == null || response.Distances == null)
+            throw new InvalidOperationException("Invalid matrix response");
+
         return response;
     }
     static double Trimean(List<double> data)
