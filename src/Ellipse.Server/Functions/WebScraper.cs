@@ -182,7 +182,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
                  _addressSemaphore.Release();
              }
              return address;
-         }, "");
+         }, "", 6);
 
         if (!string.IsNullOrWhiteSpace(address))
         {

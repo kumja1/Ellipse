@@ -27,9 +27,8 @@ public class SiteFinderService
 
         var latLngs = schools.Select(school => school.LatLng).ToList();
         var boundingBox = new BoundingBox(latLngs);
-        var gridPoints = GenerateGrid(boundingBox).ToList();
-
-        foreach (var (x, y) in gridPoints)
+        
+        foreach (var (x, y) in GenerateGrid(boundingBox))
         {
             Console.WriteLine($"X:{x}, Y:${y}");
             var marker = await GetMarker(x, y, schools).ConfigureAwait(false);

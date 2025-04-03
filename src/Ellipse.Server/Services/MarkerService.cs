@@ -14,8 +14,8 @@ namespace Ellipse.Server.Services;
 public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : IDisposable
 {
     private const int MAX_CONCURRENT_BATCHES = 2;
-    private const int MAX_RETRIES = 3;
-    private const int MATRIX_BATCH_SIZE = 25;
+    private const int MAX_RETRIES = 6;
+    private const int MATRIX_BATCH_SIZE = 23;
 
     private readonly GeoService _geocoder = geocoder;
     private readonly MapboxClient _mapboxService = mapboxService;
