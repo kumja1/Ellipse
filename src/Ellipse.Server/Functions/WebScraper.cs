@@ -93,7 +93,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var sw = Stopwatch.StartNew();
         var url = $"{BaseUrl}/page/{page}?division={_divisionCode}";
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url}");
-       
+
         IDocument document = null;
         var rows = await RetryIfInvalid<List<IElement>>(l => l.Count > 0, async (_) =>
         {
@@ -101,12 +101,11 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
             return document.QuerySelectorAll("table > tbody > tr").ToList();
         }, []);
 
-        
+
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Found {rows.Count} rows on page {page}");
         var tasks = rows.Select(ProcessRowAsync);
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
         var schools = results.Where(s => s != null).Cast<SchoolData>().ToList();
-
 
         sw.Stop();
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Page {page} processed in {sw.ElapsedMilliseconds}ms");
@@ -130,7 +129,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
         var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
         var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
-        var geoLocation = _geoService.GetLatLngCached(address);
+        var geoLocation = await RetryIfInvalid(c => c.Lat == 0 || c.Lon == 0, (_) => _geoService.GetLatLngCached(address), GeoPoint2d.Zero, 6);
 
         return new SchoolData(name, cell2, cell3, address, await geoLocation);
     }
@@ -165,7 +164,6 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
 
                  addressElement ??= document?.Body.SelectSingleNode("//strong[contains(text(),'Address')]/following-sibling::*[1]", true) as IElement;
-
                  address = addressElement?.TextContent.Trim() ?? "";
 
                  if (string.IsNullOrWhiteSpace(address))
@@ -182,7 +180,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
                  _addressSemaphore.Release();
              }
              return address;
-         }, "", 6);
+         }, "", 4);
 
         if (!string.IsNullOrWhiteSpace(address))
         {
@@ -217,8 +215,9 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         {
             result = await action(attempts);
             if (!isValid(result))
-                await Task.Delay(TimeSpan.FromSeconds(delay)).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(delay * 2 ^ attempts)).ConfigureAwait(false);
         }
         return result;
     }
+
 }
