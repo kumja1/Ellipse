@@ -19,7 +19,6 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
     private static readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
-    private static readonly SemaphoreSlim _addressSemaphore = new(20, 20);
 
     [GeneratedRegex(@"[.\s/]+")]
     private static partial Regex CleanNameRegex();
@@ -28,8 +27,6 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
     private readonly GeoService _geoService = geoService;
 
     private readonly IBrowsingContext _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
-
-    private readonly ConcurrentDictionary<string, string> _addressCache = [];
 
     public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache, GeoService geoService)
     {
@@ -136,16 +133,9 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
     private async Task<string> FetchAddressAsync(string cleanedName)
     {
-        if (_addressCache.TryGetValue(cleanedName, out var cachedAddress))
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Cache hit for {cleanedName}");
-            return cachedAddress;
-        }
-
         var address = await RetryIfInvalid(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
          {
              string address = "";
-             await _addressSemaphore.WaitAsync().ConfigureAwait(false);
              try
              {
                  var url = $"{SchoolInfoUrl}/{cleanedName}";
@@ -175,19 +165,11 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
              {
                  Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Exception occurred for {cleanedName}: {ex.Message}. Retrying...");
              }
-             finally
-             {
-                 _addressSemaphore.Release();
-             }
+
              return address;
          }, "", 4);
 
-        if (!string.IsNullOrWhiteSpace(address))
-        {
-            _addressCache[cleanedName] = address;
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Cached address for {cleanedName}");
-        }
-        else
+        if (string.IsNullOrWhiteSpace(address))
         {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Failed to get address for {cleanedName}");
         }

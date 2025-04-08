@@ -11,9 +11,9 @@ namespace Ellipse.Server.Services;
 
 public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
 {
-    private const int MAX_CONCURRENT_BATCHES = 2;
-    private const int MAX_RETRIES = 6;
-    private const int MATRIX_BATCH_SIZE = 23;
+    private const int MAX_CONCURRENT_BATCHES = 4;
+    private const int MAX_RETRIES = 5;
+    private const int MATRIX_BATCH_SIZE = 25;
 
     private readonly GeoService _geocoder = geocoder;
 
@@ -21,8 +21,6 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
     private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks = new();
-
-    private readonly string? _mapboxAccessToken = Environment.GetEnvironmentVariable("MAPBOX_API_KEY");
 
     public async ValueTask<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
     {
@@ -160,12 +158,6 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
     private async Task<TableResponse> GetMatrixBatch(GeoPoint2d source, List<GeoPoint2d> destinations)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Called for source: {source} with {destinations.Count} destinations.");
-        if (string.IsNullOrWhiteSpace(_mapboxAccessToken))
-        {
-            Console.Error.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] MAPBOX_API_KEY is missing or empty.");
-            throw new InvalidOperationException("MAPBOX_API_KEY environment variable is missing or empty.");
-        }
-
         var request = OsrmServices.Table(PredefinedProfiles.Car, GeographicalCoordinates.Create([
             Coordinate.Create(source.Lon,source.Lat),
             ..destinations.Select(dest=> Coordinate.Create(dest.Lon,source.Lat))
@@ -176,7 +168,6 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Request prepared. Calling MapboxClient.GetMatrixAsync...");
         var response = await _osrmClient.GetTableAsync(request);
-
         if (response?.Durations == null || response.Distances == null)
         {
             Console.Error.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Invalid matrix response received.");

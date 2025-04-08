@@ -12,6 +12,7 @@ public class GeoService(GeocodingService geocoder)
 
     public async Task<string> GetAddressCached(double latitude, double longitude)
     {
+        
         var latLng = new GeoPoint2d(latitude, longitude);
         if (_addressCache.TryGetValue(latLng, out var cachedAddress))
             return cachedAddress;
