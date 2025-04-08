@@ -73,7 +73,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         if (totalPages > 1)
         {
             var pages = Enumerable.Range(2, totalPages - 1);
-            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 50 }, async (page, _) =>
+            await Parallel.ForEachAsync(pages, new ParallelOptions { MaxDegreeOfParallelism = 35 }, async (page, _) =>
             {
                 var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
                 foreach (var school in schools)
