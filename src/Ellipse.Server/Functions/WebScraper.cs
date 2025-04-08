@@ -53,7 +53,8 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
             _cache.Set(divisionCode, result, new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30)
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30),
+                SlidingExpiration = TimeSpan.FromDays(7),
             });
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Result cached for division {divisionCode}");
             return result;
@@ -130,6 +131,9 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
         var geoLocation = await RetryIfInvalid(c => c.Lat == 0 || c.Lon == 0, (_) => _geoService.GetLatLngCached(address), GeoPoint2d.Zero, 6);
 
+        if (geoLocation == GeoPoint2d.Zero)
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Failed to get coordinates for {name}");
+
         return new SchoolData(name, cell2, cell3, address, geoLocation);
     }
 
@@ -138,7 +142,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var address = await RetryIfInvalid(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
          {
              string address = "";
-             
+
              await _semaphore.WaitAsync().ConfigureAwait(false);
              try
              {

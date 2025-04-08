@@ -41,8 +41,12 @@ public static class Program
 
         builder.Services
         .AddSingleton<GeoService>()
-        .AddSingleton<GeocodingService>()
         .AddSingleton<MarkerService>()
+        .AddSingleton(sp =>
+        {
+            var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+            return new GeocodingService(httpClientFactory.CreateClient("CensusGeocoder"));
+        })
         .AddHttpClient<OsrmHttpApiClient>(client =>
         {
             client.BaseAddress = new Uri("https://router.project-osrm.org/");
