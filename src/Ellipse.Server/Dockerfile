@@ -1,24 +1,24 @@
 # Stage 1: Build the application
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy the project file and restore dependencies
+# Copy all project files (include referenced projects)
 COPY ["src/Ellipse.Server/Ellipse.Server.csproj", "src/Ellipse.Server/"]
+COPY ["src/Ellipse.Common/Ellipse.Common.csproj", "src/Ellipse.Common/"]
+
+# Restore dependencies
 RUN dotnet restore "src/Ellipse.Server/Ellipse.Server.csproj"
 
-# Copy the entire source code and build the app
+# Copy the entire source code
 COPY . .
-WORKDIR "/src/src/Ellipse.Server"
 
+WORKDIR "/src/src/Ellipse.Server"
 RUN dotnet publish "Ellipse.Server.csproj" -c Release -o /app/publish
 
-# Stage 2: Create the runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+# Stage 2: Runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
-
-# Copy the published output from build stage
-COPY --from=build /app/publish /app
+COPY --from=build /app/publish .
 
 EXPOSE 8080
-
-CMD [ "./Ellipse.Server" ]
+CMD ["dotnet", "Ellipse.Server.dll"]

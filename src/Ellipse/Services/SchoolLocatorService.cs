@@ -1,9 +1,6 @@
-using System.Text.Json;
 using Ellipse.Common.Models;
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
-using System.Net;
 using System.Net.Http.Json;
-using System.Text;
 
 namespace Ellipse.Services;
 
@@ -36,7 +33,6 @@ public sealed class SchoolLocatorService : IDisposable
         _httpClient.Timeout = TimeSpan.FromMinutes(6);
 
         // _httpClient.PostAsync($"{BaseUrl}cors/add-origin", new StringContent(@$"{{""origin"": ""{_httpClient.BaseAddress.AbsoluteUri}""}}", Encoding.UTF8, "application/json"));
-
     }
 
     public async Task<List<SchoolData>> GetSchools()
@@ -50,7 +46,7 @@ public sealed class SchoolLocatorService : IDisposable
         var schools = (await Task.WhenAll(tasks).ConfigureAwait(false)).SelectMany(e => e);
 
         Console.WriteLine("[GetSchools] Completed.");
-        return schools.ToList();
+        return [.. schools];
     }
 
 
@@ -66,7 +62,7 @@ public sealed class SchoolLocatorService : IDisposable
       ]);
 
         var result = await _httpClient.SendAsync(request).ConfigureAwait(false);
-        var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>().ConfigureAwait(false)!;
+        var schools = await result.Content.ReadFromJsonAsync<List<SchoolData>>().ConfigureAwait(false);
 
         return schools;
     }

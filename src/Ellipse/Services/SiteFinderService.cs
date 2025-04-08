@@ -6,17 +6,11 @@ using Ellipse.Common.Models.Markers;
 
 namespace Ellipse.Services;
 
-public class SiteFinderService
+public class SiteFinderService(HttpClient httpClient, SchoolLocatorService schoolLocatorService)
 {
-    private readonly HttpClient _httpClient;
-    private readonly SchoolLocatorService _schoolLocatorService;
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly SchoolLocatorService _schoolLocatorService = schoolLocatorService;
     private const double STEP_SIZE = 0.1;
-
-    public SiteFinderService(HttpClient httpClient, SchoolLocatorService schoolLocatorService)
-    {
-        _httpClient = httpClient;
-        _schoolLocatorService = schoolLocatorService;
-    }
 
     public async IAsyncEnumerable<Marker> GetMarkers()
     {
