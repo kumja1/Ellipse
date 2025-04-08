@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
 
-namespace Ellipse.Components;
+namespace Ellipse.Components.MarkerMenu;
 
 partial class MarkerMenu : ComponentBase
 {
@@ -18,7 +18,7 @@ partial class MarkerMenu : ComponentBase
     private Dictionary<string, (double Distance, string Duration)>? Routes =>
         CurrentMarker?.Properties["Routes"] as Dictionary<string, (double Distance, string Duration)>;
 
-    private (double Distance, string Duration) SelectedMarkerProps =>
+    private (double Distance, string Duration) SelectedRouteProps =>
         Routes != null && Routes.TryGetValue(SelectedRouteName, out var value)
             ? value
             : (Distance: 0d, Duration: string.Empty);

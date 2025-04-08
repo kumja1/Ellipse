@@ -1,4 +1,8 @@
-@namespace Ellipse.Components
+@using Ellipse.Components.MarkerMenuItem
+@using MudBlazor
+@using OpenLayers.Blazor
+
+@namespace Ellipse.Components.MarkerMenu
 
 <MudDrawer @bind-Open="DrawerOpen" Anchor="Anchor.Left" Elevation="8"
            Class="h-full shadow-2xl bg-white text-gray-800 rounded-r-lg overflow-auto"
@@ -30,29 +34,7 @@
                 @foreach (var marker in Markers)
                 {
                     <MudListItem>
-                        <MudCard>
-                            <MudCardHeader>
-                                <CardHeaderActions>
-                                    <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
-                                                   OnClick="@(() => SelectMarker(marker))" />
-                                </CardHeaderActions>
-                                <CardHeaderContent>
-                                    <MudText Typo="Typo.h3" Color="Color.Dark" Align="Align.Start">
-                                        @marker.Text
-                                    </MudText>
-                                </CardHeaderContent>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                <div class="text-grey-400">
-                                    <MudText>
-                                        Distance: @marker.Properties["Routes"]["Average Distance"].Distance
-                                    </MudText>
-                                    <MudText>
-                                        Duration: @marker.Properties["Routes"]["Average Distance"].Duration
-                                    </MudText>
-                                </div>
-                            </MudCardContent>
-                        </MudCard>
+                        <MarkerMenuItem Marker="marker" OnSelect="SelectMarker" />
                     </MudListItem>
                 }
             }
@@ -96,13 +78,13 @@
                 <MudText Typo="Typo.body1" Class="font-medium">
                     Distance:
                     <span class="font-normal text-blue-600">
-                        @(Math.Round(SelectedMarkerProps.Distance)) miles
+                        @(Math.Round(SelectedRouteProps.Distance)) miles
                     </span>
                 </MudText>
                 <MudText Typo="Typo.body1" Class="font-medium">
                     Duration:
                     <span class="font-normal text-blue-600">
-                        @(SelectedMarkerProps.Duration)
+                        @(SelectedRouteProps.Duration)
                     </span>
                 </MudText>
             </MudStack>

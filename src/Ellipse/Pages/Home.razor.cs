@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
 using Ellipse.Services;
-using Ellipse.Components;
+using Ellipse.Components.MarkerMenu;
 
 namespace Ellipse.Pages;
 
@@ -25,7 +25,8 @@ partial class Home : ComponentBase
         await base.OnInitializedAsync();
     }
 
-    public void OnMarkerItemClick(Marker marker) {
+    public void OnMarkerItemClick(Marker marker)
+    {
         _selectedMarker = marker;
         _menu.SelectMarker(marker);
     }

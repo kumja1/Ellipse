@@ -1,8 +1,7 @@
-using Ellipse.Extensions;
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
 
-namespace Ellipse.Components;
+namespace Ellipse.Components.MapDisplay;
 
 public partial class MapDisplay
 {

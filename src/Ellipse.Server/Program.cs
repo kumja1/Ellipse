@@ -42,7 +42,8 @@ public static class Program
         builder.Services
         .AddSingleton<GeoService>()
         .AddSingleton<GeocodingService>()
-        .AddSingleton<OsrmHttpApiClient>()
-        .AddSingleton<MarkerService>();
+        .AddSingleton<MarkerService>()
+         .AddHttpClient<OsrmHttpApiClient>();
+
     }
 }
