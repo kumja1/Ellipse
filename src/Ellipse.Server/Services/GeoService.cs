@@ -1,14 +1,12 @@
+using CensusGeocoder;
 using Ellipse.Common.Models;
-using Mapbox.AspNetCore.Models;
-using Osrm.HttpApiClient;
-using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
 
 
 namespace Ellipse.Server.Services;
 
-public class GeoService(MapboxGeocoder geocoder)
+public class GeoService(GeocodingService geocoder)
 {
-    private readonly MapboxGeocoder _geocoder = geocoder;
+    private readonly GeocodingService _geocoder = geocoder;
 
     private readonly Dictionary<GeoPoint2d, string> _addressCache = [];
 
@@ -27,16 +25,8 @@ public class GeoService(MapboxGeocoder geocoder)
     {
         try
         {
-            var response = await _geocoder.ReverseGeocodingAsync(new ReverseGeocodingParameters
-            {
-                Coordinates = new GeoCoordinate
-                {
-                    Latitude = latitude,
-                    Longitude = longitude
-                }
-            });
-
-            return response?.Place?.Name ?? string.Empty;
+            var response = await _geocoder.Coordinates((decimal)latitude, (decimal)longitude);
+            return response.addressMatches?.FirstOrDefault()?.matchedAddress ?? string.Empty;
         }
         catch (Exception ex)
         {
@@ -64,17 +54,11 @@ public class GeoService(MapboxGeocoder geocoder)
     {
         try
         {
-            
-            var response = await _geocoder.GeocodingAsync(new GeocodingParameters
-            {
-                Query = address
-            });
-
-            var firstResult = response?.Places?.FirstOrDefault();
-            if (firstResult != null)
-            {
-                return (firstResult.Coordinates.Latitude, firstResult.Coordinates.Longitude);
-            }
+            var response = await _geocoder.OnelineAddressToLocation(address);
+            var firstResult = response.addressMatches?.FirstOrDefault();
+            if (firstResult == null)
+                return GeoPoint2d.Zero;
+            return (firstResult.coordinates.x, firstResult.coordinates.y);
         }
         catch (Exception ex)
         {
