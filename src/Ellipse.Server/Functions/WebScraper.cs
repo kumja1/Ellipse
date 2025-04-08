@@ -28,6 +28,8 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
     private readonly IBrowsingContext _browsingContext = BrowsingContext.New(Configuration.Default.WithDefaultLoader().WithXPath());
 
+    private readonly SemaphoreSlim _semaphore = new(20, 20);
+
     public static async Task<string> StartNewAsync(int divisionCode, bool overrideCache, GeoService geoService)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Starting scrape for division {divisionCode}");
@@ -136,6 +138,8 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var address = await RetryIfInvalid(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
          {
              string address = "";
+             
+             await _semaphore.WaitAsync().ConfigureAwait(false);
              try
              {
                  var url = $"{SchoolInfoUrl}/{cleanedName}";
@@ -164,6 +168,10 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
              catch (Exception ex)
              {
                  Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Exception occurred for {cleanedName}: {ex.Message}. Retrying...");
+             }
+             finally
+             {
+                 _semaphore.Release();
              }
 
              return address;

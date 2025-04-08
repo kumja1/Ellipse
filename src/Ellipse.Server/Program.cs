@@ -43,7 +43,10 @@ public static class Program
         .AddSingleton<GeoService>()
         .AddSingleton<GeocodingService>()
         .AddSingleton<MarkerService>()
-         .AddHttpClient<OsrmHttpApiClient>();
+        .AddHttpClient<OsrmHttpApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://router.project-osrm.org/");
+        });
 
     }
 }
