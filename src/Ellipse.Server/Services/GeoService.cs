@@ -12,7 +12,7 @@ public class GeoService(GeocodingService geocoder)
 
     public async Task<string> GetAddressCached(double latitude, double longitude)
     {
-        
+
         var latLng = new GeoPoint2d(latitude, longitude);
         if (_addressCache.TryGetValue(latLng, out var cachedAddress))
             return cachedAddress;
@@ -27,7 +27,10 @@ public class GeoService(GeocodingService geocoder)
         try
         {
             var response = await _geocoder.Coordinates((decimal)latitude, (decimal)longitude);
-            return response.addressMatches?.FirstOrDefault()?.matchedAddress ?? string.Empty;
+            var address = response.addressMatches?.FirstOrDefault()?.matchedAddress ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(address))
+                Console.WriteLine($"No address found for coordinates: {latitude}, {longitude}");
+            return address;
         }
         catch (Exception ex)
         {
@@ -58,7 +61,23 @@ public class GeoService(GeocodingService geocoder)
             var response = await _geocoder.OnelineAddressToLocation(address);
             var firstResult = response.addressMatches?.FirstOrDefault();
             if (firstResult == null)
+            {
+                Console.WriteLine($"No coordinates found for address: {address}");  
                 return GeoPoint2d.Zero;
+            }
+
+            if (firstResult.coordinates == null)
+            {
+                Console.WriteLine($"Coordinates are null for address: {address}");
+                return GeoPoint2d.Zero;
+            }
+
+            if (firstResult.coordinates.x == 0 && firstResult.coordinates.y == 0)
+            {
+                Console.WriteLine($"Coordinates are zero for address: {address}");
+                return GeoPoint2d.Zero;
+            }
+
             return (firstResult.coordinates.x, firstResult.coordinates.y);
         }
         catch (Exception ex)
