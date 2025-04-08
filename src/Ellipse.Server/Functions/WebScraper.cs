@@ -94,8 +94,8 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var url = $"{BaseUrl}/page/{page}?division={_divisionCode}";
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url}");
 
-        IDocument document = null;
-        var rows = await RetryIfInvalid<List<IElement>>(l => l.Count > 0, async (_) =>
+        IDocument? document = null;
+        var rows = await RetryIfInvalid(l => l.Count > 0, async (_) =>
         {
             document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
             return document.QuerySelectorAll("table > tbody > tr").ToList();
@@ -131,7 +131,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
         var geoLocation = await RetryIfInvalid(c => c.Lat == 0 || c.Lon == 0, (_) => _geoService.GetLatLngCached(address), GeoPoint2d.Zero, 6);
 
-        return new SchoolData(name, cell2, cell3, address, await geoLocation);
+        return new SchoolData(name, cell2, cell3, address, geoLocation);
     }
 
     private async Task<string> FetchAddressAsync(string cleanedName)
@@ -142,7 +142,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
             return cachedAddress;
         }
 
-        var address = await RetryIfInvalid<string>(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
+        var address = await RetryIfInvalid(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
          {
              string address = "";
              await _addressSemaphore.WaitAsync().ConfigureAwait(false);

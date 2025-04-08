@@ -1,6 +1,7 @@
 using Ellipse.Server.Services;
 using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
 using Mapbox.AspNetCore.DependencyInjection;
+using Osrm.HttpApiClient;
 
 namespace Ellipse.Server;
 
@@ -42,7 +43,7 @@ public static class Program
 
         builder.Services
         .AddSingleton<GeoService>()
-        .AddSingleton<MapboxClient>()
+        .AddSingleton<OsrmHttpApiClient>()
         .AddMapBoxServices(options => options.UseApiKey(Environment.GetEnvironmentVariable("MAPBOX_API_KEY")))
         .AddSingleton<MarkerService>()
         .AddHttpClient<MapboxGeocoder>();

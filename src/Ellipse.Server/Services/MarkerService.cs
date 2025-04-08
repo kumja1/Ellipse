@@ -1,24 +1,23 @@
 using Ellipse.Common.Models;
-using Ellipse.Common.Enums;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
 using Ellipse.Common.Models.Markers;
 using Route = Ellipse.Common.Models.Directions.Route;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
-using Ellipse.Common.Models.Matrix;
-using Ellipse.Common.Enums.Matrix;
+using Osrm.HttpApiClient;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : IDisposable
+public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
 {
     private const int MAX_CONCURRENT_BATCHES = 2;
     private const int MAX_RETRIES = 6;
     private const int MATRIX_BATCH_SIZE = 23;
 
     private readonly GeoService _geocoder = geocoder;
-    private readonly MapboxClient _mapboxService = mapboxService;
+
+    private readonly OsrmHttpApiClient _osrmClient = client;
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
     private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks = new();
@@ -121,12 +120,18 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
                     for (int i = 0; i < batch.Length; i++)
                     {
                         var school = batch[i];
-                        double distance = MetersToMiles(response.Distances[0][i]);
-                        double duration = response.Durations[0][i];
+                        var distance = response.Distances[0][i];
+                        var duration = response.Durations[0][i];
+                        if (!distance.HasValue || !duration.HasValue)
+                        {
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Failed to caculate route for {school.Name}");
+                            continue;
+                        }
+
                         results[school.Name] = new Route
                         {
-                            Distance = distance,
-                            Duration = duration
+                            Distance = MetersToMiles(distance.Value),
+                            Duration = duration.Value
                         };
                         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] School: {school.Name} => Distance: {distance}, Duration: {duration}");
                     }
@@ -152,7 +157,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
         return new Dictionary<string, Route>(results);
     }
 
-    private async Task<MatrixResponse> GetMatrixBatch(GeoPoint2d source, List<GeoPoint2d> destinations)
+    private async Task<TableResponse> GetMatrixBatch(GeoPoint2d source, List<GeoPoint2d> destinations)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Called for source: {source} with {destinations.Count} destinations.");
         if (string.IsNullOrWhiteSpace(_mapboxAccessToken))
@@ -161,17 +166,16 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
             throw new InvalidOperationException("MAPBOX_API_KEY environment variable is missing or empty.");
         }
 
-        var request = new MatrixRequest
-        {
-            Sources = [source],
-            Destinations = destinations,
-            Profile = RoutingProfile.Driving,
-            Annotations = [MatrixAnnotationType.Distance, MatrixAnnotationType.Duration],
-            AccessToken = _mapboxAccessToken
-        };
+        var request = OsrmServices.Table(PredefinedProfiles.Car, GeographicalCoordinates.Create([
+            Coordinate.Create(source.Lon,source.Lat),
+            ..destinations.Select(dest=> Coordinate.Create(dest.Lon,source.Lat))
+        ]))
+        .Destinations([.. Enumerable.Range(1, destinations.Count)])
+        .Sources(0)
+        .Build();
 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Request prepared. Calling MapboxClient.GetMatrixAsync...");
-        var response = await _mapboxService.GetMatrixAsync(request).ConfigureAwait(false);
+        var response = await _osrmClient.GetTableAsync(request);
 
         if (response?.Durations == null || response.Distances == null)
         {
@@ -209,7 +213,7 @@ public class MarkerService(GeoService geocoder, MapboxClient mapboxService) : ID
         return result;
     }
 
-    private static double MetersToMiles(double meters)
+    private static double MetersToMiles(float meters)
     {
         double miles = meters / 1609.34;
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [MetersToMiles] Converted {meters} meters to {miles} miles.");

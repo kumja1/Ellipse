@@ -1,6 +1,8 @@
 using Ellipse.Common.Models;
 using Mapbox.AspNetCore.Models;
+using Osrm.HttpApiClient;
 using MapboxGeocoder = Mapbox.AspNetCore.Services.MapBoxService;
+
 
 namespace Ellipse.Server.Services;
 
@@ -62,6 +64,7 @@ public class GeoService(MapboxGeocoder geocoder)
     {
         try
         {
+            
             var response = await _geocoder.GeocodingAsync(new GeocodingParameters
             {
                 Query = address
