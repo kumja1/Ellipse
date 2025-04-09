@@ -1,23 +1,23 @@
-using CensusGeocoder;
 using Ellipse.Common.Models;
+using Nominatim.API.Geocoders;
+using Nominatim.API.Models;
 
 
 namespace Ellipse.Server.Services;
 
-public class GeoService(GeocodingService geocoder)
+public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocoder)
 {
-    private readonly GeocodingService _geocoder = geocoder;
-
+    private readonly ForwardGeocoder _geocoder = geocoder;
+    private readonly ReverseGeocoder _reverseGeocoder = reverseGeocoder;
     private readonly Dictionary<GeoPoint2d, string> _addressCache = [];
 
     public async Task<string> GetAddressCached(double latitude, double longitude)
     {
-
-        var latLng = new GeoPoint2d(latitude, longitude);
+        var latLng = new GeoPoint2d(longitude, latitude);
         if (_addressCache.TryGetValue(latLng, out var cachedAddress))
             return cachedAddress;
 
-        var address = await GetAddress(latitude, longitude);
+        var address = await GetAddress(longitude, latitude);
         _addressCache[latLng] = address;
         return address;
     }
@@ -26,10 +26,23 @@ public class GeoService(GeocodingService geocoder)
     {
         try
         {
-            var response = await _geocoder.Coordinates((decimal)latitude, (decimal)longitude);
-            var address = response.addressMatches?.FirstOrDefault()?.matchedAddress ?? string.Empty;
+            var response = await _reverseGeocoder.ReverseGeocode(new ReverseGeocodeRequest
+            {
+                Latitude = latitude,
+                Longitude = longitude,
+                BreakdownAddressElements = true,
+            });
+
+            if (response == null)
+                return string.Empty;
+
+            var address = response.Address != null
+                ? $"{response.Address.HouseNumber} {response.Address.Road}, {response.Address.City}, {response.Address.State}, {response.Address.PostCode}"
+                : string.Empty;
+
             if (string.IsNullOrWhiteSpace(address))
-                Console.WriteLine($"No address found for coordinates: {latitude}, {longitude}");
+                Console.WriteLine($"No address found for coordinates: {longitude}, {latitude}");
+
             return address;
         }
         catch (Exception ex)
@@ -58,27 +71,19 @@ public class GeoService(GeocodingService geocoder)
     {
         try
         {
-            var response = await _geocoder.OnelineAddressToLocation(address);
-            var firstResult = response.addressMatches?.FirstOrDefault();
-            if (firstResult == null)
+            var response = await _geocoder.Geocode(new ForwardGeocodeRequest
             {
-                Console.WriteLine($"No coordinates found for address: {address}");  
+                queryString = address,
+                State = "Virginia",
+                CountryCodeSearch = "US",
+            });
+            if (response == null || response.Length == 0)
                 return GeoPoint2d.Zero;
-            }
 
-            if (firstResult.coordinates == null)
-            {
-                Console.WriteLine($"Coordinates are null for address: {address}");
-                return GeoPoint2d.Zero;
-            }
-
-            if (firstResult.coordinates.x == 0 && firstResult.coordinates.y == 0)
-            {
-                Console.WriteLine($"Coordinates are zero for address: {address}");
-                return GeoPoint2d.Zero;
-            }
-
-            return (firstResult.coordinates.x, firstResult.coordinates.y);
+            var firstResult = response.FirstOrDefault();
+            return firstResult != null
+                ? new GeoPoint2d(firstResult.Longitude, firstResult.Latitude)
+                : GeoPoint2d.Zero;
         }
         catch (Exception ex)
         {

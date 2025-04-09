@@ -14,9 +14,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
     private const int MAX_CONCURRENT_BATCHES = 4;
     private const int MAX_RETRIES = 5;
     private const int MATRIX_BATCH_SIZE = 25;
-
     private readonly GeoService _geocoder = geocoder;
-
     private readonly OsrmHttpApiClient _osrmClient = client;
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
@@ -107,7 +105,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             for (int retry = 0; retry <= MAX_RETRIES; retry++)
             {
                 Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Batch attempt {retry + 1} for batch with {batch.Length} schools");
-                await _semaphore.WaitAsync(1000).ConfigureAwait(false);
+                await _semaphore.WaitAsync().ConfigureAwait(false);
                 try
                 {
                     var destinationList = batch.Select(s => s.LatLng).ToList();

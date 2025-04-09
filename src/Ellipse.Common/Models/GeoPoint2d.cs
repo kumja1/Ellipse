@@ -1,8 +1,8 @@
 namespace Ellipse.Common.Models;
 
-public readonly struct GeoPoint2d(double lat, double lon)
+public readonly struct GeoPoint2d(double lon, double lat)
 {
-    public GeoPoint2d(decimal lat, decimal lon) : this((double)lat, (double)lon)
+    public GeoPoint2d(decimal lon, decimal lat) : this((double)lon, (double)lat)
     {
     }
 
