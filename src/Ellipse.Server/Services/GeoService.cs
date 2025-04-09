@@ -75,7 +75,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
             {
                 queryString = address,
                 State = "Virginia",
-                CountryCodeSearch = "us",
+                Country = "United States",
             });
 
             Console.WriteLine($"Geocoding response: {response}");

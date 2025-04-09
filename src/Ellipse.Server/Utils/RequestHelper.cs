@@ -1,3 +1,4 @@
+namespace Ellipse.Server.Utils;
 
 public static class RequestHelper
 {
