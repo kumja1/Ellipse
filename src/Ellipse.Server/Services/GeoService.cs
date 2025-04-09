@@ -29,6 +29,10 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
             Console.WriteLine($"Getting address for coordinates: {longitude}, {latitude}");
             var response = await _reverseGeocoder.ReverseGeocode(new ReverseGeocodeRequest
             {
+                BreakdownAddressElements = true,
+                ShowGeoJSON = true,
+                ShowAlternativeNames = true,
+                ShowExtraTags = true,
                 Latitude = latitude,
                 Longitude = longitude,
             });
@@ -40,6 +44,8 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
             var address = response.Address != null
                 ? $"{response.Address.HouseNumber} {response.Address.Road}, {response.Address.City}, {response.Address.State}, {response.Address.PostCode}"
                 : string.Empty;
+            
+            Console.WriteLine($"Address: {address}");
 
             if (string.IsNullOrWhiteSpace(address))
                 Console.WriteLine($"No address found for coordinates: {longitude}, {latitude}");
@@ -77,6 +83,10 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
             var response = await _geocoder.Geocode(new ForwardGeocodeRequest
             {
                 queryString = address,
+                BreakdownAddressElements = true,
+                ShowGeoJSON = true,
+                ShowAlternativeNames = true,
+                ShowExtraTags = true,
             });
 
             Console.WriteLine($"Geocoding response: {response}");
@@ -84,6 +94,11 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
             {
                 Console.WriteLine($"No coordinates found for address: {address}");
                 return GeoPoint2d.Zero;
+            }
+
+            foreach (var result in response)
+            {
+                Console.WriteLine($"Result: {result} - {result.Latitude}, {result.Longitude}");
             }
 
             var firstResult = response.FirstOrDefault();
