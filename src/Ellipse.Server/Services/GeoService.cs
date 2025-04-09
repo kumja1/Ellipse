@@ -26,6 +26,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
     {
         try
         {
+            Console.WriteLine($"Getting address for coordinates: {longitude}, {latitude}");
             var response = await _reverseGeocoder.ReverseGeocode(new ReverseGeocodeRequest
             {
                 Latitude = latitude,
@@ -61,7 +62,8 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
         GeoPoint2d latLng = _addressCache.FirstOrDefault(kvp => kvp.Value == address, new KeyValuePair<GeoPoint2d, string>(GeoPoint2d.Zero, "")).Key;
         if (latLng != GeoPoint2d.Zero)
             return latLng;
-
+        
+        Console.WriteLine($"Getting coordinates for address: {address}");
         latLng = await GetLatLng(address);
         _addressCache[latLng] = address;
         return latLng;
@@ -71,6 +73,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
     {
         try
         {
+            Console.WriteLine($"Getting coordinates for address: {address}");
             var response = await _geocoder.Geocode(new ForwardGeocodeRequest
             {
                 queryString = address,

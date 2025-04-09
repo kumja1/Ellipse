@@ -44,15 +44,15 @@ public static class Program
         .AddSingleton<GeoService>()
         .AddSingleton<MarkerService>()
         .AddSingleton<INominatimWebInterface, NominatimWebInterface>()
-        .AddSingleton(sp => new ForwardGeocoder(sp.GetRequiredService<INominatimWebInterface>(), "https://nominatim.openstreetmap.org/search"))
-        .AddSingleton(sp => new ReverseGeocoder(sp.GetRequiredService<INominatimWebInterface>(), "https://nominatim.openstreetmap.org/reverse"))
+        .AddSingleton<ForwardGeocoder>()
+        .AddSingleton<ReverseGeocoder>()
         .AddSingleton(sp =>
         {
             var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
             var client = httpClientFactory.CreateClient("OsrmClient");
 
             client.BaseAddress = new Uri("https://router.project-osrm.org/");
-            return new OsrmHttpApiClient(httpClientFactory.CreateClient("OsrmClient"));
+            return new OsrmHttpApiClient(client);
         })
         .AddHttpClient();
 
