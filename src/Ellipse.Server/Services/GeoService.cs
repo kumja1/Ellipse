@@ -11,7 +11,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
     private readonly ReverseGeocoder _reverseGeocoder = reverseGeocoder;
     private readonly Dictionary<GeoPoint2d, string> _addressCache = [];
 
-    public async Task<string> GetAddressCached(double latitude, double longitude)
+    public async Task<string> GetAddressCached(double longitude, double latitude)
     {
         var latLng = new GeoPoint2d(longitude, latitude);
         if (_addressCache.TryGetValue(latLng, out var cachedAddress))
@@ -22,7 +22,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
         return address;
     }
 
-    private async Task<string> GetAddress(double latitude, double longitude)
+    private async Task<string> GetAddress(double longitude, double latitude)
     {
         try
         {

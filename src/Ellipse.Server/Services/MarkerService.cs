@@ -65,7 +65,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         }
 
         // Start tasks concurrently
-        var addressTask = _geocoder.GetAddressCached(request.Point.Lat, request.Point.Lon);
+        var addressTask = _geocoder.GetAddressCached(request.Point.Lon, request.Point.Lat);
         var routesTask = GetMatrixRoutes(request.Point, request.Schools);
 
         string address = await addressTask.ConfigureAwait(false);
