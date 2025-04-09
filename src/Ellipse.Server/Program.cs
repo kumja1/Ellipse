@@ -1,3 +1,4 @@
+using CensusGeocoder;
 using Ellipse.Server.Services;
 using Nominatim.API.Geocoders;
 using Nominatim.API.Interfaces;
@@ -43,9 +44,7 @@ public static class Program
         builder.Services
         .AddSingleton<GeoService>()
         .AddSingleton<MarkerService>()
-        .AddSingleton<INominatimWebInterface, NominatimWebInterface>()
-        .AddSingleton<ForwardGeocoder>()
-        .AddSingleton<ReverseGeocoder>()
+        .AddSingleton<GeocodingService>()
         .AddSingleton(sp =>
         {
             var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();

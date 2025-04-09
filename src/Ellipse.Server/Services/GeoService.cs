@@ -1,15 +1,20 @@
+using CensusGeocoder;
 using Ellipse.Common.Models;
-using Nominatim.API.Geocoders;
-using Nominatim.API.Models;
+
 
 
 namespace Ellipse.Server.Services;
 
-public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocoder)
+public class GeoService
 {
-    private readonly ForwardGeocoder _geocoder = geocoder;
-    private readonly ReverseGeocoder _reverseGeocoder = reverseGeocoder;
+    private readonly GeocodingService _geocoder;
     private readonly Dictionary<GeoPoint2d, string> _addressCache = [];
+
+    public GeoService(GeocodingService geocoder)
+    {
+        _geocoder = geocoder;
+        geocoder.Vintage = "4";
+    }
 
     public async Task<string> GetAddressCached(double longitude, double latitude)
     {
@@ -27,26 +32,21 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
         try
         {
             Console.WriteLine($"Getting address for coordinates: {longitude}, {latitude}");
-            var response = await _reverseGeocoder.ReverseGeocode(new ReverseGeocodeRequest
-            {
-                BreakdownAddressElements = true,
-                ShowGeoJSON = true,
-                ShowAlternativeNames = true,
-                ShowExtraTags = true,
-                Latitude = latitude,
-                Longitude = longitude,
-            });
+            var response = await _geocoder.Coordinates((decimal)longitude, (decimal)latitude);
 
             Console.WriteLine($"Geocoding response: {response}");
-            if (response == null)
+            if (response == null || response.addressMatches.Length == 0)
+            {
+                Console.WriteLine($"No coordinates found for address: {longitude}, {latitude}");
                 return string.Empty;
+            }
 
-            var address = response.Address != null
-                ? $"{response.Address.HouseNumber} {response.Address.Road}, {response.Address.City}, {response.Address.State}, {response.Address.PostCode}"
+            var addressMatch = response.addressMatches.FirstOrDefault();
+            var address = addressMatch != null
+                ? addressMatch.matchedAddress
                 : string.Empty;
-            
-            Console.WriteLine($"Address: {address}");
 
+            Console.WriteLine($"Address: {address}");
             if (string.IsNullOrWhiteSpace(address))
                 Console.WriteLine($"No address found for coordinates: {longitude}, {latitude}");
 
@@ -68,7 +68,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
         GeoPoint2d latLng = _addressCache.FirstOrDefault(kvp => kvp.Value == address, new KeyValuePair<GeoPoint2d, string>(GeoPoint2d.Zero, "")).Key;
         if (latLng != GeoPoint2d.Zero)
             return latLng;
-        
+
         Console.WriteLine($"Getting coordinates for address: {address}");
         latLng = await GetLatLng(address);
         _addressCache[latLng] = address;
@@ -80,31 +80,24 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
         try
         {
             Console.WriteLine($"Getting coordinates for address: {address}");
-            var response = await _geocoder.Geocode(new ForwardGeocodeRequest
-            {
-                queryString = address,
-                BreakdownAddressElements = true,
-                ShowGeoJSON = true,
-                ShowAlternativeNames = true,
-                ShowExtraTags = true,
-            });
+            var response = await _geocoder.OnelineAddressToGeography(address);
 
             Console.WriteLine($"Geocoding response: {response}");
-            if (response == null || response.Length == 0)
+            if (response == null || response.addressMatches.Length == 0)
             {
                 Console.WriteLine($"No coordinates found for address: {address}");
                 return GeoPoint2d.Zero;
             }
 
-            foreach (var result in response)
+            foreach (var result in response.addressMatches)
             {
-                Console.WriteLine($"Result: {result} - {result.Latitude}, {result.Longitude}");
+                Console.WriteLine($"Result: {result} - {result.coordinates.x}, {result.coordinates.y}");
             }
 
-            var firstResult = response.FirstOrDefault();
+            var firstResult = response.addressMatches.FirstOrDefault();
             Console.WriteLine($"First result: {firstResult}");
             return firstResult != null
-                ? new GeoPoint2d(firstResult.Longitude, firstResult.Latitude)
+                ? new GeoPoint2d(firstResult.coordinates.x, firstResult.coordinates.y)
                 : GeoPoint2d.Zero;
         }
         catch (Exception ex)
