@@ -32,6 +32,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
                 Longitude = longitude,
             });
 
+            Console.WriteLine($"Geocoding response: {response}");
             if (response == null)
                 return string.Empty;
 
@@ -76,10 +77,16 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
                 State = "Virginia",
                 CountryCodeSearch = "us",
             });
+
+            Console.WriteLine($"Geocoding response: {response}");
             if (response == null || response.Length == 0)
+            {
+                Console.WriteLine($"No coordinates found for address: {address}");
                 return GeoPoint2d.Zero;
+            }
 
             var firstResult = response.FirstOrDefault();
+            Console.WriteLine($"First result: {firstResult}");
             return firstResult != null
                 ? new GeoPoint2d(firstResult.Longitude, firstResult.Latitude)
                 : GeoPoint2d.Zero;
