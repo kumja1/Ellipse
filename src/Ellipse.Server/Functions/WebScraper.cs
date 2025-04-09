@@ -130,7 +130,8 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
         var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
         var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
-        var geoLocation = await RequestHelper.RetryIfInvalid(c => c == GeoPoint2d.Zero, (attempt) =>{
+        var geoLocation = await RequestHelper.RetryIfInvalid(c => c != GeoPoint2d.Zero, (attempt) =>
+        {
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Fetching coordinates for {name}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Address: {address}");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt: {attempt}");

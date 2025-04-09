@@ -13,7 +13,11 @@ public static class RequestHelper
             {
                 value = await func(retries);
                 if (!isValid(value))
-                    await Task.Delay((int)(delayMs * Math.Pow(2, ++retries)));
+                {
+                    Console.WriteLine($"Retrying... Attempt {retries + 1} of {maxRetries}");
+                    retries++;
+                    await Task.Delay((int)(delayMs * Math.Pow(2, retries)));
+                }
             }
             catch (Exception ex)
             {
@@ -22,7 +26,7 @@ public static class RequestHelper
         }
         if (retries >= maxRetries)
             Console.WriteLine($"Max retries reached. Returning default value: {defaultValue}");
-            
+
         return value;
     }
 }
