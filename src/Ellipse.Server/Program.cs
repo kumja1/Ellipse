@@ -1,8 +1,5 @@
 using CensusGeocoder;
 using Ellipse.Server.Services;
-using Nominatim.API.Geocoders;
-using Nominatim.API.Interfaces;
-using Nominatim.API.Web;
 using Osrm.HttpApiClient;
 
 namespace Ellipse.Server;
