@@ -108,7 +108,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                 await _semaphore.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    var destinationList = batch.Select(s => s.LatLng).ToList();
+                    List<GeoPoint2d> destinationList = [.. batch.Select(s => s.LatLng)];
                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Calling GetMatrixBatch for {destinationList.Count} destinations");
                     var response = await GetMatrixBatch(source, destinationList).ConfigureAwait(false);
                     Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Received matrix response");

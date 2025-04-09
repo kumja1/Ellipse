@@ -30,7 +30,6 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
             {
                 Latitude = latitude,
                 Longitude = longitude,
-                BreakdownAddressElements = true,
             });
 
             if (response == null)
@@ -75,7 +74,7 @@ public class GeoService(ForwardGeocoder geocoder, ReverseGeocoder reverseGeocode
             {
                 queryString = address,
                 State = "Virginia",
-                CountryCodeSearch = "US",
+                CountryCodeSearch = "us",
             });
             if (response == null || response.Length == 0)
                 return GeoPoint2d.Zero;

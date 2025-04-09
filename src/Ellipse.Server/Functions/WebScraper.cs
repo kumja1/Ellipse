@@ -95,7 +95,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url}");
 
         IDocument? document = null;
-        var rows = await RetryIfInvalid(l => l.Count > 0, async (_) =>
+        var rows = await RequestHelper.RetryIfInvalid(l => l.Count > 0, async (_) =>
         {
             document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
             return document.QuerySelectorAll("table > tbody > tr").ToList();
@@ -129,7 +129,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
         var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
         var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
-        var geoLocation = await RetryIfInvalid(c => c.Lat == 0 || c.Lon == 0, (_) => _geoService.GetLatLngCached(address), GeoPoint2d.Zero, 6);
+        var geoLocation = await RequestHelper.RetryIfInvalid(c => c.Lat == 0 || c.Lon == 0, (_) => _geoService.GetLatLngCached(address), GeoPoint2d.Zero, 6);
 
         if (geoLocation == GeoPoint2d.Zero)
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Failed to get coordinates for {name}");
@@ -139,7 +139,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
     private async Task<string> FetchAddressAsync(string cleanedName)
     {
-        var address = await RetryIfInvalid(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
+        var address = await RequestHelper.RetryIfInvalid(s => !string.IsNullOrWhiteSpace(s), async (attempt) =>
          {
              string address = "";
 
@@ -200,18 +200,5 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         return pages;
     }
 
-    private static async Task<TResult> RetryIfInvalid<TResult>(Func<TResult, bool> isValid, Func<int, Task<TResult>> action, TResult defaultValue, int maxAttempts = 3, int delay = 2)
-    {
-        TResult result = defaultValue;
-        int attempts = 0;
-
-        while (attempts < maxAttempts && !isValid(result))
-        {
-            result = await action(attempts);
-            if (!isValid(result))
-                await Task.Delay(TimeSpan.FromSeconds(delay * 2 ^ attempts)).ConfigureAwait(false);
-        }
-        return result;
-    }
 
 }
