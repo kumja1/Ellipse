@@ -9,6 +9,7 @@ using Microsoft.Extensions.Caching.Memory;
 using System.Text.RegularExpressions;
 using AngleSharp.XPath;
 using Ellipse.Server.Services;
+using Ellipse.Server.Utils;
 
 namespace Ellipse.Server.Functions;
 
