@@ -26,7 +26,7 @@ partial class Program
         builder
             .Services.AddMudServices()
             .AddScoped<SiteFinderService>()
-            .AddHttpClient<SchoolLocatorService>(client =>
+            .AddHttpClient<SchoolFetcherService>(client =>
             {
                 client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
             });
