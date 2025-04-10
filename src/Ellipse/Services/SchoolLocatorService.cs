@@ -30,7 +30,7 @@ public sealed class SchoolLocatorService : IDisposable
     public SchoolLocatorService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        _httpClient.Timeout = TimeSpan.FromMinutes(6);
+        _httpClient.Timeout = TimeSpan.FromMinutes(10);
 
         // _httpClient.PostAsync($"{BaseUrl}cors/add-origin", new StringContent(@$"{{""origin"": ""{_httpClient.BaseAddress.AbsoluteUri}""}}", Encoding.UTF8, "application/json"));
     }

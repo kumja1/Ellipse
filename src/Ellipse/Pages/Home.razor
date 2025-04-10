@@ -8,11 +8,13 @@
 <PageTitle>Home</PageTitle>
 
 <div class="bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200">
+    <div class="w-screen h-screen absolute inset-0">
+        <MapDisplay Markers="_markers" OnMarkerClick="OnMarkerItemClick" />
+    </div>
     <!-- Sidebar -->
     <div class="z-10">
         <MarkerMenu @ref="_menu" DrawerOpen="true" OnButtonClick="GoToLandSearch" IsListMode="true" />
     </div>
-    <div class="w-screen h-screen absolute inset-0">
-        <MapDisplay Markers="_markers" OnMarkerClick="OnMarkerItemClick"  />
-    </div>
+    <MudFab StartIcon="@Icons.Material.Filled.Menu" IconColor="Color.Primary" Class="bg-blue z-10 absolute left-0 bottom-0" />
+
 </div>
