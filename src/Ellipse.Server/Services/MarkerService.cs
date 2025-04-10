@@ -158,7 +158,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         for (int retry = 0; retry <= MAX_RETRIES; retry++)
         {
             Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Batch attempt {retry + 1} for batch with {batch.Length} schools"
+                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Batch attempt {retry} for batch with {batch.Length} schools"
             );
             await _semaphore.WaitAsync(token).ConfigureAwait(false);
             try
@@ -172,15 +172,19 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                     $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Received matrix response"
                 );
 
+                if (
+                    response.Distances.Length == 0
+                    || response.Durations.Length == 0
+                    || response.Distances[0].Length < batch.Length
+                )
+                {
+                    throw new InvalidOperationException("Incomplete matrix response");
+                }
+
                 for (int i = 0; i < batch.Length; i++)
                 {
                     var school = batch[i];
-                    if (response.Distances.Length == 0 || response.Durations.Length == 0)
-                    {
-                        Console.WriteLine(
-                            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Failed to get route response for {school.Name}"
-                        );
-                    }
+
                     var distance = response.Distances[0][i];
                     var duration = response.Durations[0][i];
                     if (!distance.HasValue || !duration.HasValue)
@@ -200,7 +204,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                         $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] School: {school.Name} => Distance: {distance}, Duration: {duration}"
                     );
                 }
-                continue;
+                break;
             }
             catch (Exception ex) when (retry < MAX_RETRIES)
             {
