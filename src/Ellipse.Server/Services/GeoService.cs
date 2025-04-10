@@ -1,3 +1,4 @@
+using System.Globalization;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding;
@@ -162,8 +163,17 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             {
                 Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
                 Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
+                var geocodeResponse = await _mapBoxGeocoder.GeocodingAsync(
+                    new GeocodingParameters { Query = address }
+                );
 
-                return GeoPoint2d.Zero;
+                var location = geocodeResponse.Features.OrderBy(f => f.Relevance).LastOrDefault();
+                if (location == null)
+                {
+                    Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
+                    return GeoPoint2d.Zero;
+                }
+                return new GeoPoint2d(location.Geometry.Coordinate.Longitude, location.Geometry.Coordinate.Latitude);
             }
 
             var firstResult = response.Result.AddressMatches.FirstOrDefault();
