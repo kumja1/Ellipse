@@ -42,8 +42,8 @@ public static class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
         builder.Services
-        .AddSingleton<GeoService>()
-        .AddSingleton<MarkerService>()
+        .AddScoped<MarkerService>()
+        .AddScoped<GeoService>()
         .AddScoped<INominatimWebInterface, NominatimWebInterface>()
         .AddScoped<ForwardGeocoder>()
         .AddScoped<ReverseGeocoder>()
