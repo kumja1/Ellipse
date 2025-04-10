@@ -45,6 +45,7 @@ public static class Program
             .AddHttpClient<OsrmHttpApiClient>(
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")
-            );
+            )
+            .SetHandlerLifetime(TimeSpan.FromMinutes(5));
     }
 }
