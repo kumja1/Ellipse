@@ -141,9 +141,8 @@ namespace Ellipse.Server.Functions
                             );
                             var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
                             foreach (var school in schools)
-                            {
                                 queue.Enqueue(school);
-                            }
+
                             Console.WriteLine(
                                 $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Processed page {page}, found {schools.Count} schools"
                             );
@@ -184,9 +183,9 @@ namespace Ellipse.Server.Functions
                         );
                         return rowList;
                     },
-                    defaultValue: new List<IElement>(),
-                    maxRetries: 4,
-                    delayMs: 200
+                    defaultValue: [],
+                    maxRetries: 10,
+                    delayMs: 300
                 )
                 .ConfigureAwait(false);
 
@@ -195,7 +194,7 @@ namespace Ellipse.Server.Functions
             var schools = results.Where(s => s != null).Cast<SchoolData>().ToList();
 
             sw.Stop();
-            int totalPages = ParseTotalPages(document);
+            int totalPages = ParseTotalPages(document!);
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Completed processing page {page} in {sw.ElapsedMilliseconds}ms - TotalPages: {totalPages}"
             );
@@ -244,17 +243,15 @@ namespace Ellipse.Server.Functions
                         return location;
                     },
                     defaultValue: GeoPoint2d.Zero,
-                    maxRetries: 6,
+                    maxRetries: 10,
                     delayMs: 300
                 )
                 .ConfigureAwait(false);
 
             if (geoLocation == GeoPoint2d.Zero)
-            {
                 Console.WriteLine(
                     $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Failed to get coordinates for school {name}"
                 );
-            }
 
             return new SchoolData(name, cell2, cell3, address, geoLocation);
         }
@@ -327,7 +324,7 @@ namespace Ellipse.Server.Functions
                         return fetchedAddress;
                     },
                     defaultValue: "",
-                    maxRetries: 4,
+                    maxRetries: 10,
                     delayMs: 300
                 )
                 .ConfigureAwait(false);
