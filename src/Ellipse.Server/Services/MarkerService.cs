@@ -175,6 +175,12 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                 for (int i = 0; i < batch.Length; i++)
                 {
                     var school = batch[i];
+                    if (response.Distances.Length == 0 || response.Durations.Length == 0)
+                    {
+                        Console.WriteLine(
+                            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Failed to get route response for {school.Name}"
+                        );
+                    }
                     var distance = response.Distances[0][i];
                     var duration = response.Durations[0][i];
                     if (!distance.HasValue || !duration.HasValue)
@@ -231,7 +237,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                 GeographicalCoordinates.Create(
                     [
                         Coordinate.Create(source.Lon, source.Lat),
-                        .. destinations.Select(dest => Coordinate.Create(dest.Lon, source.Lat)),
+                        .. destinations.Select(dest => Coordinate.Create(dest.Lon, dest.Lat)),
                     ]
                 )
             )
