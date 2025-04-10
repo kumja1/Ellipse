@@ -137,79 +137,87 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Schools chunked into {batches.Count()} batches"
         );
 
-        var batchTasks = batches.Select(async batch =>
-        {
-            for (int retry = 0; retry <= MAX_RETRIES; retry++)
-            {
-                Console.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Batch attempt {retry + 1} for batch with {batch.Length} schools"
-                );
-                await _semaphore.WaitAsync().ConfigureAwait(false);
-                try
-                {
-                    List<GeoPoint2d> destinationList = [.. batch.Select(s => s.LatLng)];
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Calling GetMatrixBatch for {destinationList.Count} destinations"
-                    );
-                    var response = await GetMatrixBatch(source, destinationList)
-                        .ConfigureAwait(false);
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Received matrix response"
-                    );
+        await Parallel.ForEachAsync(
+            batches,
+            async (batch, token) => await GetMatrixBatch(source, batch, results, token)
+        );
 
-                    for (int i = 0; i < batch.Length; i++)
-                    {
-                        var school = batch[i];
-                        var distance = response.Distances[0][i];
-                        var duration = response.Durations[0][i];
-                        if (!distance.HasValue || !duration.HasValue)
-                        {
-                            Console.WriteLine(
-                                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Failed to caculate route for {school.Name}"
-                            );
-                            continue;
-                        }
-
-                        results[school.Name] = new Route
-                        {
-                            Distance = MetersToMiles(distance.Value),
-                            Duration = duration.Value,
-                        };
-                        Console.WriteLine(
-                            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] School: {school.Name} => Distance: {distance}, Duration: {duration}"
-                        );
-                    }
-                    return;
-                }
-                catch (Exception ex) when (retry < MAX_RETRIES)
-                {
-                    Console.Error.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Matrix API call failed on attempt {retry + 1}: {ex.Message}"
-                    );
-                    int delayMs = 500 * (int)Math.Pow(2, retry);
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Waiting {delayMs}ms before retrying."
-                    );
-                    await Task.Delay(delayMs).ConfigureAwait(false);
-                }
-                finally
-                {
-                    _semaphore.Release();
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Semaphore released."
-                    );
-                }
-            }
-        });
-
-        await Task.WhenAll(batchTasks).ConfigureAwait(false);
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] All batch tasks completed."
         );
-        return new Dictionary<string, Route>(results);
+        return results.ToDictionary();
     }
 
-    private async Task<TableResponse> GetMatrixBatch(
+    private async Task GetMatrixBatch(
+        GeoPoint2d source,
+        SchoolData[] batch,
+        ConcurrentDictionary<string, Route> results,
+        CancellationToken token
+    )
+    {
+        for (int retry = 0; retry <= MAX_RETRIES; retry++)
+        {
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Batch attempt {retry + 1} for batch with {batch.Length} schools"
+            );
+            await _semaphore.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                List<GeoPoint2d> destinationList = [.. batch.Select(s => s.LatLng)];
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Calling GetMatrixBatch for {destinationList.Count} destinations"
+                );
+                var response = await GetMatrixRoute(source, destinationList).ConfigureAwait(false);
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Received matrix response"
+                );
+
+                for (int i = 0; i < batch.Length; i++)
+                {
+                    var school = batch[i];
+                    var distance = response.Distances[0][i];
+                    var duration = response.Durations[0][i];
+                    if (!distance.HasValue || !duration.HasValue)
+                    {
+                        Console.WriteLine(
+                            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Failed to caculate route for {school.Name}"
+                        );
+                        continue;
+                    }
+
+                    results[school.Name] = new Route
+                    {
+                        Distance = MetersToMiles(distance.Value),
+                        Duration = duration.Value,
+                    };
+                    Console.WriteLine(
+                        $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] School: {school.Name} => Distance: {distance}, Duration: {duration}"
+                    );
+                }
+                continue;
+            }
+            catch (Exception ex) when (retry < MAX_RETRIES)
+            {
+                Console.Error.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Matrix API call failed on attempt {retry + 1}: {ex.Message}"
+                );
+                int delayMs = 500 * (int)Math.Pow(2, retry);
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Waiting {delayMs}ms before retrying."
+                );
+                await Task.Delay(delayMs, token).ConfigureAwait(false);
+            }
+            finally
+            {
+                _semaphore.Release();
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Semaphore released."
+                );
+            }
+        }
+    }
+
+    private async Task<TableResponse> GetMatrixRoute(
         GeoPoint2d source,
         List<GeoPoint2d> destinations
     )
