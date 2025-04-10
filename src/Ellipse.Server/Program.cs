@@ -1,6 +1,9 @@
-using CensusGeocoder;
 using Ellipse.Server.Services;
 using Osrm.HttpApiClient;
+using Nominatim.API;
+using Nominatim.API.Interfaces;
+using Nominatim.API.Web;
+using Nominatim.API.Geocoders;
 
 namespace Ellipse.Server;
 
@@ -41,16 +44,9 @@ public static class Program
         builder.Services
         .AddSingleton<GeoService>()
         .AddSingleton<MarkerService>()
-        .AddSingleton<GeocodingService>()
-        .AddSingleton(sp =>
-        {
-            var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-            var client = httpClientFactory.CreateClient("OsrmClient");
-
-            client.BaseAddress = new Uri("https://router.project-osrm.org/");
-            return new OsrmHttpApiClient(client);
-        })
-        .AddHttpClient();
-
+        .AddScoped<INominatimWebInterface, NominatimWebInterface>()
+        .AddScoped<ForwardGeocoder>()
+        .AddScoped<ReverseGeocoder>()
+        .AddHttpClient<OsrmHttpApiClient>("OsrmClient", client => client.BaseAddress = new Uri("https://router.project-osrm.org/"));
     }
 }
