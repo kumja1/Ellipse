@@ -1,7 +1,7 @@
+using Ellipse.Components.MarkerMenu;
+using Ellipse.Services;
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
-using Ellipse.Services;
-using Ellipse.Components.MarkerMenu;
 
 namespace Ellipse.Pages;
 
@@ -31,7 +31,8 @@ partial class Home : ComponentBase
         _menu.SelectMarker(marker);
     }
 
-    public void GoToLandSearch() => _navigationManager.NavigateTo($"https://www.landsearch.com/properties/{_selectedMarker.Properties["Name"]}");
-
-
+    public void GoToLandSearch() =>
+        _navigationManager.NavigateTo(
+            $"https://www.landsearch.com/properties/{_selectedMarker.Properties["Name"]}"
+        );
 }

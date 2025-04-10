@@ -1,9 +1,9 @@
 using Ellipse.Server.Services;
-using Osrm.HttpApiClient;
 using Nominatim.API;
+using Nominatim.API.Geocoders;
 using Nominatim.API.Interfaces;
 using Nominatim.API.Web;
-using Nominatim.API.Geocoders;
+using Osrm.HttpApiClient;
 
 namespace Ellipse.Server;
 
@@ -16,13 +16,11 @@ public static class Program
 
         var app = builder.Build();
 
-
         app.UseRouting();
         app.UseCors("DynamicCors");
         app.UseRequestTimeouts();
         app.MapControllers();
         app.Run();
-
     }
 
     public static void ConfigureServices(WebApplicationBuilder builder)
@@ -30,23 +28,27 @@ public static class Program
         builder.Services.AddRouting();
         builder.Services.AddCors(options =>
         {
-            options.AddPolicy("DynamicCors", policy =>
-            {
-                policy.SetIsOriginAllowed(origin => true)
-                     .AllowAnyHeader()
-                     .AllowAnyMethod();
-            });
+            options.AddPolicy(
+                "DynamicCors",
+                policy =>
+                {
+                    policy.SetIsOriginAllowed(origin => true).AllowAnyHeader().AllowAnyMethod();
+                }
+            );
         });
 
-        builder.Services.AddRequestTimeouts(options => options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5)));
+        builder.Services.AddRequestTimeouts(options =>
+            options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5))
+        );
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
-        builder.Services
-        .AddSingleton<MarkerService>()
-        .AddSingleton<GeoService>()
-        .AddScoped<INominatimWebInterface, NominatimWebInterface>()
-        .AddScoped<ForwardGeocoder>()
-        .AddScoped<ReverseGeocoder>()
-        .AddHttpClient<OsrmHttpApiClient>("OsrmClient", client => client.BaseAddress = new Uri("https://router.project-osrm.org/"));
+        builder
+            .Services.AddSingleton<MarkerService>()
+            .AddSingleton<GeoService>()
+            .AddSingleton<CensusGeocoderClient>()
+            .AddHttpClient<OsrmHttpApiClient>(
+                "OsrmClient",
+                client => client.BaseAddress = new Uri("https://router.project-osrm.org/")
+            );
     }
 }

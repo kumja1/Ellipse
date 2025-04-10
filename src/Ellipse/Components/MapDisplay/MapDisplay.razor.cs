@@ -5,13 +5,15 @@ namespace Ellipse.Components.MapDisplay;
 
 public partial class MapDisplay
 {
-    [Parameter] public required IAsyncEnumerable<Marker> Markers { get; set; }
+    [Parameter]
+    public required IAsyncEnumerable<Marker> Markers { get; set; }
 
-    [Parameter] public required Action<Marker> OnMarkerClick { get; set; }
+    [Parameter]
+    public required Action<Marker> OnMarkerClick { get; set; }
 
     private OpenStreetMap _map { get; set; }
 
-    protected async override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
         if (Markers != null)
@@ -28,7 +30,9 @@ public partial class MapDisplay
                 }
                 else
                 {
-                    double closestDistance = closestMarker.Properties["Distances"]["Average Distance"].Distance;
+                    double closestDistance = closestMarker
+                        .Properties["Distances"]["Average Distance"]
+                        .Distance;
                     if (markerDistance < closestDistance)
                     {
                         closestMarker.PinColor = PinColor.Red;

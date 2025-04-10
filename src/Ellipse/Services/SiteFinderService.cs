@@ -1,38 +1,38 @@
-// File: Services/MarkerClientService.cs
 using System.Net.Http.Json;
-using OpenLayers.Blazor;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
+using OpenLayers.Blazor;
 
 namespace Ellipse.Services;
 
-public class SiteFinderService(HttpClient httpClient, SchoolLocatorService schoolLocatorService)
+public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoolLocatorService)
 {
     private readonly HttpClient _httpClient = httpClient;
-    private readonly SchoolLocatorService _schoolLocatorService = schoolLocatorService;
+    private readonly SchoolFetcherService _schoolLocatorService = schoolLocatorService;
     private const double STEP_SIZE = 0.1;
 
     public async IAsyncEnumerable<Marker> GetMarkers()
     {
-
         var schools = await _schoolLocatorService.GetSchools().ConfigureAwait(false);
         if (schools.Count == 0)
             yield break;
 
         var latLngs = schools.Select(school => school.LatLng).ToList();
         var boundingBox = new BoundingBox(latLngs);
-        
+
         foreach (var (x, y) in GenerateGrid(boundingBox))
         {
             Console.WriteLine($"X:{x}, Y:${y}");
             var marker = await GetMarker(x, y, schools).ConfigureAwait(false);
             if (marker != null)
-                yield return new Marker(MarkerType.MarkerAwesome, new Coordinate(x, y), marker.Address, PinColor.Red)
+                yield return new Marker(
+                    MarkerType.MarkerAwesome,
+                    new Coordinate(x, y),
+                    marker.Address,
+                    PinColor.Red
+                )
                 {
-                    Properties = {
-                      ["Name"] = marker.Address,
-                      ["Routes"] = marker.Routes,
-                    }
+                    Properties = { ["Name"] = marker.Address, ["Routes"] = marker.Routes },
                 };
         }
     }
@@ -41,8 +41,15 @@ public class SiteFinderService(HttpClient httpClient, SchoolLocatorService schoo
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync($"{Settings.ServerUrl}marker/get-markers", new MarkerRequest(schools, new GeoPoint2d(x, y))).ConfigureAwait(false);
-            var markerResponse = await response.Content.ReadFromJsonAsync<MarkerResponse>().ConfigureAwait(false);
+            var response = await _httpClient
+                .PostAsJsonAsync(
+                    $"{Settings.ServerUrl}marker/get-markers",
+                    new MarkerRequest(schools, new GeoPoint2d(x, y))
+                )
+                .ConfigureAwait(false);
+            var markerResponse = await response
+                .Content.ReadFromJsonAsync<MarkerResponse>()
+                .ConfigureAwait(false);
 
             return markerResponse;
         }
@@ -56,27 +63,7 @@ public class SiteFinderService(HttpClient httpClient, SchoolLocatorService schoo
     private static IEnumerable<(double x, double y)> GenerateGrid(BoundingBox boundingBox)
     {
         for (var x = boundingBox.MinLat; x <= boundingBox.MaxLat; x += STEP_SIZE)
-            for (var y = boundingBox.MinLng; y <= boundingBox.MaxLng; y += STEP_SIZE)
-                yield return (x, y);
-    }
-}
-
-
-public record BoundingBox
-{
-    public double MinLat { get; }
-    public double MaxLat { get; }
-    public double MinLng { get; }
-    public double MaxLng { get; }
-
-    public BoundingBox(List<GeoPoint2d> latLngs)
-    {
-        if (latLngs.Count == 0)
-            throw new ArgumentException("LatLngs list cannot be empty", nameof(latLngs));
-
-        MinLat = latLngs.Min(latLng => latLng.Lat);
-        MaxLat = latLngs.Max(latLng => latLng.Lat);
-        MinLng = latLngs.Min(latLng => latLng.Lon);
-        MaxLng = latLngs.Max(latLng => latLng.Lon);
+        for (var y = boundingBox.MinLng; y <= boundingBox.MaxLng; y += STEP_SIZE)
+            yield return (x, y);
     }
 }

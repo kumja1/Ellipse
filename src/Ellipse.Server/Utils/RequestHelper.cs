@@ -2,8 +2,13 @@ namespace Ellipse.Server.Utils;
 
 public static class RequestHelper
 {
-
-    public async static Task<TResult> RetryIfInvalid<TResult>(Func<TResult, bool> isValid, Func<int, Task<TResult>> func, TResult defaultValue = default, int maxRetries = 3, int delayMs = 100)
+    public static async Task<TResult> RetryIfInvalid<TResult>(
+        Func<TResult, bool> isValid,
+        Func<int, Task<TResult>> func,
+        TResult defaultValue = default,
+        int maxRetries = 3,
+        int delayMs = 100
+    )
     {
         int retries = 0;
         TResult value = defaultValue;
