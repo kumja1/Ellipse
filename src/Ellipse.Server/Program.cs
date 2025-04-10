@@ -1,4 +1,5 @@
 using Ellipse.Server.Services;
+using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 
 namespace Ellipse.Server;
@@ -36,8 +37,18 @@ public static class Program
         builder.Services.AddRequestTimeouts(options =>
             options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5))
         );
+
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
+
+        builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
+        {
+            options.HttpClientActions.Add(client =>
+            {
+                client.Timeout = TimeSpan.FromMinutes(5);
+            });
+        });
+
         builder
             .Services.AddSingleton<MarkerService>()
             .AddSingleton<GeoService>()
@@ -46,6 +57,6 @@ public static class Program
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")
             )
-            .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5));
     }
 }
