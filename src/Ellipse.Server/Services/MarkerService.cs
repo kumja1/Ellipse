@@ -26,7 +26,8 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Called for point: {request.Point}"
         );
-        if (_cache.TryGetValue(request.Point, out string? cachedData))
+
+        if (_cache.TryGetValue(request.Point, out string? cachedData) && !request.OverrideCache)
         {
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cache hit for point: {request.Point}"

@@ -44,7 +44,7 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
             var response = await _httpClient
                 .PostAsJsonAsync(
                     $"{Settings.ServerUrl}marker/get-markers",
-                    new MarkerRequest(schools, new GeoPoint2d(x, y))
+                    new MarkerRequest(schools, new GeoPoint2d(x, y), false)
                 )
                 .ConfigureAwait(false);
             var markerResponse = await response
@@ -62,8 +62,8 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
 
     private static IEnumerable<(double x, double y)> GenerateGrid(BoundingBox boundingBox)
     {
-        for (var x = boundingBox.MinLat; x <= boundingBox.MaxLat; x += STEP_SIZE)
-        for (var y = boundingBox.MinLng; y <= boundingBox.MaxLng; y += STEP_SIZE)
+        for (var x = boundingBox.MinLng; x <= boundingBox.MaxLng; x += STEP_SIZE)
+        for (var y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += STEP_SIZE)
             yield return (x, y);
     }
 }

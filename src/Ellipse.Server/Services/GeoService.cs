@@ -1,4 +1,3 @@
-using System.Globalization;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding;
@@ -173,7 +172,10 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
                     Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
                     return GeoPoint2d.Zero;
                 }
-                return new GeoPoint2d(location.Geometry.Coordinate.Longitude, location.Geometry.Coordinate.Latitude);
+                return new GeoPoint2d(
+                    location.Geometry.Coordinate.Longitude,
+                    location.Geometry.Coordinate.Latitude
+                );
             }
 
             var firstResult = response.Result.AddressMatches.FirstOrDefault();
