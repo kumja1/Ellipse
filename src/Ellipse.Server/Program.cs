@@ -57,6 +57,5 @@ public static class Program
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")
             )
-            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5));
     }
 }
