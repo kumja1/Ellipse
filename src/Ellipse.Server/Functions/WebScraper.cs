@@ -133,7 +133,7 @@ namespace Ellipse.Server.Functions
                 await Parallel
                     .ForEachAsync(
                         pages,
-                        new ParallelOptions { MaxDegreeOfParallelism = 35 },
+                        new ParallelOptions { MaxDegreeOfParallelism = 40 },
                         async (page, _) =>
                         {
                             Console.WriteLine(
@@ -244,7 +244,7 @@ namespace Ellipse.Server.Functions
                     },
                     defaultValue: GeoPoint2d.Zero,
                     maxRetries: 10,
-                    delayMs: 300
+                    delayMs: 50
                 )
                 .ConfigureAwait(false);
 
@@ -260,7 +260,7 @@ namespace Ellipse.Server.Functions
         {
             string address = await RequestHelper
                 .RetryIfInvalid(
-                    isValid: s => !string.IsNullOrWhiteSpace(s),
+                    isValid: s => !string.IsNullOrEmpty(s),
                     func: async (attempt) =>
                     {
                         Console.WriteLine(
@@ -325,7 +325,7 @@ namespace Ellipse.Server.Functions
                     },
                     defaultValue: "",
                     maxRetries: 10,
-                    delayMs: 300
+                    delayMs: 50
                 )
                 .ConfigureAwait(false);
 
