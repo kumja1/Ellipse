@@ -1,12 +1,17 @@
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding;
+using Geo.MapBox;
+using Geo.MapBox.Models;
+using Geo.MapBox.Models.Parameters;
 
 namespace Ellipse.Server.Services;
 
-public class GeoService(CensusGeocoderClient geocoder)
+public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding mapBoxGeocoder)
 {
-    private readonly CensusGeocoderClient _geocoder = geocoder;
+    private readonly CensusGeocoderClient _censusGeocoder = censusGeocoder;
+    private readonly IMapBoxGeocoding _mapBoxGeocoder = mapBoxGeocoder;
+
     private readonly Dictionary<GeoPoint2d, string> _addressCache = [];
 
     public async Task<string> GetAddressCached(double longitude, double latitude)
@@ -50,15 +55,31 @@ public class GeoService(CensusGeocoderClient geocoder)
             };
 
             Console.WriteLine($"[GetAddress] ReverseGeocodeRequest created: {request}");
-            var response = await _geocoder.ReverseGeocode(request);
+            var response = await _censusGeocoder.ReverseGeocode(request);
             Console.WriteLine($"[GetAddress] Received response: {response}");
 
             if (response == null)
             {
                 Console.WriteLine(
-                    $"[GetAddress] Response is null for coordinates: {longitude}, {latitude}"
+                    $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
                 );
-                return string.Empty;
+                Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
+                var mapboxResponse = await _mapBoxGeocoder.ReverseGeocodingAsync(
+                    new ReverseGeocodingParameters
+                    {
+                        Coordinate = new Coordinate { Longitude = longitude, Latitude = latitude },
+                    }
+                );
+
+                var match = mapboxResponse.Features.OrderBy(f => f.Relevance).LastOrDefault();
+                if (match == null)
+                {
+                    Console.WriteLine(
+                        $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
+                    );
+                    return string.Empty;
+                }
+                return match.Address;
             }
 
             var addressMatch = response.Result.AddressMatches.FirstOrDefault();
@@ -134,12 +155,14 @@ public class GeoService(CensusGeocoderClient geocoder)
             };
 
             Console.WriteLine($"[GetLatLng] ForwardGeocodeRequest created: {request}");
-            var response = await _geocoder.Geocode(request);
+            var response = await _censusGeocoder.Geocode(request);
             Console.WriteLine($"[GetLatLng] Received response: {response}");
 
             if (response == null || response.Result.AddressMatches.Count == 0)
             {
                 Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
+                Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
+
                 return GeoPoint2d.Zero;
             }
 

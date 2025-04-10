@@ -1,4 +1,5 @@
 using Ellipse.Server.Services;
+using Geo.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 
@@ -57,5 +58,8 @@ public static class Program
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")
             );
+
+        var mapboxClient = builder.Services.AddMapBoxGeocoding();
+        mapboxClient.AddKey(Environment.GetEnvironmentVariable("MAPBOX_API_KEY"));
     }
 }
