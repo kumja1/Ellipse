@@ -1,4 +1,3 @@
-using Ellipse.Server.Functions;
 using Ellipse.Server.Services;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +19,7 @@ public class SchoolsController(GeoService geoService) : ControllerBase
         if (divisionCode <= 0)
             return BadRequest("Error: Missing or invalid required field 'divisionCode'.");
 
-        var result = await WebScraper.StartNewAsync(divisionCode, overrideCache, geoService);
+        var result = await WebScraperService.StartNewAsync(divisionCode, overrideCache, geoService);
         return Content(result, "application/json");
     }
 }
