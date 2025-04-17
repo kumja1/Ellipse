@@ -11,7 +11,7 @@ public sealed class FileCache : IDisposable
 
     public FileCache(string fileName)
     {
-        _db = new(Path.Join(Environment.CurrentDirectory, fileName, ".db"));
+        _db = new(Path.Join(Environment.CurrentDirectory, $"{fileName}.db"));
         _col = _db.GetCollection<FileCacheEntry>("server_cache");
         _col.EnsureIndex(x => x.Key, unique: true);
     }
