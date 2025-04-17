@@ -19,7 +19,7 @@ public sealed partial class WebScraperService
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
 
-    private static readonly FileCache _cache = new();
+    private static readonly FileCache _cache = new("cache");
     private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
     [GeneratedRegex(@"[.\s/]+")]
@@ -85,14 +85,7 @@ public sealed partial class WebScraperService
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartScraperAsync] Scrape completed for Division {divisionCode}"
             );
 
-            _cache.Set(
-                divisionCode,
-                result,
-                new FileCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30),
-                }
-            );
+            _cache.Set(divisionCode, result);
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartScraperAsync] Result cached for Division {divisionCode}"
             );
