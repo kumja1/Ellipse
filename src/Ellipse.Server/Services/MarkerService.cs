@@ -79,6 +79,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] Processing MarkerRequest for point: {request.Point}"
         );
+
         if (request.Schools.Count == 0)
         {
             Console.WriteLine(
@@ -253,7 +254,8 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Request prepared. Calling MapboxClient.GetMatrixAsync..."
         );
         var response = await _osrmClient.GetTableAsync(request);
-        if (response?.Durations == null || response.Distances == null)
+        Console.WriteLine(response.ToString());
+        if (response?.Durations == null || response?.Distances == null)
         {
             Console.Error.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Invalid matrix response received."

@@ -2,6 +2,7 @@ using Ellipse;
 using Ellipse.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Extensions.Http;
 using MudBlazor.Services;
 
 partial class Program
@@ -23,6 +24,13 @@ partial class Program
 
     public static void ConfigureServices(WebAssemblyHostBuilder builder)
     {
+        builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
+        {
+            options.HttpClientActions.Add(client =>
+            {
+                client.Timeout = TimeSpan.FromMinutes(10);
+            });
+        });
         builder
             .Services.AddMudServices()
             .AddScoped<SiteFinderService>()

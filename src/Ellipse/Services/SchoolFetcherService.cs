@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Components.WebAssembly.Http;
 
 namespace Ellipse.Services;
 
-public sealed class SchoolFetcherService : IDisposable
+public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
 {
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _httpClient = httpClient;
 
     private readonly Dictionary<string, int> _divisionCodes = new()
     {
@@ -26,14 +26,6 @@ public sealed class SchoolFetcherService : IDisposable
         ["Richmond City"] = 123,
         ["Sussex County"] = 91,
     };
-
-    public SchoolFetcherService(HttpClient httpClient)
-    {
-        _httpClient = httpClient;
-        _httpClient.Timeout = TimeSpan.FromMinutes(10);
-
-        // _httpClient.PostAsync($"{BaseUrl}cors/add-origin", new StringContent(@$"{{""origin"": ""{_httpClient.BaseAddress.AbsoluteUri}""}}", Encoding.UTF8, "application/json"));
-    }
 
     public async Task<List<SchoolData>> GetSchools()
     {

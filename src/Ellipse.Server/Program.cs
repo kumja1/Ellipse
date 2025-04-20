@@ -46,7 +46,7 @@ public static class Program
         {
             options.HttpClientActions.Add(client =>
             {
-                client.Timeout = TimeSpan.FromMinutes(5);
+                client.Timeout = TimeSpan.FromMinutes(10);
             });
         });
 
@@ -60,6 +60,8 @@ public static class Program
             );
 
         var mapboxClient = builder.Services.AddMapBoxGeocoding();
-        mapboxClient.AddKey(Environment.GetEnvironmentVariable("MAPBOX_API_KEY"));
+        mapboxClient.AddKey(
+            "pk.eyJ1Ijoia3VtamExIiwiYSI6ImNtOGl0eXdiMzBiYm0ya29lbXV2YWY5dWMifQ.GhJar4VuZnxM7llZdVylqQ"
+        );
     }
 }

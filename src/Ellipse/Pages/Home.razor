@@ -11,10 +11,15 @@
     <div class="w-screen h-screen absolute inset-0">
         <MapDisplay Markers="_markers" OnMarkerClick="OnMarkerItemClick" />
     </div>
-    <!-- Sidebar -->
-    <div class="z-10">
-        <MarkerMenu @ref="_menu" DrawerOpen="true" OnButtonClick="GoToLandSearch" IsListMode="true" />
-    </div>
-    <MudFab StartIcon="@Icons.Material.Filled.Menu" IconColor="Color.Primary" Class="bg-blue z-10 absolute left-0 bottom-0" />
 
+    <MarkerMenu 
+        @ref="_menu" 
+        OnButtonClick="GoToLandSearch" 
+        IsListMode="true" />
+
+    <MudFab 
+        StartIcon="@Icons.Material.Filled.Menu"
+        IconColor="Color.Primary"
+        Class="bg-blue z-10 absolute left-4 bottom-4"
+         />
 </div>

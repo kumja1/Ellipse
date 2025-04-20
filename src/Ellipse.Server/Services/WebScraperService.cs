@@ -7,8 +7,6 @@ using AngleSharp;
 using AngleSharp.Dom;
 using AngleSharp.XPath;
 using Ellipse.Common.Models;
-using Ellipse.Server.Models;
-using Ellipse.Server.Services;
 using Ellipse.Server.Utils;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -19,7 +17,7 @@ public sealed partial class WebScraperService
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
 
-    private static readonly FileCache _cache = new("cache");
+    private static readonly MemoryCache _cache = new(new MemoryCacheOptions() { });
     private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
     [GeneratedRegex(@"[.\s/]+")]
@@ -50,7 +48,7 @@ public sealed partial class WebScraperService
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Starting scrape for division {divisionCode}"
         );
-        if (_cache.TryGet(divisionCode, out string? cachedData) && !overrideCache)
+        if (_cache.TryGetValue(divisionCode, out string? cachedData) && !overrideCache)
         {
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Cache hit for division {divisionCode}"
@@ -85,7 +83,15 @@ public sealed partial class WebScraperService
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartScraperAsync] Scrape completed for Division {divisionCode}"
             );
 
-            _cache.Set(divisionCode, result);
+            _cache.Set(
+                divisionCode,
+                result,
+                new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30),
+                    SlidingExpiration = TimeSpan.FromDays(7),
+                }
+            );
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartScraperAsync] Result cached for Division {divisionCode}"
             );
@@ -122,11 +128,10 @@ public sealed partial class WebScraperService
 
         if (totalPages > 1)
         {
-            var pages = Enumerable.Range(2, totalPages - 1);
             await Parallel
                 .ForEachAsync(
-                    pages,
-                    new ParallelOptions { MaxDegreeOfParallelism = 40 },
+                    Enumerable.Range(2, totalPages - 1),
+                    new ParallelOptions { MaxDegreeOfParallelism = 50 },
                     async (page, _) =>
                     {
                         Console.WriteLine(
