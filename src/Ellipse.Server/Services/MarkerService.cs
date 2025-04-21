@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
+using Ellipse.Server.Utils;
 using Microsoft.Extensions.Caching.Memory;
 using Osrm.HttpApiClient;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
@@ -9,13 +10,11 @@ using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
+internal class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
 {
     private const int MaxConcurrentBatches = 4;
     private const int MaxRetries = 5;
     private const int MatrixBatchSize = 25;
-
-    private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly SemaphoreSlim _semaphore = new(MaxConcurrentBatches);
 
     private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks =
@@ -27,12 +26,17 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Called for point: {request.Point}"
         );
 
-        if (_cache.TryGetValue(request.Point, out string? cachedData) && !request.OverrideCache)
+        if (
+            SingletonMemoryCache.TryGetEntry<MarkerService, string>(
+                request.Point,
+                out string? cachedData
+            ) && !request.OverrideCache
+        )
         {
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cache hit for point: {request.Point}"
             );
-            var deserialized = JsonSerializer.Deserialize<MarkerResponse>(cachedData)!;
+            var deserialized = JsonSerializer.Deserialize<MarkerResponse>(StringCompressor.DecompressString(cachedData))!;
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Returning cached MarkerResponse"
             );
@@ -50,9 +54,9 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         if (markerResponse != null)
         {
             string serialized = JsonSerializer.Serialize(markerResponse);
-            _cache.Set(
+            SingletonMemoryCache.SetEntry<MarkerService, string>(
                 request.Point,
-                serialized,
+                StringCompressor.CompressString(serialized),
                 new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(10),
@@ -131,7 +135,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Called for source: {source} with {schools.Count} schools"
         );
         var results = new ConcurrentDictionary<string, Route>();
-        List<SchoolData[]> batches = [..schools.Chunk(MatrixBatchSize)];
+        List<SchoolData[]> batches = [.. schools.Chunk(MatrixBatchSize)];
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Schools chunked into {batches.Count} batches"
         );
@@ -172,13 +176,12 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                 );
 
                 if (
-                    response.Distances.Length == 0
+                    response == null
+                    || response.Distances.Length == 0
                     || response.Durations.Length == 0
                     || response.Distances[0].Length < batch.Length
                 )
-                {
                     throw new InvalidOperationException("Incomplete matrix response");
-                }
 
                 for (int i = 0; i < batch.Length; i++)
                 {
@@ -227,7 +230,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         }
     }
 
-    private async Task<TableResponse> GetMatrixRoute(
+    private async Task<TableResponse?> GetMatrixRoute(
         GeoPoint2d source,
         List<GeoPoint2d> destinations
     )
@@ -235,6 +238,10 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Called for source: {source} with {destinations.Count} destinations."
         );
+
+        if (destinations.Any(g => g == GeoPoint2d.Zero))
+            return null;
+
         var request = OsrmServices
             .Table(
                 PredefinedProfiles.Car,
@@ -273,7 +280,8 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [Trimean] Calculating trimean for {data.Count} data points."
         );
-        var sorted = data.OrderBy(x => x).ToList();
+
+        List<double> sorted = [.. data.OrderBy(x => x)];
         double q1 = WeightedPercentile(sorted, 0.25);
         double median = WeightedPercentile(sorted, 0.50);
         double q3 = WeightedPercentile(sorted, 0.75);

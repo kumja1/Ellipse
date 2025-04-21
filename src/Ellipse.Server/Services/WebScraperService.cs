@@ -12,12 +12,11 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Ellipse.Server.Services;
 
-public sealed partial class WebScraperService
+internal sealed partial class WebScraperService
 {
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
 
-    private static readonly MemoryCache _cache = new(new MemoryCacheOptions() { });
     private static readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
     [GeneratedRegex(@"[.\s/]+")]
@@ -48,12 +47,17 @@ public sealed partial class WebScraperService
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Starting scrape for division {divisionCode}"
         );
-        if (_cache.TryGetValue(divisionCode, out string? cachedData) && !overrideCache)
+        if (
+            SingletonMemoryCache.TryGetEntry<WebScraperService, string>(
+                divisionCode,
+                out string? cachedData
+            ) && !overrideCache
+        )
         {
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Cache hit for division {divisionCode}"
             );
-            return cachedData!;
+            return StringCompressor.DecompressString(cachedData!);
         }
 
         Console.WriteLine(
@@ -83,9 +87,9 @@ public sealed partial class WebScraperService
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartScraperAsync] Scrape completed for Division {divisionCode}"
             );
 
-            _cache.Set(
+            SingletonMemoryCache.SetEntry<WebScraperService, string>(
                 divisionCode,
-                result,
+                StringCompressor.CompressString(result),
                 new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30),

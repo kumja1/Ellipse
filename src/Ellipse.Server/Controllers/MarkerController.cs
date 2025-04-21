@@ -3,11 +3,11 @@ using Ellipse.Common.Models.Markers;
 using Ellipse.Server.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Ellipse.Server.Controllers
-{
+namespace Ellipse.Server.Controllers;
+
     [ApiController]
     [Route("api/[controller]")]
-    public class MarkerController(MarkerService markerService) : ControllerBase
+    internal class MarkerController(MarkerService markerService) : ControllerBase
     {
         // POST api/marker?x=...&y=...
         [HttpPost("get-markers")]
@@ -19,4 +19,4 @@ namespace Ellipse.Server.Controllers
             return Ok(response);
         }
     }
-}
+

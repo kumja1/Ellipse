@@ -7,7 +7,7 @@
     <MudContainer>
         <MudStack Spacing="10" AlignItems="AlignItems.Center" Justify="Justify.Center" Class="relative z-10">
             <MudText Typo="Typo.h1" Class="font-medium text-black font-sans">Ellipse</MudText>
-            <MudButton Class="bg-sky-600 hover:bg-sky-700" OnClick="NavToMap">
+            <MudButton Class="bg-sky-600 hover:bg-sky-700" OnClick="@(() => _navigationManager.NavigateTo("map"))">
                 <MudText Class="text-white">Open Map</MudText>
             </MudButton>
         </MudStack>

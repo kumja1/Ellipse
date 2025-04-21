@@ -7,7 +7,6 @@ namespace Ellipse.Pages;
 
 partial class Home : ComponentBase
 {
-    [Inject] private NavigationManager _navigationManager { get; set; }
-    
-    private void NavToMap() => _navigationManager.NavigateTo("map");
+    [Inject]
+    private NavigationManager _navigationManager { get; set; }
 }
