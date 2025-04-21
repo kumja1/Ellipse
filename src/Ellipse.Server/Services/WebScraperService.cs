@@ -113,7 +113,7 @@ public sealed partial class WebScraperService
         }
     }
 
-    public async Task<string> ScrapeAsync()
+    private async Task<string> ScrapeAsync()
     {
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Beginning scrape for Division {_divisionCode}"
@@ -131,7 +131,7 @@ public sealed partial class WebScraperService
             await Parallel
                 .ForEachAsync(
                     Enumerable.Range(2, totalPages - 1),
-                    new ParallelOptions { MaxDegreeOfParallelism = 35 },
+                    new ParallelOptions { MaxDegreeOfParallelism = 32 },
                     async (page, _) =>
                     {
                         Console.WriteLine(

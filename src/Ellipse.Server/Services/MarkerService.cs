@@ -11,11 +11,13 @@ namespace Ellipse.Server.Services;
 
 public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
 {
-    private const int MAX_CONCURRENT_BATCHES = 4;
-    private const int MAX_RETRIES = 5;
-    private const int MATRIX_BATCH_SIZE = 25;
+    private const int MaxConcurrentBatches = 4;
+    private const int MaxRetries = 5;
+    private const int MatrixBatchSize = 25;
+
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
-    private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
+    private readonly SemaphoreSlim _semaphore = new(MaxConcurrentBatches);
+
     private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks =
         new();
 
@@ -36,12 +38,10 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             );
             return deserialized;
         }
-        else
-        {
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cache miss for point: {request.Point}"
-            );
-        }
+
+        Console.WriteLine(
+            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cache miss for point: {request.Point}"
+        );
 
         var markerResponse = await _currentTasks
             .GetOrAdd(request.Point, _ => ProcessMarkerRequestAsync(request))
@@ -131,9 +131,9 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Called for source: {source} with {schools.Count} schools"
         );
         var results = new ConcurrentDictionary<string, Route>();
-        var batches = schools.Chunk(MATRIX_BATCH_SIZE);
+        List<SchoolData[]> batches = [..schools.Chunk(MatrixBatchSize)];
         Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Schools chunked into {batches.Count()} batches"
+            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Schools chunked into {batches.Count} batches"
         );
 
         await Parallel.ForEachAsync(
@@ -154,7 +154,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         CancellationToken token
     )
     {
-        for (int retry = 0; retry <= MAX_RETRIES; retry++)
+        for (int retry = 0; retry <= MaxRetries; retry++)
         {
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Batch attempt {retry} for batch with {batch.Length} schools"
@@ -203,9 +203,10 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                         $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] School: {school.Name} => Distance: {distance}, Duration: {duration}"
                     );
                 }
+
                 break;
             }
-            catch (Exception ex) when (retry < MAX_RETRIES)
+            catch (Exception ex) when (retry < MaxRetries)
             {
                 Console.Error.WriteLine(
                     $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Matrix API call failed on attempt {retry + 1}: {ex.Message}"
