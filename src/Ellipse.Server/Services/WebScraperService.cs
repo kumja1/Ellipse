@@ -12,7 +12,7 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Ellipse.Server.Services;
 
-internal sealed partial class WebScraperService
+public sealed partial class WebScraperService
 {
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";

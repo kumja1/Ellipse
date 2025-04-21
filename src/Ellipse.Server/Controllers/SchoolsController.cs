@@ -7,7 +7,7 @@ namespace Ellipse.Server.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [RequestTimeout("ResponseTimeout")]
-internal class SchoolsController(GeoService geoService) : ControllerBase
+public class SchoolsController(GeoService geoService) : ControllerBase
 {
     // POST api/schools/get-schools
     [HttpPost("get-schools")]

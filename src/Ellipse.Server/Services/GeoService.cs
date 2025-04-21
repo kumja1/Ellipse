@@ -7,7 +7,7 @@ using Geo.MapBox.Models.Parameters;
 
 namespace Ellipse.Server.Services;
 
-internal class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding mapBoxGeocoder)
+public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding mapBoxGeocoder)
     : IDisposable
 {
     private readonly Dictionary<GeoPoint2d, string> _addressCache = [];

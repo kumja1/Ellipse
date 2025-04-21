@@ -6,7 +6,7 @@ using Ellipse.Common.Models.Geocoding;
 
 namespace Ellipse.Server.Services;
 
-internal sealed class CensusGeocoderClient(HttpClient client) : IDisposable
+public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
 {
     private const string BaseUrl = "https://geocoding.geo.census.gov/geocoder/";
 

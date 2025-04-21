@@ -10,7 +10,7 @@ using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-internal class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
+public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
 {
     private const int MaxConcurrentBatches = 4;
     private const int MaxRetries = 5;
