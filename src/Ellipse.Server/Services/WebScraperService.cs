@@ -93,7 +93,7 @@ public sealed partial class WebScraperService
                 new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30),
-                    SlidingExpiration = TimeSpan.FromDays(7),
+                    SlidingExpiration = TimeSpan.FromDays(10),
                 }
             );
             Console.WriteLine(
