@@ -1,0 +1,28 @@
+@page "/map"
+@using Ellipse.Components.MarkerMenu
+@using Ellipse.Components.MapDisplay
+
+@namespace Ellipse.Pages
+
+<PageTitle>Map</PageTitle>
+
+<div class="w-screen h-screen overflow-hidden">
+    <div class="absolute inset-0 z-0">
+        <MapDisplay Markers="_markers" OnMarkerClick="OnMarkerItemClick"/>
+    </div>
+
+    <div class="relative z-10">
+        <MarkerMenu
+            MenuOpen="true"
+            @ref="_menu"
+            OnButtonClick="GoToLandSearch"
+            IsListMode="true"/>
+
+        <MudFab
+            Size="Size.Medium"
+            StartIcon="@Icons.Material.Filled.Menu"
+            OnClick="ToggleMenu"
+            Class="fixed left-2 bottom-2 z-20 bg-blue-600 hover:bg-blue-700 text-white border border-white" 
+        />
+    </div>
+</div>

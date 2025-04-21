@@ -7,33 +7,33 @@ namespace Ellipse.Services;
 
 public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoolLocatorService)
 {
-    private readonly HttpClient _httpClient = httpClient;
-    private readonly SchoolFetcherService _schoolLocatorService = schoolLocatorService;
-    private const double STEP_SIZE = 0.1;
+    private const double StepSize = 0.1;
 
     public async IAsyncEnumerable<Marker> GetMarkers()
     {
-        var schools = await _schoolLocatorService.GetSchools().ConfigureAwait(false);
+        var schools = await schoolLocatorService.GetSchools().ConfigureAwait(false);
         if (schools.Count == 0)
             yield break;
 
         var latLngs = schools.Select(school => school.LatLng).ToList();
         var boundingBox = new BoundingBox(latLngs);
 
-        foreach (var (x, y) in GenerateGrid(boundingBox))
+        for (var x = boundingBox.MinLng; x <= boundingBox.MaxLng; x += StepSize)
         {
-            Console.WriteLine($"X:{x}, Y:${y}");
-            var marker = await GetMarker(x, y, schools).ConfigureAwait(false);
-            if (marker != null)
-                yield return new Marker(
-                    MarkerType.MarkerAwesome,
-                    new Coordinate(x, y),
-                    marker.Address,
-                    PinColor.Red
-                )
-                {
-                    Properties = { ["Name"] = marker.Address, ["Routes"] = marker.Routes },
-                };
+            for (var y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += StepSize)
+            {
+                Console.WriteLine($"X:{x}, Y:${y}");
+                var marker = await GetMarker(x, y, schools).ConfigureAwait(false);
+                if (marker != null)
+                    yield return new Marker(
+                        MarkerType.MarkerAwesome,
+                        new Coordinate(x, y),
+                        marker.Address
+                    )
+                    {
+                        Properties = { ["Name"] = marker.Address, ["Routes"] = marker.Routes },
+                    };
+            }
         }
     }
 
@@ -41,7 +41,7 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
     {
         try
         {
-            var response = await _httpClient
+            var response = await httpClient
                 .PostAsJsonAsync(
                     $"{Settings.ServerUrl}marker/get-markers",
                     new MarkerRequest(schools, new GeoPoint2d(x, y), false)
@@ -60,10 +60,5 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
         }
     }
 
-    private static IEnumerable<(double x, double y)> GenerateGrid(BoundingBox boundingBox)
-    {
-        for (var x = boundingBox.MinLng; x <= boundingBox.MaxLng; x += STEP_SIZE)
-        for (var y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += STEP_SIZE)
-            yield return (x, y);
-    }
+
 }

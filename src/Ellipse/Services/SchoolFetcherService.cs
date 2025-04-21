@@ -6,8 +6,6 @@ namespace Ellipse.Services;
 
 public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
 {
-    private readonly HttpClient _httpClient = httpClient;
-
     private readonly Dictionary<string, int> _divisionCodes = new()
     {
         ["Amelia County"] = 4,
@@ -33,32 +31,43 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
 
         var tasks = _divisionCodes.Select(kvp => ProcessDivision(kvp.Key, kvp.Value)).ToList();
 
-        var schools = (await Task.WhenAll(tasks).ConfigureAwait(false)).SelectMany(e => e);
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+        var schools = results
+            .Where(x => x != null)
+            .SelectMany(x => x);
 
         Console.WriteLine("[GetSchools] Completed.");
         return [.. schools];
     }
 
-    private async Task<List<SchoolData>> ProcessDivision(string name, int code)
+    private async Task<List<SchoolData>?> ProcessDivision(string name, int code)
     {
-        Console.WriteLine($"[ProcessDivision] Starting {name}");
-        var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"{Settings.ServerUrl}schools/get-schools"
-        );
+        try
+        {
+            Console.WriteLine($"[ProcessDivision] Starting {name}");
+            var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{Settings.ServerUrl}schools/get-schools"
+            );
 
-        request.SetBrowserRequestMode(BrowserRequestMode.Cors);
-        request.Content = new FormUrlEncodedContent(
-            [new KeyValuePair<string, string>("divisionCode", code.ToString())]
-        );
+            request.SetBrowserRequestMode(BrowserRequestMode.Cors);
+            request.Content = new FormUrlEncodedContent(
+                [new KeyValuePair<string, string>("divisionCode", code.ToString())]
+            );
 
-        var result = await _httpClient.SendAsync(request).ConfigureAwait(false);
-        var schools = await result
-            .Content.ReadFromJsonAsync<List<SchoolData>>()
-            .ConfigureAwait(false);
+            var result = await httpClient.SendAsync(request).ConfigureAwait(false);
+            var schools = await result
+                .Content.ReadFromJsonAsync<List<SchoolData>>()
+                .ConfigureAwait(false);
 
-        return schools;
+            return schools;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ProcessDivision] An error occured while processing division {code}: {ex.Message}");
+            return [];
+        }
     }
 
-    public void Dispose() => _httpClient.Dispose();
+    public void Dispose() => httpClient.Dispose();
 }
