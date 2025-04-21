@@ -12,20 +12,30 @@ internal static class StringCompressor
     /// <returns></returns>
     public static string CompressString(string text)
     {
-        byte[] buffer = Encoding.UTF8.GetBytes(text);
-        var memoryStream = new MemoryStream();
-        using var gZipStream = new GZipStream(memoryStream, CompressionMode.Compress, true);
+        try
+        {
+            byte[] buffer = Encoding.UTF8.GetBytes(text);
+            var memoryStream = new MemoryStream();
+            using var gZipStream = new GZipStream(memoryStream, CompressionMode.Compress);
 
-        gZipStream.Write(buffer, 0, buffer.Length);
-        memoryStream.Position = 0;
+            gZipStream.Write(buffer, 0, buffer.Length);
+            gZipStream.Close();
 
-        var compressedData = new byte[memoryStream.Length];
-        memoryStream.Read(compressedData, 0, compressedData.Length);
+            memoryStream.Position = 0;
 
-        var gZipBuffer = new byte[compressedData.Length + 4];
-        Buffer.BlockCopy(compressedData, 0, gZipBuffer, 4, compressedData.Length);
-        Buffer.BlockCopy(BitConverter.GetBytes(buffer.Length), 0, gZipBuffer, 0, 4);
-        return Convert.ToBase64String(gZipBuffer);
+            var compressedData = new byte[memoryStream.Length];
+            memoryStream.ReadExactly(compressedData, 0, compressedData.Length);
+
+            var gZipBuffer = new byte[compressedData.Length + 4];
+            Buffer.BlockCopy(compressedData, 0, gZipBuffer, 4, compressedData.Length);
+            Buffer.BlockCopy(BitConverter.GetBytes(buffer.Length), 0, gZipBuffer, 0, 4);
+            return Convert.ToBase64String(gZipBuffer);
+        }
+        catch (Exception _)
+        {
+            Console.WriteLine($"[CompressString] Failed to compress string: {text}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -35,18 +45,23 @@ internal static class StringCompressor
     /// <returns></returns>
     public static string DecompressString(string compressedText)
     {
-        byte[] gZipBuffer = Convert.FromBase64String(compressedText);
-        using var memoryStream = new MemoryStream();
+        try
+        {
+            byte[] gZipBuffer = Convert.FromBase64String(compressedText);
+            using var memoryStream = new MemoryStream();
 
-        int dataLength = BitConverter.ToInt32(gZipBuffer, 0);
-        memoryStream.Write(gZipBuffer, 4, gZipBuffer.Length - 4);
+            int dataLength = BitConverter.ToInt32(gZipBuffer, 0);
+            memoryStream.Write(gZipBuffer, 4, gZipBuffer.Length - 4);
 
-        var buffer = new byte[dataLength];
-
-        memoryStream.Position = 0;
-        using var gZipStream = new GZipStream(memoryStream, CompressionMode.Decompress);
-
-        gZipStream.Read(buffer, 0, buffer.Length);
-        return Encoding.UTF8.GetString(buffer);
+            memoryStream.Position = 0;
+            using var gZipStream = new GZipStream(memoryStream, CompressionMode.Decompress);
+            using var reader = new StreamReader(gZipStream);
+            return reader.ReadToEnd();
+        }
+        catch (Exception _)
+        {
+            Console.WriteLine($"[DecompressString] Failed to decompress string: {compressedText}");
+            throw;
+        }
     }
 }

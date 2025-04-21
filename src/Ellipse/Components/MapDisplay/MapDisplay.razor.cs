@@ -16,6 +16,11 @@ public partial class MapDisplay
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
+        await InvokeAsync(SortMarkers);
+    }
+
+    private async Task SortMarkers()
+    {
         if (Markers != null)
         {
             Marker? closestMarker = null;
