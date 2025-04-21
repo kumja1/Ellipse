@@ -3,5 +3,5 @@ namespace Ellipse;
 public static class Settings
 {
     public const string ServerUrl =
-        "http://localhost:6000/api/";
+        "https://doubtful-beatrix-lum-studios-0cd001db.koyeb.app/api/";
 }

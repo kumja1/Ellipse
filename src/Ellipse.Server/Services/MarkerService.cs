@@ -14,8 +14,6 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
     private const int MAX_CONCURRENT_BATCHES = 4;
     private const int MAX_RETRIES = 5;
     private const int MATRIX_BATCH_SIZE = 25;
-    private readonly GeoService _geocoder = geocoder;
-    private readonly OsrmHttpApiClient _osrmClient = client;
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
     private readonly SemaphoreSlim _semaphore = new(MAX_CONCURRENT_BATCHES);
     private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks =
@@ -88,7 +86,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             return null;
         }
 
-        var addressTask = _geocoder.GetAddressCached(request.Point.Lon, request.Point.Lat);
+        var addressTask = geocoder.GetAddressCached(request.Point.Lon, request.Point.Lat);
         var routesTask = GetMatrixRoutes(request.Point, request.Schools);
 
         string address = await addressTask.ConfigureAwait(false);
@@ -253,7 +251,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         Console.WriteLine(
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Request prepared. Calling MapboxClient.GetMatrixAsync..."
         );
-        var response = await _osrmClient.GetTableAsync(request);
+        var response = await client.GetTableAsync(request);
         Console.WriteLine(response.ToString());
         if (response?.Durations == null || response?.Distances == null)
         {

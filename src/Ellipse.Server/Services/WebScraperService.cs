@@ -106,7 +106,7 @@ public sealed partial class WebScraperService
         }
         finally
         {
-            _scrapingTasks.TryRemove(divisionCode, out var _);
+            _scrapingTasks.TryRemove(divisionCode, out _);
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartScraperAsync] Removed Division {divisionCode} from active tasks"
             );
@@ -131,7 +131,7 @@ public sealed partial class WebScraperService
             await Parallel
                 .ForEachAsync(
                     Enumerable.Range(2, totalPages - 1),
-                    new ParallelOptions { MaxDegreeOfParallelism = 50 },
+                    new ParallelOptions { MaxDegreeOfParallelism = 35 },
                     async (page, _) =>
                     {
                         Console.WriteLine(

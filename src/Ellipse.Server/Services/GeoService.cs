@@ -9,9 +9,6 @@ namespace Ellipse.Server.Services;
 
 public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding mapBoxGeocoder)
 {
-    private readonly CensusGeocoderClient _censusGeocoder = censusGeocoder;
-    private readonly IMapBoxGeocoding _mapBoxGeocoder = mapBoxGeocoder;
-
     private readonly Dictionary<GeoPoint2d, string> _addressCache = [];
 
     public async Task<string> GetAddressCached(double longitude, double latitude)
@@ -55,7 +52,7 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             };
 
             Console.WriteLine($"[GetAddress] ReverseGeocodeRequest created: {request}");
-            var response = await _censusGeocoder.ReverseGeocode(request);
+            var response = await censusGeocoder.ReverseGeocode(request);
             Console.WriteLine($"[GetAddress] Received response: {response}");
 
             if (response == null)
@@ -64,7 +61,7 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
                     $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
                 );
                 Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
-                var mapboxResponse = await _mapBoxGeocoder.ReverseGeocodingAsync(
+                var mapboxResponse = await mapBoxGeocoder.ReverseGeocodingAsync(
                     new ReverseGeocodingParameters
                     {
                         Coordinate = new Coordinate { Longitude = longitude, Latitude = latitude },
@@ -155,14 +152,14 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             };
 
             Console.WriteLine($"[GetLatLng] ForwardGeocodeRequest created: {request}");
-            var response = await _censusGeocoder.Geocode(request);
+            var response = await censusGeocoder.Geocode(request);
             Console.WriteLine($"[GetLatLng] Received response: {response}");
 
             if (response == null || response.Result.AddressMatches.Count == 0)
             {
                 Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
                 Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
-                var geocodeResponse = await _mapBoxGeocoder.GeocodingAsync(
+                var geocodeResponse = await mapBoxGeocoder.GeocodingAsync(
                     new GeocodingParameters { Query = address }
                 );
 

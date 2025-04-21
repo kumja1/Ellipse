@@ -8,8 +8,6 @@ namespace Ellipse.Server.Services;
 
 public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
 {
-    private readonly HttpClient _client = client;
-
     private const string BaseUrl = "https://geocoding.geo.census.gov/geocoder/";
 
     public async Task<GeocodingResponse> Geocode(GeocodingRequest request)
@@ -48,7 +46,7 @@ public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
 
     public async Task<GeocodingResponse> GetResponse(string url)
     {
-        var response = await _client.GetAsync(url);
+        var response = await client.GetAsync(url);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<GeocodingResponse>()
@@ -140,5 +138,5 @@ public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
             builder.Append($"{key}={Uri.EscapeDataString(value)}&"); // Use Uri.EscapeDataString to make the parameter URL-safe.
     }
 
-    public void Dispose() => _client.Dispose();
+    public void Dispose() => client.Dispose();
 }
