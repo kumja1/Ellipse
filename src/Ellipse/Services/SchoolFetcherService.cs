@@ -54,8 +54,14 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
             request.Content = new FormUrlEncodedContent(
                 [new KeyValuePair<string, string>("divisionCode", code.ToString())]
             );
-
-            var result = await httpClient.SendAsync(request).ConfigureAwait(false);
+            
+            HttpResponseMessage result;
+            
+            do {
+                result = await httpClient.SendAsync(request).ConfigureAwait(false);
+            }
+            while (!result.IsSuccessStatusCode);
+            
             var schools = await result
                 .Content.ReadFromJsonAsync<List<SchoolData>>()
                 .ConfigureAwait(false);

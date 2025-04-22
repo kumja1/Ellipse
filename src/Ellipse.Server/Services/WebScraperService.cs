@@ -136,7 +136,7 @@ public sealed partial class WebScraperService
                 await Parallel
                     .ForEachAsync(
                         Enumerable.Range(2, totalPages - 1),
-                        new ParallelOptions { MaxDegreeOfParallelism = 30 },
+                        new ParallelOptions { MaxDegreeOfParallelism = 28,  },
                         async (page, _) =>
                         {
                             try
@@ -164,12 +164,11 @@ public sealed partial class WebScraperService
                     .ConfigureAwait(false);
             }
 
-            var allSchools = queue.ToList();
             sw.Stop();
             Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Completed scraping Division {_divisionCode} in {sw.ElapsedMilliseconds}ms. Total schools scraped: {allSchools.Count}"
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Completed scraping Division {_divisionCode} in {sw.ElapsedMilliseconds}ms. Total schools scraped: {queue.Count}"
             );
-            return JsonSerializer.Serialize(allSchools);
+            return JsonSerializer.Serialize(queue.ToList());
         }
         catch (Exception ex)
         {
