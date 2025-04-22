@@ -36,7 +36,9 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cache hit for point: {request.Point}"
             );
-            var deserialized = JsonSerializer.Deserialize<MarkerResponse>(StringCompressor.DecompressString(cachedData))!;
+            var deserialized = JsonSerializer.Deserialize<MarkerResponse>(
+                StringCompressor.DecompressString(cachedData)
+            )!;
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Returning cached MarkerResponse"
             );
@@ -51,27 +53,20 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             .GetOrAdd(request.Point, _ => ProcessMarkerRequestAsync(request))
             .ConfigureAwait(false);
 
-        if (markerResponse != null)
-        {
-            string serialized = JsonSerializer.Serialize(markerResponse);
-            SingletonMemoryCache.SetEntry<MarkerService, string>(
-                request.Point,
-                StringCompressor.CompressString(serialized),
-                new MemoryCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(10),
-                }
-            );
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cached new MarkerResponse for point: {request.Point}"
-            );
-        }
-        else
-        {
+        if (markerResponse == null)
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] MarkerResponse is null for point: {request.Point}"
             );
-        }
+
+        string serialized = JsonSerializer.Serialize(markerResponse);
+        SingletonMemoryCache.SetEntry<MarkerService, string>(
+            request.Point,
+            StringCompressor.CompressString(serialized),
+            new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(10) }
+        );
+        Console.WriteLine(
+            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cached new MarkerResponse for point: {request.Point}"
+        );
 
         return markerResponse;
     }
@@ -239,7 +234,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Called for source: {source} with {destinations.Count} destinations."
         );
 
-        if (destinations.Any(g => g == GeoPoint2d.Zero))
+        if (destinations.Contains(GeoPoint2d.Zero))
             return null;
 
         var request = OsrmServices

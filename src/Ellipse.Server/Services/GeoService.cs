@@ -158,7 +158,7 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             var response = await censusGeocoder.Geocode(request);
             Console.WriteLine($"[GetLatLng] Received response: {response}");
 
-            if (response == null || response.Result.AddressMatches.Count == 0) 
+            if (response == null || response.Result.AddressMatches.Count == 0)
                 return await GetLatLngWithMapbox(address);
 
             var firstResult = response.Result.AddressMatches.FirstOrDefault();

@@ -16,11 +16,14 @@ internal static class StringCompressor
         {
             byte[] buffer = Encoding.UTF8.GetBytes(text);
             var memoryStream = new MemoryStream();
-            using var gZipStream = new GZipStream(memoryStream, CompressionMode.Compress);
+            using var gZipStream = new GZipStream(
+                memoryStream,
+                CompressionMode.Compress,
+                leaveOpen: true
+            );
 
             gZipStream.Write(buffer, 0, buffer.Length);
-            gZipStream.Close();
-
+            gZipStream.Flush();
             memoryStream.Position = 0;
 
             var compressedData = new byte[memoryStream.Length];

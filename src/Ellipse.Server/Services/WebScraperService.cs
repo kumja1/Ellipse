@@ -5,7 +5,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
-using AngleSharp.XPath;
 using Ellipse.Common.Models;
 using Ellipse.Server.Utils;
 using Microsoft.Extensions.Caching.Memory;
@@ -119,221 +118,263 @@ public sealed partial class WebScraperService
 
     private async Task<string> ScrapeAsync()
     {
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Beginning scrape for Division {_divisionCode}"
-        );
-        var sw = Stopwatch.StartNew();
-
-        var (firstPageSchools, totalPages) = await ProcessPageAsync(1).ConfigureAwait(false);
-        var queue = new ConcurrentQueue<SchoolData>(firstPageSchools);
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Processed first page for Division {_divisionCode} - Total pages: {totalPages}"
-        );
-
-        if (totalPages > 1)
+        try
         {
-            await Parallel
-                .ForEachAsync(
-                    Enumerable.Range(2, totalPages - 1),
-                    new ParallelOptions { MaxDegreeOfParallelism = 32 },
-                    async (page, _) =>
-                    {
-                        Console.WriteLine(
-                            $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Starting processing for page {page}"
-                        );
-                        var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
-                        foreach (var school in schools)
-                            queue.Enqueue(school);
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Beginning scrape for Division {_divisionCode}"
+            );
+            var sw = Stopwatch.StartNew();
 
-                        Console.WriteLine(
-                            $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Processed page {page}, found {schools.Count} schools"
-                        );
-                    }
-                )
-                .ConfigureAwait(false);
+            var (firstPageSchools, totalPages) = await ProcessPageAsync(1).ConfigureAwait(false);
+            var queue = new ConcurrentQueue<SchoolData>(firstPageSchools);
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Processed first page for Division {_divisionCode} - Total pages: {totalPages}"
+            );
+
+            if (totalPages > 1)
+            {
+                await Parallel
+                    .ForEachAsync(
+                        Enumerable.Range(2, totalPages - 1),
+                        new ParallelOptions { MaxDegreeOfParallelism = 30 },
+                        async (page, _) =>
+                        {
+                            try
+                            {
+                                Console.WriteLine(
+                                    $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Starting processing for page {page}"
+                                );
+                                var (schools, _) = await ProcessPageAsync(page)
+                                    .ConfigureAwait(false);
+                                foreach (var school in schools)
+                                    queue.Enqueue(school);
+
+                                Console.WriteLine(
+                                    $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Processed page {page}, found {schools.Count} schools"
+                                );
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine(
+                                    $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Exception processing page {page}: {ex}"
+                                );
+                            }
+                        }
+                    )
+                    .ConfigureAwait(false);
+            }
+
+            var allSchools = queue.ToList();
+            sw.Stop();
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Completed scraping Division {_divisionCode} in {sw.ElapsedMilliseconds}ms. Total schools scraped: {allSchools.Count}"
+            );
+            return JsonSerializer.Serialize(allSchools);
         }
-
-        var allSchools = queue.ToList();
-        sw.Stop();
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Completed scraping Division {_divisionCode} in {sw.ElapsedMilliseconds}ms. Total schools scraped: {allSchools.Count}"
-        );
-        return JsonSerializer.Serialize(allSchools);
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ScrapeAsync] Unhandled exception: {ex}"
+            );
+            throw;
+        }
     }
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ProcessPageAsync(int page)
     {
-        var sw = Stopwatch.StartNew();
-        var url = $"{BaseUrl}/page/{page}?division={_divisionCode}";
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url} for page {page}"
-        );
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            var url = $"{BaseUrl}/page/{page}?division={_divisionCode}";
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Fetching URL: {url} for page {page}"
+            );
 
-        IDocument? document = null;
-        List<IElement> rows = await RequestHelper
-            .RetryIfInvalid(
-                isValid: l => l.Count > 0,
-                func: async (_) =>
-                {
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Attempting to load document for URL: {url}"
-                    );
-                    document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-                    var rowList = document.QuerySelectorAll("table > tbody > tr").ToList();
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Found {rowList.Count} rows in document for page {page}"
-                    );
-                    return rowList;
-                },
-                defaultValue: [],
-                maxRetries: 10,
-                delayMs: 300
-            )
-            .ConfigureAwait(false);
+            IDocument? document = null;
+            List<IElement> rows = await RequestHelper
+                .RetryIfInvalid(
+                    isValid: l => l.Count > 0,
+                    func: async (_) =>
+                    {
+                        try
+                        {
+                            Console.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Attempting to load document for URL: {url}"
+                            );
+                            document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+                            var rowList = document.QuerySelectorAll("table > tbody > tr").ToList();
+                            Console.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Found {rowList.Count} rows in document for page {page}"
+                            );
+                            return rowList;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Exception loading document: {ex}"
+                            );
+                            return [];
+                        }
+                    },
+                    defaultValue: [],
+                    maxRetries: 10,
+                    delayMs: 300
+                )
+                .ConfigureAwait(false);
 
-        var tasks = rows.Select(ProcessRowAsync);
-        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-        var schools = results.Where(s => s != null).Cast<SchoolData>().ToList();
+            var tasks = rows.Select(ProcessRowAsync);
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            var schools = results.Where(s => s != null).Cast<SchoolData>().ToList();
 
-        sw.Stop();
-        int totalPages = ParseTotalPages(document!);
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Completed processing page {page} in {sw.ElapsedMilliseconds}ms - TotalPages: {totalPages}"
-        );
-        return (schools, totalPages);
+            sw.Stop();
+            int totalPages = ParseTotalPages(document!);
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Completed processing page {page} in {sw.ElapsedMilliseconds}ms - TotalPages: {totalPages}"
+            );
+            return (schools, totalPages);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessPageAsync] Exception on page {page}: {ex}"
+            );
+            return ([], 1); // Default to page 1 only
+        }
     }
 
     private async Task<SchoolData?> ProcessRowAsync(IElement row)
     {
-        var nameCell = row.QuerySelector("td:first-child");
-        if (nameCell == null)
+        try
+        {
+            var nameCell = row.QuerySelector("td:first-child");
+            if (nameCell == null)
+            {
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Skipping row with missing name cell."
+                );
+                return null;
+            }
+
+            var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
+            var cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Processing school: {name} (Cleaned: {cleanedName})"
+            );
+
+            var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
+            var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
+            var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Fetched address for {name}: {address}"
+            );
+
+            var geoLocation = await RequestHelper
+                .RetryIfInvalid(
+                    isValid: c => c != GeoPoint2d.Zero,
+                    func: async (attempt) =>
+                    {
+                        try
+                        {
+                            Console.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt {attempt}: Fetching coordinates for {name} with address: {address}"
+                            );
+                            var location = await _geoService
+                                .GetLatLngCached(address)
+                                .ConfigureAwait(false);
+                            Console.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt {attempt}: Received coordinates: {location} for {name}"
+                            );
+                            return location;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt {attempt}: Error fetching coordinates: {ex}"
+                            );
+                            return GeoPoint2d.Zero;
+                        }
+                    },
+                    defaultValue: GeoPoint2d.Zero,
+                    maxRetries: 10,
+                    delayMs: 50
+                )
+                .ConfigureAwait(false);
+
+            if (geoLocation == GeoPoint2d.Zero)
+                Console.WriteLine(
+                    $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Failed to get coordinates for school {name}"
+                );
+
+            return new SchoolData(name, cell2, cell3, address, geoLocation);
+        }
+        catch (Exception ex)
         {
             Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Skipping row with missing name cell."
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Error processing row: {ex}"
             );
             return null;
         }
-
-        var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
-        var cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
-
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Processing school: {name} (Cleaned: {cleanedName})"
-        );
-
-        var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
-        var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
-        var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Fetched address for {name}: {address}"
-        );
-
-        var geoLocation = await RequestHelper
-            .RetryIfInvalid(
-                isValid: c => c != GeoPoint2d.Zero,
-                func: async (attempt) =>
-                {
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt {attempt}: Fetching coordinates for {name} with address: {address}"
-                    );
-                    var location = await _geoService.GetLatLngCached(address).ConfigureAwait(false);
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt {attempt}: Received coordinates: {location} for {name}"
-                    );
-                    return location;
-                },
-                defaultValue: GeoPoint2d.Zero,
-                maxRetries: 10,
-                delayMs: 50
-            )
-            .ConfigureAwait(false);
-
-        if (geoLocation == GeoPoint2d.Zero)
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Failed to get coordinates for school {name}"
-            );
-
-        return new SchoolData(name, cell2, cell3, address, geoLocation);
     }
 
     private async Task<string> FetchAddressAsync(string cleanedName)
     {
-        string address = await RequestHelper
-            .RetryIfInvalid(
-                isValid: s => !string.IsNullOrEmpty(s),
-                func: async (attempt) =>
-                {
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Fetching address for {cleanedName}"
-                    );
-                    string fetchedAddress = string.Empty;
-                    await _semaphore.WaitAsync().ConfigureAwait(false);
-                    try
+        try
+        {
+            string address = await RequestHelper
+                .RetryIfInvalid(
+                    isValid: s => !string.IsNullOrEmpty(s),
+                    func: async (attempt) =>
                     {
-                        var url = $"{SchoolInfoUrl}/{cleanedName}";
-                        Console.WriteLine(
-                            $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Opening URL: {url}"
-                        );
-                        var document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-
-                        if (document == null)
-                            Console.WriteLine(
-                                $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Document is null for URL: {url}"
-                            );
-
-                        var addressElement = document?.QuerySelector(
-                            "span[itemprop='streetAddress'], "
-                                + "[itemtype='http://schema.org/PostalAddress'] [itemprop='streetAddress'], "
-                                + "span[itemprop='address'] > span, "
-                                + "[itemtype='http://schema.org/PostalAddress']"
-                        );
-
-                        // Fallback via XPath if needed
-                        addressElement ??=
-                            document?.Body.SelectSingleNode(
-                                "//strong[contains(text(),'Address')]/following-sibling::*[1]",
-                                true
-                            ) as IElement;
-
-                        fetchedAddress = addressElement?.TextContent.Trim() ?? "";
-                        if (string.IsNullOrWhiteSpace(fetchedAddress))
+                        try
                         {
                             Console.WriteLine(
-                                $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: No address found at URL: {url}"
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Fetching address for {cleanedName}"
                             );
+                            string fetchedAddress = string.Empty;
+                            await _semaphore.WaitAsync().ConfigureAwait(false);
+                            try
+                            {
+                                var url = $"{SchoolInfoUrl}/{cleanedName}";
+                                Console.WriteLine(
+                                    $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Requesting: {url}"
+                                );
+                                var doc = await _browsingContext
+                                    .OpenAsync(url)
+                                    .ConfigureAwait(false);
+                                var el = doc.QuerySelector("div.address");
+                                fetchedAddress = WebUtility
+                                    .HtmlDecode(el?.TextContent ?? "")
+                                    .Trim();
+                            }
+                            finally
+                            {
+                                _semaphore.Release();
+                            }
+                            return fetchedAddress;
                         }
-                        else
+                        catch (Exception ex)
                         {
                             Console.WriteLine(
-                                $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Fetched address: {fetchedAddress} for {cleanedName}"
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Error fetching from page: {ex}"
                             );
+                            return string.Empty;
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(
-                            $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Exception occurred for {cleanedName}: {ex}"
-                        );
-                    }
-                    finally
-                    {
-                        _semaphore.Release();
-                    }
-                    return fetchedAddress;
-                },
-                defaultValue: "",
-                maxRetries: 10,
-                delayMs: 50
-            )
-            .ConfigureAwait(false);
+                    },
+                    defaultValue: "",
+                    maxRetries: 10,
+                    delayMs: 200
+                )
+                .ConfigureAwait(false);
 
-        if (string.IsNullOrWhiteSpace(address))
+            return address;
+        }
+        catch (Exception ex)
         {
             Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Final failure: Unable to obtain address for {cleanedName}"
+                $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Fatal error: {ex}"
             );
+            return string.Empty;
         }
-        return address;
     }
 
     private static int ParseTotalPages(IDocument document)

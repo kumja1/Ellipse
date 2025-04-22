@@ -31,6 +31,7 @@ partial class Program
                 client.Timeout = TimeSpan.FromMinutes(10);
             });
         });
+
         builder
             .Services.AddMudServices()
             .AddScoped<SiteFinderService>()
