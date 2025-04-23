@@ -117,7 +117,7 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                 $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] No routes found."
             );
         }
-
+        
         return routes.Count == 0 ? null : new MarkerResponse(address, routes);
     }
 
@@ -234,6 +234,11 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Called for source: {source} with {destinations.Count} destinations."
         );
 
+
+Console.WriteLine(
+            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Destinations: {string.Join("\n", destinations)}"
+        );
+        
         if (destinations.Contains(GeoPoint2d.Zero))
             return null;
 

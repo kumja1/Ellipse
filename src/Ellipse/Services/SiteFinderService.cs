@@ -22,7 +22,7 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
         {
             for (var y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += StepSize)
             {
-                Console.WriteLine($"X:{x}, Y:${y}");
+                Console.WriteLine($"X:{x}, Y:{y}");
                 var marker = await GetMarker(x, y, schools).ConfigureAwait(false);
                 if (marker != null)
                     yield return new Marker(
@@ -59,6 +59,4 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
             return null;
         }
     }
-
-
 }

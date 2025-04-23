@@ -32,9 +32,7 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
         var tasks = _divisionCodes.Select(kvp => ProcessDivision(kvp.Key, kvp.Value)).ToList();
 
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-        var schools = results
-            .Where(x => x != null)
-            .SelectMany(x => x);
+        var schools = results.Where(x => x is not null).SelectMany(x => x);
 
         Console.WriteLine("[GetSchools] Completed.");
         return [.. schools];
@@ -54,23 +52,28 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
             request.Content = new FormUrlEncodedContent(
                 [new KeyValuePair<string, string>("divisionCode", code.ToString())]
             );
-            
+
             HttpResponseMessage result;
-            
-            do {
+            do
+            {
                 result = await httpClient.SendAsync(request).ConfigureAwait(false);
-            }
-            while (!result.IsSuccessStatusCode);
-            
+            } while (!result.IsSuccessStatusCode);
+
             var schools = await result
                 .Content.ReadFromJsonAsync<List<SchoolData>>()
                 .ConfigureAwait(false);
 
+            foreach (SchoolData data in schools)
+            {
+                Console.WriteLine(data);
+            }
             return schools;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ProcessDivision] An error occured while processing division {code}: {ex.Message}");
+            Console.WriteLine(
+                $"[ProcessDivision] An error occured while processing division {code}: {ex.Message}"
+            );
             return [];
         }
     }

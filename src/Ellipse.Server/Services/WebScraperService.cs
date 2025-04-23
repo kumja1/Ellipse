@@ -56,6 +56,7 @@ public sealed partial class WebScraperService
             Console.WriteLine(
                 $"[{DateTime.Now:HH:mm:ss.fff}] [StartNewAsync] Cache hit for division {divisionCode}"
             );
+
             return StringCompressor.DecompressString(cachedData!);
         }
 
@@ -136,7 +137,7 @@ public sealed partial class WebScraperService
                 await Parallel
                     .ForEachAsync(
                         Enumerable.Range(2, totalPages - 1),
-                        new ParallelOptions { MaxDegreeOfParallelism = 28,  },
+                        new ParallelOptions { MaxDegreeOfParallelism = 28 },
                         async (page, _) =>
                         {
                             try
@@ -262,9 +263,13 @@ public sealed partial class WebScraperService
 
             var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
             var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
+
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Fetching address for: {name}"
+            );
             var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
             Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Fetched address for {name}: {address}"
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Address fetched for {name}: {address}"
             );
 
             var geoLocation = await RequestHelper
@@ -288,28 +293,26 @@ public sealed partial class WebScraperService
                         catch (Exception ex)
                         {
                             Console.WriteLine(
-                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt {attempt}: Error fetching coordinates: {ex}"
+                                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Attempt {attempt}: Failed to fetch coordinates for {name}. Exception: {ex}"
                             );
                             return GeoPoint2d.Zero;
                         }
                     },
                     defaultValue: GeoPoint2d.Zero,
-                    maxRetries: 10,
-                    delayMs: 50
+                    maxRetries: 5,
+                    delayMs: 500
                 )
                 .ConfigureAwait(false);
 
-            if (geoLocation == GeoPoint2d.Zero)
-                Console.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Failed to get coordinates for school {name}"
-                );
-
-            return new SchoolData(name, cell2, cell3, address, geoLocation);
+            Console.WriteLine(
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Geopoint Location: {geoLocation}"
+            );
+            return new SchoolData(name, address, cell2, cell3, geoLocation);
         }
         catch (Exception ex)
         {
             Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Error processing row: {ex}"
+                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessRowAsync] Exception for row: {ex}"
             );
             return null;
         }
@@ -329,6 +332,7 @@ public sealed partial class WebScraperService
                             Console.WriteLine(
                                 $"[{DateTime.Now:HH:mm:ss.fff}] [FetchAddressAsync] Attempt {attempt}: Fetching address for {cleanedName}"
                             );
+
                             string fetchedAddress = string.Empty;
                             await _semaphore.WaitAsync().ConfigureAwait(false);
                             try
@@ -340,7 +344,10 @@ public sealed partial class WebScraperService
                                 var doc = await _browsingContext
                                     .OpenAsync(url)
                                     .ConfigureAwait(false);
-                                var el = doc.QuerySelector("div.address");
+                                var el = doc.QuerySelector(
+                                    "[itemtype='http://schema.org/PostalAddress']"
+                                );
+
                                 fetchedAddress = WebUtility
                                     .HtmlDecode(el?.TextContent ?? "")
                                     .Trim();

@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Ellipse.Common.Models;
 
 public readonly record struct SchoolData(
-    string Name,
-    string Division,
-    string GradeSpan,
-    string Address,
-    GeoPoint2d LatLng
+    [property: JsonPropertyName("Name")] string Name,
+    [property: JsonPropertyName("Division")] string Division,
+    [property: JsonPropertyName("GradeSpan")] string GradeSpan,
+    [property: JsonPropertyName("Address")] string Address,
+    [property: JsonPropertyName("LatLng")] GeoPoint2d LatLng
 );
