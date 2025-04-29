@@ -43,7 +43,7 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
         try
         {
             var response = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
-                r => r.IsSuccessStatusCode,
+                r => r != null && r.IsSuccessStatusCode,
                 async _ =>
                     await httpClient
                         .PostAsJsonAsync(

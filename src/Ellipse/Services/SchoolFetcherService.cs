@@ -44,29 +44,30 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
         try
         {
             Console.WriteLine($"[ProcessDivision] Starting {name}");
-            var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                $"{Settings.ServerUrl}schools/get-schools"
-            );
-
-            request.SetBrowserRequestMode(BrowserRequestMode.Cors);
-            request.Content = new FormUrlEncodedContent(
-                [new KeyValuePair<string, string>("divisionCode", code.ToString())]
-            );
 
             HttpResponseMessage result = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
-                r => r.IsSuccessStatusCode,
-                async _ => await httpClient.SendAsync(request).ConfigureAwait(false)
+                r => r != null && r.IsSuccessStatusCode,
+                async _ =>
+                {
+                    var request = new HttpRequestMessage(
+                        HttpMethod.Post,
+                        $"{Settings.ServerUrl}schools/get-schools"
+                    );
+
+                    request.SetBrowserRequestMode(BrowserRequestMode.Cors);
+                    request.Content = new FormUrlEncodedContent(
+                        [new KeyValuePair<string, string>("divisionCode", code.ToString())]
+                    );
+                    return await httpClient.SendAsync(request).ConfigureAwait(false);
+                },
+                maxRetries: 5,
+                delayMs: 300
             );
 
             var schools = await result
                 .Content.ReadFromJsonAsync<List<SchoolData>>()
                 .ConfigureAwait(false);
 
-            foreach (SchoolData data in schools)
-            {
-                Console.WriteLine(data);
-            }
             return schools;
         }
         catch (Exception ex)

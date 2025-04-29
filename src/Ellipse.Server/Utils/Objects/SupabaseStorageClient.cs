@@ -10,7 +10,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
     private readonly Supabase.Client _client = client;
     private IStorageFileApi<FileObject>? _bucketApi;
 
-    public async ValueTask InitBucket()
+    public async ValueTask InitializeAsync()
     {
         try
         {

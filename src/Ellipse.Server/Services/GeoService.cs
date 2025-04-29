@@ -31,9 +31,9 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
         );
 
         var address = await GetAddress(longitude, latitude);
-
         if (string.IsNullOrEmpty(address))
             address = await GetAddressWithMapbox(longitude, latitude);
+
         Console.WriteLine(
             $"[GetAddressCached] Caching address for {longitude}, {latitude}: {address}"
         );
@@ -61,7 +61,7 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             Console.WriteLine($"[GetAddress] Received response: {response}");
 
             if (response == null)
-                return await GetAddressWithMapbox(longitude, latitude);
+                return string.Empty;
 
             var addressMatch = response.Result.AddressMatches.FirstOrDefault();
             var address = addressMatch != null ? addressMatch.MatchedAddress : string.Empty;
@@ -135,7 +135,11 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
         Console.WriteLine(
             $"[GetLatLngCached] Cache miss for address: {address}. Invoking GetLatLng."
         );
+
         latLng = await GetLatLng(address);
+        if (latLng == GeoPoint2d.Zero)
+            latLng = await GetLatLngWithMapbox(address);
+
         Console.WriteLine(
             $"[GetLatLngCached] Caching coordinates for address: {address} as: {latLng}"
         );
@@ -162,7 +166,7 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             Console.WriteLine($"[GetLatLng] Received response: {response}");
 
             if (response == null || response.Result.AddressMatches.Count == 0)
-                return await GetLatLngWithMapbox(address);
+                return GeoPoint2d.Zero;
 
             var firstResult = response.Result.AddressMatches.FirstOrDefault();
             Console.WriteLine($"[GetLatLng] First geocoding result: {firstResult}");
@@ -179,9 +183,8 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             Console.WriteLine(
                 $"[GetLatLng] Error getting coordinates for address: {address}. Exception: {ex.Message}"
             );
+            return GeoPoint2d.Zero;
         }
-
-        return GeoPoint2d.Zero;
     }
 
     private async Task<GeoPoint2d> GetLatLngWithMapbox(string address)
@@ -206,7 +209,9 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         _addressCache.Clear();
+
         censusGeocoder.Dispose();
     }
 }

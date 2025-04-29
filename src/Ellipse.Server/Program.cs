@@ -1,3 +1,4 @@
+using AngleSharp.Common;
 using DotNetEnv;
 using DotNetEnv.Extensions;
 using Ellipse.Server.Services;
@@ -13,16 +14,24 @@ public static class Program
 {
     public static async Task Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
-        await ConfigureServices(builder);
+        try
+        {
+            var builder = WebApplication.CreateBuilder(args);
+            await ConfigureServices(builder);
 
-        var app = builder.Build();
+            var app = builder.Build();
 
-        app.UseRouting();
-        app.UseCors("DynamicCors");
-        app.UseRequestTimeouts();
-        app.MapControllers();
-        app.Run();
+            app.UseRouting();
+            app.UseCors("DynamicCors");
+            app.UseRequestTimeouts();
+            app.MapControllers();
+            app.Run();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "An error occured");
+            throw;
+        }
     }
 
     public static async ValueTask ConfigureServices(WebApplicationBuilder builder)
@@ -62,7 +71,6 @@ public static class Program
             .Services.AddSingleton<MarkerService>()
             .AddSingleton<GeoService>()
             .AddSingleton<CensusGeocoderClient>()
-            .AddSingleton<SupabaseStorageClient>()
             .AddSingleton<WebScraperService>()
             .AddHttpClient<OsrmHttpApiClient>(
                 "OsrmClient",
@@ -71,17 +79,24 @@ public static class Program
 
         Dictionary<string, string> env = Env.Load(Path.Join(Environment.CurrentDirectory, ".env"))
             .ToDotEnvDictionary(CreateDictionaryOption.Throw);
+
+        string? mapboxKey = env.GetValueOrDefault("MAPBOX_API_KEY");
         string? anonKey = env.GetValueOrDefault("SUPABASE_ANON_KEY");
         string? supabaseUrl = env.GetValueOrDefault("SUPABASE_PROJECT_URL");
 
         ArgumentException.ThrowIfNullOrEmpty(anonKey);
         ArgumentException.ThrowIfNullOrEmpty(supabaseUrl);
+        ArgumentException.ThrowIfNullOrEmpty(mapboxKey);
+
         var mapboxClient = builder.Services.AddMapBoxGeocoding();
-        mapboxClient.AddKey(anonKey);
+        mapboxClient.AddKey(mapboxKey);
 
         Supabase.Client client = new(supabaseUrl, anonKey);
-        await client.InitializeAsync();
+        SupabaseStorageClient storageClient = new(client);
 
-        builder.Services.AddSingleton(client);
+        await client.InitializeAsync();
+        await storageClient.InitializeAsync();
+
+        builder.Services.AddSingleton(client).AddSingleton(storageClient);
     }
 }

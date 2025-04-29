@@ -18,16 +18,15 @@ public static class FuncHelper
             {
                 value = await func(retries);
                 if (!isValid(value))
-                {
                     Console.WriteLine($"Retrying... Attempt {retries + 1} of {maxRetries}");
-                    retries++;
-                    await Task.Delay((int)(delayMs * Math.Pow(2, retries)));
-                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
+            
+            retries++;
+            await Task.Delay((int)(delayMs * Math.Pow(2, retries)));
         }
         if (retries >= maxRetries)
             Console.WriteLine($"Max retries reached. Returning default value: {defaultValue}");
