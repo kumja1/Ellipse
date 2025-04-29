@@ -31,6 +31,9 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
         );
 
         var address = await GetAddress(longitude, latitude);
+
+        if (string.IsNullOrEmpty(address))
+            address = await GetAddressWithMapbox(longitude, latitude);
         Console.WriteLine(
             $"[GetAddressCached] Caching address for {longitude}, {latitude}: {address}"
         );

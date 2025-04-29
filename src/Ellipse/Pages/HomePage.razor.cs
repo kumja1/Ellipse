@@ -5,7 +5,7 @@ using OpenLayers.Blazor;
 
 namespace Ellipse.Pages;
 
-partial class Home : ComponentBase
+partial class HomePage : ComponentBase
 {
     [Inject]
     private NavigationManager _navigationManager { get; set; }

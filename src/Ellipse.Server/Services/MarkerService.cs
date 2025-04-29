@@ -2,86 +2,67 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
-using Ellipse.Server.Utils;
-using Microsoft.Extensions.Caching.Memory;
+using Ellipse.Server.Utils.Helpers;
+using Ellipse.Server.Utils.Objects;
 using Osrm.HttpApiClient;
+using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
 using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDisposable
+public class MarkerService(
+    GeoService geocoder,
+    OsrmHttpApiClient client,
+    SupabaseStorageClient storageClient
+) : IDisposable
 {
     private const int MaxConcurrentBatches = 4;
     private const int MaxRetries = 5;
     private const int MatrixBatchSize = 25;
     private readonly SemaphoreSlim _semaphore = new(MaxConcurrentBatches);
+    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = new();
 
-    private readonly ConcurrentDictionary<GeoPoint2d, ValueTask<MarkerResponse?>> _currentTasks =
-        new();
-
-    public async ValueTask<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
+    public async Task<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
     {
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Called for point: {request.Point}"
-        );
+        Log.Information("Called for point: {Point}", request.Point);
 
-        if (
-            SingletonMemoryCache.TryGetEntry<MarkerService, string>(
-                request.Point,
-                out string? cachedData
-            ) && !request.OverrideCache
-        )
+        string? cachedData = await storageClient.Get(request.Point);
+        if (!string.IsNullOrEmpty(cachedData) && !request.OverrideCache)
         {
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cache hit for point: {request.Point}"
-            );
+            Log.Information("Cache hit for point: {Point}", request.Point);
             var deserialized = JsonSerializer.Deserialize<MarkerResponse>(
                 StringCompressor.DecompressString(cachedData)
             )!;
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Returning cached MarkerResponse"
-            );
+            Log.Information("Returning cached MarkerResponse");
             return deserialized;
         }
 
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cache miss for point: {request.Point}"
-        );
+        Log.Information("Cache miss for point: {Point}", request.Point);
 
         var markerResponse = await _currentTasks
             .GetOrAdd(request.Point, _ => ProcessMarkerRequestAsync(request))
             .ConfigureAwait(false);
 
         if (markerResponse == null)
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] MarkerResponse is null for point: {request.Point}"
-            );
+            Log.Warning("MarkerResponse is null for point: {Point}", request.Point);
 
         string serialized = JsonSerializer.Serialize(markerResponse);
-        SingletonMemoryCache.SetEntry<MarkerService, string>(
-            request.Point,
-            StringCompressor.CompressString(serialized),
-            new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(10) }
-        );
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMarkerByLocation] Cached new MarkerResponse for point: {request.Point}"
-        );
+
+        await storageClient.Set(request.Point, StringCompressor.CompressString(serialized));
+
+        Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
         return markerResponse;
     }
 
-    private async ValueTask<MarkerResponse?> ProcessMarkerRequestAsync(MarkerRequest request)
+    private async Task<MarkerResponse?> ProcessMarkerRequestAsync(MarkerRequest request)
     {
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] Processing MarkerRequest for point: {request.Point}"
-        );
+        Log.Information("Processing MarkerRequest for point: {Point}", request.Point);
 
         if (request.Schools.Count == 0)
         {
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] No schools provided. Returning null."
-            );
+            Log.Warning("No schools provided. Returning null.");
             return null;
         }
 
@@ -89,14 +70,10 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         var routesTask = GetMatrixRoutes(request.Point, request.Schools);
 
         string address = await addressTask.ConfigureAwait(false);
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] Address fetched: {address}"
-        );
+        Log.Information("Address fetched: {Address}", address);
 
         var routes = await routesTask.ConfigureAwait(false);
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] Matrix routes obtained. Count: {routes.Count}"
-        );
+        Log.Information("Matrix routes obtained. Count: {Count}", routes.Count);
 
         if (routes.Count > 0)
         {
@@ -107,17 +84,17 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                 Distance = avgDistance,
                 Duration = avgDuration,
             };
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] Calculated average route: Distance={avgDistance}, Duration={avgDuration}"
+            Log.Information(
+                "Calculated average route: Distance={Distance}, Duration={Duration}",
+                avgDistance,
+                avgDuration
             );
         }
         else
         {
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [ProcessMarkerRequestAsync] No routes found."
-            );
+            Log.Warning("No routes found.");
         }
-        
+
         return routes.Count == 0 ? null : new MarkerResponse(address, routes);
     }
 
@@ -126,49 +103,42 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         List<SchoolData> schools
     )
     {
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Called for source: {source} with {schools.Count} schools"
-        );
+        Log.Information("Called for source: {Source} with {Count} schools", source, schools.Count);
         var results = new ConcurrentDictionary<string, Route>();
         List<SchoolData[]> batches = [.. schools.Chunk(MatrixBatchSize)];
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Schools chunked into {batches.Count} batches"
+        Log.Information("Schools chunked into {BatchCount} batches", batches.Count);
+
+        await Task.WhenAll(
+            batches.Select(async (batch, token) => await GetMatrixBatch(source, batch, results))
         );
 
-        await Parallel.ForEachAsync(
-            batches,
-            async (batch, token) => await GetMatrixBatch(source, batch, results, token)
-        );
-
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] All batch tasks completed."
-        );
+        Log.Information("All batch tasks completed.");
         return results.ToDictionary();
     }
 
     private async Task GetMatrixBatch(
         GeoPoint2d source,
         SchoolData[] batch,
-        ConcurrentDictionary<string, Route> results,
-        CancellationToken token
+        ConcurrentDictionary<string, Route> results
     )
     {
         for (int retry = 0; retry <= MaxRetries; retry++)
         {
-            Console.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Batch attempt {retry} for batch with {batch.Length} schools"
+            Log.Information(
+                "Batch attempt {Retry} for batch with {Count} schools",
+                retry,
+                batch.Length
             );
-            await _semaphore.WaitAsync(token).ConfigureAwait(false);
+            await _semaphore.WaitAsync().ConfigureAwait(false);
             try
             {
                 List<GeoPoint2d> destinationList = [.. batch.Select(s => s.LatLng)];
-                Console.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Calling GetMatrixBatch for {destinationList.Count} destinations"
+                Log.Information(
+                    "Calling GetMatrixBatch for {Count} destinations",
+                    destinationList.Count
                 );
                 var response = await GetMatrixRoute(source, destinationList).ConfigureAwait(false);
-                Console.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Received matrix response"
-                );
+                Log.Information("Received matrix response");
 
                 if (
                     response == null
@@ -181,14 +151,11 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                 for (int i = 0; i < batch.Length; i++)
                 {
                     var school = batch[i];
-
                     var distance = response.Distances[0][i];
                     var duration = response.Durations[0][i];
                     if (!distance.HasValue || !duration.HasValue)
                     {
-                        Console.WriteLine(
-                            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Failed to caculate route for {school.Name}"
-                        );
+                        Log.Warning("Failed to calculate route for {School}", school.Name);
                         continue;
                     }
 
@@ -197,8 +164,11 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
                         Distance = MetersToMiles(distance.Value),
                         Duration = duration.Value,
                     };
-                    Console.WriteLine(
-                        $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] School: {school.Name} => Distance: {distance}, Duration: {duration}"
+                    Log.Information(
+                        "School: {School} => Distance: {Distance}, Duration: {Duration}",
+                        school.Name,
+                        distance,
+                        duration
                     );
                 }
 
@@ -206,21 +176,16 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
             }
             catch (Exception ex) when (retry < MaxRetries)
             {
-                Console.Error.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Matrix API call failed on attempt {retry + 1}: {ex.Message}"
-                );
+                Log.Warning(ex, "Matrix API call failed on attempt {Attempt}", retry + 1);
                 int delayMs = 500 * (int)Math.Pow(2, retry);
-                Console.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Waiting {delayMs}ms before retrying."
-                );
-                await Task.Delay(delayMs, token).ConfigureAwait(false);
+
+                Log.Information("Waiting {Delay}ms before retrying.", delayMs);
+                await Task.Delay(delayMs).ConfigureAwait(false);
             }
             finally
             {
                 _semaphore.Release();
-                Console.WriteLine(
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixRoutes] Semaphore released."
-                );
+                Log.Information("Semaphore released.");
             }
         }
     }
@@ -230,15 +195,13 @@ public class MarkerService(GeoService geocoder, OsrmHttpApiClient client) : IDis
         List<GeoPoint2d> destinations
     )
     {
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Called for source: {source} with {destinations.Count} destinations."
+        Log.Information(
+            "Called for source: {Source} with {Count} destinations.",
+            source,
+            destinations.Count
         );
+        Log.Information("Destinations: {Destinations}", string.Join("\n", destinations));
 
-
-Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Destinations: {string.Join("\n", destinations)}"
-        );
-        
         if (destinations.Contains(GeoPoint2d.Zero))
             return null;
 
@@ -256,71 +219,41 @@ Console.WriteLine(
             .Sources(0)
             .Build();
 
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Request prepared. Calling MapboxClient.GetMatrixAsync..."
-        );
+        Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
         var response = await client.GetTableAsync(request);
-        Console.WriteLine(response.ToString());
+        Log.Information("{Response}", response);
+
         if (response?.Durations == null || response?.Distances == null)
         {
-            Console.Error.WriteLine(
-                $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Invalid matrix response received."
-            );
+            Log.Error("Invalid matrix response received.");
             throw new InvalidOperationException("Invalid matrix response");
         }
 
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [GetMatrixBatch] Matrix response successfully received."
-        );
+        Log.Information("Matrix response successfully received.");
         return response;
     }
 
     private static double Trimean(List<double> data)
     {
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [Trimean] Calculating trimean for {data.Count} data points."
-        );
-
+        Log.Information("Calculating trimean for {Count} data points.", data.Count);
         List<double> sorted = [.. data.OrderBy(x => x)];
         double q1 = WeightedPercentile(sorted, 0.25);
-        double median = WeightedPercentile(sorted, 0.50);
+        double median = WeightedPercentile(sorted, 0.5);
         double q3 = WeightedPercentile(sorted, 0.75);
-        double trimean = (q1 + 2 * median + q3) / 4.0;
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [Trimean] q1: {q1}, Median: {median}, q3: {q3}, Trimean: {trimean}"
-        );
-        return trimean;
+        return (q1 + 2 * median + q3) / 4.0;
     }
 
     private static double WeightedPercentile(List<double> sorted, double percentile)
     {
-        double rank = percentile * (sorted.Count - 1);
-        int lowerIndex = (int)Math.Floor(rank);
-        int upperIndex = (int)Math.Ceiling(rank);
-        if (lowerIndex == upperIndex)
-            return sorted[lowerIndex];
-
-        double weight = rank - lowerIndex;
-        double result = sorted[lowerIndex] * (1 - weight) + sorted[upperIndex] * weight;
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [WeightedPercentile] Percentile: {percentile}, Rank: {rank}, Result: {result}"
-        );
-        return result;
+        double position = (sorted.Count - 1) * percentile;
+        int left = (int)Math.Floor(position);
+        int right = (int)Math.Ceiling(position);
+        return left == right
+            ? sorted[left]
+            : sorted[left] + (sorted[right] - sorted[left]) * (position - left);
     }
 
-    private static double MetersToMiles(float meters)
-    {
-        double miles = meters / 1609.34;
-        Console.WriteLine(
-            $"[{DateTime.Now:HH:mm:ss.fff}] [MetersToMiles] Converted {meters} meters to {miles} miles."
-        );
-        return miles;
-    }
+    private static double MetersToMiles(double meters) => meters * 0.000621371;
 
-    public void Dispose()
-    {
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [Dispose] Disposing MarkerService.");
-        GC.SuppressFinalize(this);
-        _semaphore.Dispose();
-    }
+    public void Dispose() => _semaphore.Dispose();
 }

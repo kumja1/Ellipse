@@ -1,55 +1,34 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.Caching.Memory;
 using Ellipse.Server.Utils;
+using Ellipse.Server.Utils.Helpers;
 using Ellipse.Server.Utils.Objects;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Ellipse.Server.Services;
 
-public sealed class WebScraperService
+public sealed class WebScraperService(GeoService geoService, SupabaseStorageClient storageClient)
 {
     private readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
-    public async Task<string> StartNewAsync(
-        int divisionCode,
-        bool overrideCache,
-        GeoService geoService,
-        SupabaseStorageClient storageClient)
+    public async Task<string> StartNewAsync(int divisionCode, bool overrideCache)
     {
-        if (
-            SingletonMemoryCache.TryGetEntry<WebScraperService, string>(
-                divisionCode,
-                out string? cachedData
-            ) && !overrideCache
-        )
-        {
+        string? cachedData = await storageClient.Get(divisionCode);
+        if (!string.IsNullOrEmpty(cachedData) && !overrideCache)
             return StringCompressor.DecompressString(cachedData!);
-        }
 
-        var task = _scrapingTasks.GetOrAdd(
-            divisionCode,
-            _ => StartScraperAsync(divisionCode, geoService)
-        );
+        var task = _scrapingTasks.GetOrAdd(divisionCode, _ => StartScraperAsync(divisionCode));
         var result = await task.ConfigureAwait(false);
         return result;
     }
 
-    private async Task<string> StartScraperAsync(int divisionCode, GeoService geoService)
+    private async Task<string> StartScraperAsync(int divisionCode)
     {
         try
         {
             var scraper = new WebScraper(divisionCode, geoService);
             string result = await scraper.ScrapeAsync().ConfigureAwait(false);
 
-            SingletonMemoryCache.SetEntry<WebScraperService, string>(
-                divisionCode,
-                StringCompressor.CompressString(result),
-                new MemoryCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30),
-                    SlidingExpiration = TimeSpan.FromDays(10),
-                }
-            );
-
+            await storageClient.Set(divisionCode, StringCompressor.CompressString(result));
             return result;
         }
         catch

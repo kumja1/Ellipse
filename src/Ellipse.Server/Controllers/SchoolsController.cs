@@ -7,7 +7,8 @@ namespace Ellipse.Server.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [RequestTimeout("ResponseTimeout")]
-public class SchoolsController(GeoService geoService) : ControllerBase
+public class SchoolsController(GeoService geoService, WebScraperService scraperService)
+    : ControllerBase
 {
     // POST api/schools/get-schools
     [HttpPost("get-schools")]
@@ -19,7 +20,7 @@ public class SchoolsController(GeoService geoService) : ControllerBase
         if (divisionCode <= 0)
             return BadRequest("Error: Missing or invalid required field 'divisionCode'.");
 
-        var result = await WebScraperService.StartNewAsync(divisionCode, overrideCache, geoService);
+        var result = await scraperService.StartNewAsync(divisionCode, overrideCache);
         return Content(result, "application/json");
     }
 }

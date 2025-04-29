@@ -10,15 +10,14 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
     private readonly Supabase.Client _client = client;
     private IStorageFileApi<FileObject>? _bucketApi;
 
-    public IStorageFileApi<FileObject>? BucketApi =>
-        _bucketApi ?? throw new InvalidOperationException("Bucket API cannot be null");
-
     public async ValueTask InitBucket()
     {
         try
         {
             Bucket? bucket = await GetOrCreateBucket("server_cache");
-            _bucketApi = _client.Storage.From(bucket!.Id);
+            ArgumentNullException.ThrowIfNull(bucket);
+
+            _bucketApi = _client.Storage.From(bucket.Id!);
         }
         catch (Exception e)
         {
@@ -26,22 +25,20 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
     }
 
-    private async Task<Bucket> GetOrCreateBucket(string name)
+    private async Task<Bucket?> GetOrCreateBucket(string name)
     {
         try
         {
             Bucket? bucket = await _client.Storage.GetBucket(name);
             if (bucket != null)
-                bucket = await _client.Storage.CreateBucket(
-                    name,
-                    new BucketUpsertOptions
-                    {
-                        FileSizeLimit = "30MB",
-                        AllowedMimes = ["text/plain"],
-                    }
-                );
+                return bucket;
 
-            return (await _client.Storage.GetBucket(name))!;
+            await _client.Storage.CreateBucket(
+                name,
+                new BucketUpsertOptions { FileSizeLimit = "30MB", AllowedMimes = ["text/plain"] }
+            );
+
+            return await _client.Storage.GetBucket(name);
         }
         catch (Exception e)
         {
@@ -49,6 +46,13 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
             throw;
         }
     }
+
+    public async ValueTask Set(
+        object obj,
+        string content,
+        string folder = "",
+        Supabase.Storage.FileOptions options = null
+    ) => await Set(obj.ToString(), content, folder, null);
 
     public async ValueTask Set(
         string key,
@@ -67,7 +71,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         byte[] data = Encoding.UTF8.GetBytes(content);
         try
         {
-            await BucketApi.Upload(data, $"{folder}/{key}.txt", options);
+            await _bucketApi?.Upload(data, $"{folder}/{key}.txt", options);
         }
         catch (Exception e)
         {
@@ -75,11 +79,13 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
     }
 
+    public async ValueTask Remove(object obj) => await Remove(obj.ToString());
+
     public async ValueTask Remove(string name)
     {
         try
         {
-            await BucketApi!.Remove($"{name}.txt");
+            await _bucketApi?.Remove($"{name}.txt");
         }
         catch (Exception e)
         {
@@ -87,11 +93,13 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
     }
 
+    public async Task<string> Get(object obj) => await Get(obj.ToString());
+
     public async Task<string> Get(string name)
     {
         try
         {
-            byte[] data = await BucketApi.Download($"{name}.txt", null);
+            byte[] data = await _bucketApi?.Download($"{name}.txt", null);
             return Encoding.UTF8.GetString(data);
         }
         catch (Exception e)

@@ -4,41 +4,44 @@
 
 @namespace Ellipse.Components.MarkerMenu
 
-<MudDrawer @bind-Open="MenuOpen" Anchor="Anchor.Left" Elevation="8"
-           Class="@_Class"
-           Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
+<MudDrawer @bind-Open="MenuOpen" Anchor="Anchor.Left" Elevation="8" Class="@_Class"
+    Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
     <!-- Drawer Header -->
-    <MudDrawerHeader Class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-t-lg shadow">
+    <MudDrawerHeader
+        Class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-t-lg shadow">
         <MudText Typo="Typo.h5" Class="font-bold tracking-wide">
             Location Details
         </MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Close" @onclick="ToggleMenu" Edge="Edge.End"
-                       Class="text-white hover:text-gray-300 transition-colors duration-200" />
+            Class="text-white hover:text-gray-300 transition-colors duration-200" />
         @if (!IsListMode)
         {
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="ToggleMode" Edge="Edge.Start"
-                           Class="text-white hover:text-gray-300 transition-colors duration-200" />
+                Class="text-white hover:text-gray-300 transition-colors duration-200" />
         }
     </MudDrawerHeader>
 
     <!-- Drawer Content -->
+
+
+
     @if (IsListMode)
     {
-        <MudList T="Marker">
-            @if (Markers == null)
-            {
-                <MudProgressCircular Indeterminate Size="Size.Large" Class="flex place-self-center" />
-            }
-            else
-            {
-                @foreach (var marker in Markers)
+        @if (_markers.Count == 0)
+        {
+            <MudProgressCircular Indeterminate Size="Size.Large" Class="flex place-self-center" />
+        }
+        else
+        {
+            <MudList T="Marker">
+                @foreach (var marker in _markers)
                 {
                     <MudListItem>
                         <MarkerMenuItem Marker="marker" OnSelect="SelectMarker" />
                     </MudListItem>
                 }
-            }
-        </MudList>
+            </MudList>
+        }
     }
     else
     {
@@ -51,18 +54,17 @@
 
             <!-- Actions -->
             <MudStack Justify="Justify.FlexStart" Row Spacing="2">
-                <MudButton Variant="Variant.Filled"
-                           Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg"
-                           OnClick="OnButtonClick">
-                    Open in LandSearch
-                </MudButton>
-            </MudStack>
-            <MudDivider />
+                 <MudButton Variant="Variant.Filled"
+                     Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg">
+                     Open in LandSearch
+                 </MudButton>
+             </MudStack>
+             <MudDivider />
 
-            <!-- Route Selection -->
-            <MudSelect Label="Select Mode" Dense Outlined @bind-Value="_selectedRouteName"
-                       Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
-                @if (Routes != null)
+             <!-- Route Selection -->
+             <MudSelect Label="Select Mode" Dense Outlined @bind-Value="_selectedRouteName"
+                 Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
+                 @if (Routes != null)
                 {
                     @foreach (var (routeName, _) in Routes)
                     {
@@ -90,4 +92,4 @@
             </MudStack>
         </MudStack>
     }
-</MudDrawer>
+    </MudDrawer>

@@ -2,7 +2,6 @@ namespace Ellipse.Common.Models;
 
 public readonly record struct GeoPoint2d(double Lon, double Lat)
 {
-
     public override string ToString() => $"{Lon},{Lat}";
 
     public static implicit operator GeoPoint2d(ValueTuple<double, double> tuple) =>

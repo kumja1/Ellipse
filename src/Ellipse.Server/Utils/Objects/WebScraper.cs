@@ -6,28 +6,25 @@ using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
 using Ellipse.Common.Models;
-using Ellipse.Server.Utils;
+using Ellipse.Server.Services;
+using Ellipse.Server.Utils.Helpers;
+using Serilog;
 
 namespace Ellipse.Server.Utils.Objects;
 
-public sealed partial class WebScraper
+public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 {
     private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
+    private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
 
     [GeneratedRegex(@"[.\s/]+")]
     private static partial Regex CleanNameRegex();
 
-    private readonly int _divisionCode;
-    private readonly GeoService _geoService;
     private readonly IBrowsingContext _browsingContext = BrowsingContext.New(
         Configuration.Default.WithDefaultLoader().WithXPath()
     );
 
-    public WebScraper(int divisionCode, GeoService geoService)
-    {
-        _divisionCode = divisionCode;
-        _geoService = geoService;
-    }
+    private readonly SemaphoreSlim _semaphore = new(20, 20);
 
     public async Task<string> ScrapeAsync()
     {
@@ -37,15 +34,17 @@ public sealed partial class WebScraper
 
         if (totalPages > 1)
         {
-            await Parallel.ForEachAsync(
-                Enumerable.Range(2, totalPages - 1),
-                new ParallelOptions { MaxDegreeOfParallelism = 28 },
-                async (page, _) =>
-                {
-                    var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
-                    foreach (var school in schools)
-                        queue.Enqueue(school);
-                }
+            await Task.WhenAll(
+                Enumerable
+                    .Range(2, totalPages - 1)
+                    .Select(
+                        async (page, _) =>
+                        {
+                            var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
+                            foreach (var school in schools)
+                                queue.Enqueue(school);
+                        }
+                    )
             );
         }
 
@@ -55,19 +54,21 @@ public sealed partial class WebScraper
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ProcessPageAsync(int page)
     {
-        var url = $"{BaseUrl}/page/{page}?division={_divisionCode}";
+        var url = $"{BaseUrl}/page/{page}?division={divisionCode}";
         IDocument? document = null;
-        List<IElement> rows = await RequestHelper.RetryIfInvalid(
-            isValid: l => l.Count > 0,
-            func: async _ =>
-            {
-                document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-                return document.QuerySelectorAll("table > tbody > tr").ToList();
-            },
-            defaultValue: [],
-            maxRetries: 10,
-            delayMs: 300
-        ).ConfigureAwait(false);
+        List<IElement> rows = await FuncHelper
+            .RetryIfInvalid(
+                isValid: l => l.Count > 0,
+                func: async _ =>
+                {
+                    document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+                    return document.QuerySelectorAll("table > tbody > tr").ToList();
+                },
+                defaultValue: [],
+                maxRetries: 10,
+                delayMs: 300
+            )
+            .ConfigureAwait(false);
 
         var tasks = rows.Select(ProcessRowAsync);
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -79,7 +80,8 @@ public sealed partial class WebScraper
     private async Task<SchoolData?> ProcessRowAsync(IElement row)
     {
         var nameCell = row.QuerySelector("td:first-child");
-        if (nameCell == null) return null;
+        if (nameCell == null)
+            return null;
 
         var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
         var cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
@@ -88,36 +90,94 @@ public sealed partial class WebScraper
         var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
 
         var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
-        var geoLocation = await RequestHelper.RetryIfInvalid(
-            isValid: c => c != GeoPoint2d.Zero,
-            func: async _ => await _geoService.GeocodeAsync(address),
-            defaultValue: GeoPoint2d.Zero
-        ).ConfigureAwait(false);
+        var geoLocation = await FuncHelper
+            .RetryIfInvalid(
+                isValid: c => c != GeoPoint2d.Zero,
+                func: async _ => await geoService.GetLatLngCached(address),
+                defaultValue: GeoPoint2d.Zero
+            )
+            .ConfigureAwait(false);
 
         return new SchoolData
         {
             Name = name,
             Address = address,
-            Location = geoLocation,
-            ExtraInfo1 = cell2,
-            ExtraInfo2 = cell3
+            Division = cell2,
+            GradeSpan = cell3,
+            LatLng = geoLocation,
         };
     }
 
     private async Task<string> FetchAddressAsync(string cleanedName)
     {
-        var addressUrl = $"https://schoolquality.virginia.gov/schools/{cleanedName}";
-        var doc = await _browsingContext.OpenAsync(addressUrl).ConfigureAwait(false);
-        var el = doc.QuerySelector(".school-address");
-        return el?.TextContent.Trim() ?? "";
+        try
+        {
+            string address = await FuncHelper
+                .RetryIfInvalid(
+                    isValid: s => !string.IsNullOrEmpty(s),
+                    func: async (attempt) =>
+                    {
+                        try
+                        {
+                            Log.Information(
+                                "Attempt {Attempt}: Fetching address for {Name}",
+                                attempt,
+                                cleanedName
+                            );
+
+                            string fetchedAddress = string.Empty;
+                            await _semaphore.WaitAsync().ConfigureAwait(false);
+                            try
+                            {
+                                var url = $"{SchoolInfoUrl}/{cleanedName}";
+                                Log.Information("Requesting: {Url}", url);
+
+                                var doc = await _browsingContext
+                                    .OpenAsync(url)
+                                    .ConfigureAwait(false);
+
+                                var el = doc.QuerySelector(
+                                    "[itemtype='http://schema.org/PostalAddress']"
+                                );
+
+                                fetchedAddress = WebUtility
+                                    .HtmlDecode(el?.TextContent ?? "")
+                                    .Trim();
+                            }
+                            finally
+                            {
+                                _semaphore.Release();
+                            }
+                            return fetchedAddress;
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "Error fetching from page");
+                            return string.Empty;
+                        }
+                    },
+                    defaultValue: "",
+                    maxRetries: 10,
+                    delayMs: 200
+                )
+                .ConfigureAwait(false);
+
+            return address;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Fatal error during address fetch");
+            return string.Empty;
+        }
     }
 
-    private int ParseTotalPages(IDocument document)
+    private static int ParseTotalPages(IDocument document)
     {
-        var pageLinks = document.QuerySelectorAll(".pager .pager__item").ToList();
-        return pageLinks
-            .Select(p => int.TryParse(p.TextContent, out var n) ? n : 0)
-            .DefaultIfEmpty(1)
+        int totalPages = document
+            .QuerySelectorAll("a.page-numbers")
+            .Select(e => int.TryParse(e.TextContent, out var p) ? p : 0)
+            .Append(1)
             .Max();
+        return totalPages;
     }
 }

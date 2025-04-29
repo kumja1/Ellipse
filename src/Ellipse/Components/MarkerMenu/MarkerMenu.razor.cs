@@ -6,28 +6,33 @@ namespace Ellipse.Components.MarkerMenu;
 
 partial class MarkerMenu : ComponentBase
 {
-    [Parameter] public bool MenuOpen { get; set; }
-    [Parameter] public List<Marker>? Markers { get; set; }
-    [Parameter] public Action? OnButtonClick { get; set; }
+    [Parameter]
+    public bool MenuOpen { get; set; }
 
-    [Parameter] public bool IsListMode { get; set; }
+    [Parameter]
+    public Action? OnButtonClick { get; set; }
 
-    [Parameter] public string Class { get; set; }
-    
+    [Parameter]
+    public bool IsListMode { get; set; }
+
+    [Parameter]
+    public string Class { get; set; }
 
     private string _Class =>
         CssBuilder
             .Default("shadow-2xl bg-white rounded-r-lg overflow-auto")
             .AddClass(Class, !string.IsNullOrWhiteSpace(Class))
             .Build();
-    
+
     private string _selectedRouteName = "Average Distance";
 
-    private Marker? CurrentMarker { get; set; }
+    private readonly List<Marker>? _markers = [];
+
+    private Marker? CurrentMarker;
 
     private Dictionary<string, (double Distance, string Duration)>? Routes =>
         CurrentMarker?.Properties["Routes"]
-            as Dictionary<string, (double Distance, string Duration)>;
+        as Dictionary<string, (double Distance, string Duration)>;
 
     private (double Distance, string Duration) SelectedRouteProps =>
         Routes != null && Routes.TryGetValue(_selectedRouteName, out var value)
@@ -43,4 +48,6 @@ partial class MarkerMenu : ComponentBase
         CurrentMarker = marker;
         IsListMode = false;
     }
+
+    public void AddMarker(Marker marker) => _markers.Add(marker);
 }
