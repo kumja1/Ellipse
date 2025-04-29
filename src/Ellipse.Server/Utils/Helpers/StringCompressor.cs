@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 
-namespace Ellipse.Server.Utils;
+namespace Ellipse.Server.Utils.Helpers;
 
 internal static class StringCompressor
 {

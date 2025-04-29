@@ -1,6 +1,6 @@
-namespace Ellipse.Server.Utils;
+namespace Ellipse.Server.Utils.Helpers;
 
-internal static class RequestHelper
+internal static class FuncHelper
 {
     public static async Task<TResult> RetryIfInvalid<TResult>(
         Func<TResult, bool> isValid,
