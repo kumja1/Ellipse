@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Ellipse.Common.Models;
+using Ellipse.Common.Utils;
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
 
 namespace Ellipse.Services;
@@ -53,11 +54,10 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
                 [new KeyValuePair<string, string>("divisionCode", code.ToString())]
             );
 
-            HttpResponseMessage result;
-            do
-            {
-                result = await httpClient.SendAsync(request).ConfigureAwait(false);
-            } while (!result.IsSuccessStatusCode);
+            HttpResponseMessage result = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
+                r => r.IsSuccessStatusCode,
+                async _ => await httpClient.SendAsync(request).ConfigureAwait(false)
+            );
 
             var schools = await result
                 .Content.ReadFromJsonAsync<List<SchoolData>>()
@@ -72,7 +72,7 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
         catch (Exception ex)
         {
             Console.WriteLine(
-                $"[ProcessDivision] An error occured while processing division {code}: {ex.Message}"
+                $"[ProcessDivision] An error occured while processing division {code}: {ex.Message}, {ex.StackTrace}"
             );
             return [];
         }

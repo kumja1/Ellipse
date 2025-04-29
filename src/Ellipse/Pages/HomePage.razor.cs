@@ -8,5 +8,5 @@ namespace Ellipse.Pages;
 partial class HomePage : ComponentBase
 {
     [Inject]
-    private NavigationManager _navigationManager { get; set; }
+    private NavigationManager NavigationManager { get; set; }
 }

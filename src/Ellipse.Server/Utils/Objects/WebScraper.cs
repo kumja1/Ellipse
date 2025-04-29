@@ -6,8 +6,8 @@ using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
 using Ellipse.Common.Models;
+using Ellipse.Common.Utils;
 using Ellipse.Server.Services;
-using Ellipse.Server.Utils.Helpers;
 using Serilog;
 
 namespace Ellipse.Server.Utils.Objects;

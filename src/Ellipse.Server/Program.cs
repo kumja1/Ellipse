@@ -63,6 +63,7 @@ public static class Program
             .AddSingleton<GeoService>()
             .AddSingleton<CensusGeocoderClient>()
             .AddSingleton<SupabaseStorageClient>()
+            .AddSingleton<WebScraperService>()
             .AddHttpClient<OsrmHttpApiClient>(
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")

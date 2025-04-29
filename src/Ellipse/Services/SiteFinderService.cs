@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
+using Ellipse.Common.Utils;
 using OpenLayers.Blazor;
 
 namespace Ellipse.Services;
@@ -41,13 +42,18 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
     {
         try
         {
-            var response = await httpClient
-                .PostAsJsonAsync(
-                    $"{Settings.ServerUrl}marker/get-markers",
-                    new MarkerRequest(schools, new GeoPoint2d(x, y), false)
-                )
-                .ConfigureAwait(false);
-            var markerResponse = await response
+            var response = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
+                r => r.IsSuccessStatusCode,
+                async _ =>
+                    await httpClient
+                        .PostAsJsonAsync(
+                            $"{Settings.ServerUrl}marker/get-markers",
+                            new MarkerRequest(schools, new GeoPoint2d(x, y), false)
+                        )
+                        .ConfigureAwait(false)
+            );
+
+            MarkerResponse? markerResponse = await response
                 .Content.ReadFromJsonAsync<MarkerResponse>()
                 .ConfigureAwait(false);
 
