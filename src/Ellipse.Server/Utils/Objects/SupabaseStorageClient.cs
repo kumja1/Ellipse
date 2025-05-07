@@ -21,7 +21,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
         catch (Exception e)
         {
-            Log.Error(e, "An error occured when initing the bucket");
+            Log.Error(e, "An error occurred when initializing the bucket");
         }
     }
 
@@ -42,17 +42,19 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
         catch (Exception e)
         {
-            Log.Error(e, "An error occured while creating a bucket for {0}", name);
+            Log.Error(e, "An error occurred while creating a bucket for {0}", name);
             throw;
         }
     }
+
+    private static string BuildPath(string key, string folder) => string.IsNullOrWhiteSpace(folder) ? $"{key}.txt" : $"{folder.TrimEnd('/')}/{key}.txt";
 
     public async ValueTask Set(
         object obj,
         string content,
         string folder = "",
-        Supabase.Storage.FileOptions options = null
-    ) => await Set(obj.ToString(), content, folder, null);
+        Supabase.Storage.FileOptions? options = null
+    ) => await Set(obj.ToString(), content, folder, options);
 
     public async ValueTask Set(
         string key,
@@ -69,42 +71,48 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         };
 
         byte[] data = Encoding.UTF8.GetBytes(content);
+        string path = BuildPath(key, folder);
+
         try
         {
-            await _bucketApi?.Upload(data, $"{folder}/{key}.txt", options);
+            await _bucketApi?.Upload(data, path, options);
         }
         catch (Exception e)
         {
-            Log.Error(e, "An error occured while uploading JSON string to {0}", key);
+            Log.Error(e, "An error occurred while uploading data to {0}", path);
         }
     }
 
-    public async ValueTask Remove(object obj) => await Remove(obj.ToString());
+    public async ValueTask Remove(object obj, string folder = "") => await Remove(obj.ToString(), folder);
 
-    public async ValueTask Remove(string name)
+    public async ValueTask Remove(string key, string folder = "")
     {
+        string path = BuildPath(key, folder);
+
         try
         {
-            await _bucketApi?.Remove($"{name}.txt");
+            await _bucketApi?.Remove(path);
         }
         catch (Exception e)
         {
-            Log.Error(e, "An error occured while removing JSON {0}", name);
+            Log.Error(e, "An error occurred while removing data for {0}", path);
         }
     }
 
-    public async Task<string> Get(object obj) => await Get(obj.ToString());
+    public async Task<string> Get(object obj, string folder = "") => await Get(obj.ToString(), folder);
 
-    public async Task<string> Get(string name)
+    public async Task<string> Get(string key, string folder = "")
     {
+        string path = BuildPath(key, folder);
+
         try
         {
-            byte[] data = await _bucketApi?.Download($"{name}.txt", null);
+            byte[] data = await _bucketApi?.Download(path, null);
             return Encoding.UTF8.GetString(data);
         }
         catch (Exception e)
         {
-            Log.Error(e, "An error occured while fetching JSON {0}", name);
+            Log.Error(e, "An error occurred while fetching data for {0}", path);
             return string.Empty;
         }
     }

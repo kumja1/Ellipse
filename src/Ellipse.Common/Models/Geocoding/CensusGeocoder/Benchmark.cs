@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Ellipse.Common.Models.Geocoding;
+namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
 public class Benchmark
 {

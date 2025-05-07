@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Ellipse.Common.Models.Geocoding;
+namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
 /// <summary>
 /// Models the overall response returned by the Census Geocoder API.

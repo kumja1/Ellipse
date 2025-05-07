@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Ellipse.Common.Models.Geocoding;
+namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
 public class Input
 {

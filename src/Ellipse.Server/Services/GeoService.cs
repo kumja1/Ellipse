@@ -1,17 +1,25 @@
 using System.Collections.Concurrent;
+using System.Text;
+using AngleSharp.Text;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
-using Ellipse.Common.Models.Geocoding;
-using Geo.MapBox;
-using Geo.MapBox.Models;
-using Geo.MapBox.Models.Parameters;
+using Ellipse.Common.Models.Geocoding.CensusGeocoder;
+using Ellipse.Common.Models.Geocoding.CensusGeocoder.PhotonGeocoder;
+using Ellipse.Server.Utils.Objects;
+using Geo.ArcGIS;
+using Geo.ArcGIS.Models;
+using Geo.ArcGIS.Models.Parameters;
+using Geo.ArcGIS.Models.Responses;
 
 namespace Ellipse.Server.Services;
 
-public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding mapBoxGeocoder)
-    : IDisposable
+public class GeoService(
+    CensusGeocoderClient censusGeocoder,
+    PhotonGeocoderClient photonGeocoder,
+    SupabaseStorageClient storageClient
+) : IDisposable
 {
-    private readonly ConcurrentDictionary<GeoPoint2d, string> _addressCache = [];
+    private const string FolderName = "geocoding_cache";
 
     public async Task<string> GetAddressCached(double longitude, double latitude)
     {
@@ -19,25 +27,29 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
         Console.WriteLine(
             $"[GetAddressCached] Searching cache for coordinates: {longitude}, {latitude}"
         );
-        if (_addressCache.TryGetValue(latLng, out var cachedAddress))
+
+        string? cachedAddress = await storageClient.Get(latLng, FolderName);
+        if (!string.IsNullOrEmpty(cachedAddress))
         {
             Console.WriteLine(
                 $"[GetAddressCached] Cache hit for {longitude}, {latitude} - Address: {cachedAddress}"
             );
             return cachedAddress;
         }
+
         Console.WriteLine(
             $"[GetAddressCached] Cache miss for {longitude}, {latitude}. Invoking GetAddress."
         );
 
         var address = await GetAddress(longitude, latitude);
         if (string.IsNullOrEmpty(address))
-            address = await GetAddressWithMapbox(longitude, latitude);
+            address = await GetAddressWithArcGIS(longitude, latitude);
 
         Console.WriteLine(
             $"[GetAddressCached] Caching address for {longitude}, {latitude}: {address}"
         );
-        _addressCache[latLng] = address;
+
+        await storageClient.Set(latLng, address, FolderName);
         return address;
     }
 
@@ -67,11 +79,13 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
             var address = addressMatch != null ? addressMatch.MatchedAddress : string.Empty;
 
             if (string.IsNullOrWhiteSpace(address))
+            {
                 Console.WriteLine(
-                    $"[GetAddress] No address found for coordinates: {longitude}, {latitude}"
-                );
+                 $"[GetAddress] No address found for coordinates: {longitude}, {latitude}"
+             );
+            }
             else
-                Console.WriteLine($"[GetAddress] Address found: {address}");
+            { Console.WriteLine($"[GetAdditress] Address found: {address}"); }
 
             return address;
         }
@@ -84,26 +98,42 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
         }
     }
 
-    private async Task<string> GetAddressWithMapbox(double longitude, double latitude)
+    private async Task<string> GetAddressWithArcGIS(double longitude, double latitude)
     {
         Console.WriteLine($"[GetLatLng] No address found for coordinates: {longitude}, {latitude}");
         Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
-        var mapboxResponse = await mapBoxGeocoder.ReverseGeocodingAsync(
-            new ReverseGeocodingParameters
+        var response = await photonGeocoder.ReverseGeocodeAsync(
+            new PhotonReverseGeocodeRequest
             {
-                Coordinate = new Coordinate { Longitude = longitude, Latitude = latitude },
+                Longitude = longitude,
+                Latitude = latitude
             }
         );
 
-        var match = mapboxResponse.Features.OrderBy(f => f.Relevance).LastOrDefault();
-        if (match == null)
+        if (response == null)
         {
             Console.WriteLine(
                 $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
             );
             return string.Empty;
         }
-        return match.Address;
+
+        var props = response.Features[0].Properties;
+        var addressParts = StringBuilderPool.Obtain();
+
+        if (!string.IsNullOrWhiteSpace(props.Street))
+            addressParts.Append(props.Street);
+
+        if (!string.IsNullOrWhiteSpace(props.Postcode))
+            addressParts.Append(props.Postcode);
+
+        if (!string.IsNullOrWhiteSpace(props.City))
+            addressParts.Append(props.City);
+
+        if (!string.IsNullOrWhiteSpace(props.Country))
+            addressParts.Append(props.Country);
+
+        return addressParts.ToString();
     }
 
     public async Task<GeoPoint2d> GetLatLngCached(string address)
@@ -117,12 +147,7 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
         }
 
         Console.WriteLine($"[GetLatLngCached] Searching cache for address: {address}");
-        GeoPoint2d latLng = _addressCache
-            .FirstOrDefault(
-                kvp => kvp.Value.Equals(address, StringComparison.OrdinalIgnoreCase),
-                new KeyValuePair<GeoPoint2d, string>(GeoPoint2d.Zero, "")
-            )
-            .Key;
+        GeoPoint2d latLng = GeoPoint2d.From(await storageClient.Get(address, FolderName));
 
         if (latLng != GeoPoint2d.Zero)
         {
@@ -138,12 +163,13 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
 
         latLng = await GetLatLng(address);
         if (latLng == GeoPoint2d.Zero)
-            latLng = await GetLatLngWithMapbox(address);
+            latLng = await GetLatLngWithArcGIS(address);
 
         Console.WriteLine(
             $"[GetLatLngCached] Caching coordinates for address: {address} as: {latLng}"
         );
-        _addressCache[latLng] = address;
+
+        await storageClient.Set(address, latLng.ToString(), FolderName);
         return latLng;
     }
 
@@ -187,31 +213,42 @@ public class GeoService(CensusGeocoderClient censusGeocoder, IMapBoxGeocoding ma
         }
     }
 
-    private async Task<GeoPoint2d> GetLatLngWithMapbox(string address)
+    private async Task<GeoPoint2d> GetLatLngWithArcGIS(string address)
     {
-        Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
-        Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
-        var geocodeResponse = await mapBoxGeocoder.GeocodingAsync(
-            new GeocodingParameters { Query = address }
-        );
-
-        var location = geocodeResponse.Features.OrderBy(f => f.Relevance).LastOrDefault();
-        if (location == null)
+        try
         {
             Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
+            Console.WriteLine("[GetLatLng] Switching to Mapbox geocoder");
+
+            var geocodeResponse = await photonGeocoder.GeocodeAsync(new PhotonGeocodeRequest
+            {
+                Query = address
+            });
+
+            if (geocodeResponse == null)
+                return GeoPoint2d.Zero;
+
+            var location = geocodeResponse.Features[0];
+            if (location == null)
+            {
+                Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
+                return GeoPoint2d.Zero;
+            }
+
+            return new GeoPoint2d(location.Geometry.Coordinates[0], location.Geometry.Coordinates[1]);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[GetLatLng] Error getting coordinates for address: {address}. Exception: {ex.Message}, {ex.StackTrace}"
+            );
             return GeoPoint2d.Zero;
         }
-        return new GeoPoint2d(
-            location.Geometry.Coordinate.Longitude,
-            location.Geometry.Coordinate.Latitude
-        );
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _addressCache.Clear();
-
         censusGeocoder.Dispose();
     }
 }

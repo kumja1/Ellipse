@@ -21,13 +21,14 @@ public class MarkerService(
     private const int MaxRetries = 5;
     private const int MatrixBatchSize = 25;
     private readonly SemaphoreSlim _semaphore = new(MaxConcurrentBatches);
-    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = new();
+    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = [];
+    private const string FolderName = "markers_cache";
 
     public async Task<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
     {
         Log.Information("Called for point: {Point}", request.Point);
 
-        string? cachedData = await storageClient.Get(request.Point);
+        string? cachedData = await storageClient.Get(request.Point, FolderName);
         if (!string.IsNullOrEmpty(cachedData) && !request.OverrideCache)
         {
             Log.Information("Cache hit for point: {Point}", request.Point);
@@ -49,7 +50,7 @@ public class MarkerService(
 
         string serialized = JsonSerializer.Serialize(markerResponse);
 
-        await storageClient.Set(request.Point, StringCompressor.CompressString(serialized));
+        await storageClient.Set(request.Point, StringCompressor.CompressString(serialized), FolderName);
 
         Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
@@ -140,14 +141,6 @@ public class MarkerService(
                 var response = await GetMatrixRoute(source, destinationList).ConfigureAwait(false);
                 Log.Information("Received matrix response");
 
-                if (
-                    response == null
-                    || response.Distances.Length == 0
-                    || response.Durations.Length == 0
-                    || response.Distances[0].Length < batch.Length
-                )
-                    throw new InvalidOperationException("Incomplete matrix response");
-
                 for (int i = 0; i < batch.Length; i++)
                 {
                     var school = batch[i];
@@ -217,13 +210,14 @@ public class MarkerService(
             )
             .Destinations([.. Enumerable.Range(1, destinations.Count)])
             .Sources(0)
+            .Annotations(TableAnnotations.DurationAndDistance)
             .Build();
 
         Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
         var response = await client.GetTableAsync(request);
         Log.Information("{Response}", response);
 
-        if (response?.Durations == null || response?.Distances == null)
+        if (response == null || response?.Durations == null || response?.Distances == null)
         {
             Log.Error("Invalid matrix response received.");
             throw new InvalidOperationException("Invalid matrix response");

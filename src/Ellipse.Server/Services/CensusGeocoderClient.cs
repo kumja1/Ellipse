@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Ellipse.Common.Enums.Geocoding;
-using Ellipse.Common.Models.Geocoding;
+using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
 namespace Ellipse.Server.Services;
 

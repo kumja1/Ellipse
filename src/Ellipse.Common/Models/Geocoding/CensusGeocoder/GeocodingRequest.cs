@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using Ellipse.Common.Enums.Geocoding;
 
-namespace Ellipse.Common.Models.Geocoding;
+namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
 /// <summary>
 /// Base request model encapsulating properties common to all types of geocoding requests.

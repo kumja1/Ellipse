@@ -1,6 +1,6 @@
 using Ellipse.Common.Enums.Geocoding;
 
-namespace Ellipse.Common.Models.Geocoding;
+namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
 /// <summary>
 /// A specialized reverse geocoding request that ensures the correct search type is set.

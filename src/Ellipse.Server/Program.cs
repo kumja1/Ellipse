@@ -3,10 +3,13 @@ using DotNetEnv;
 using DotNetEnv.Extensions;
 using Ellipse.Server.Services;
 using Ellipse.Server.Utils.Objects;
+using Geo.ArcGIS;
+using Geo.ArcGIS.Services;
 using Geo.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 using Serilog;
+using Supabase;
 
 namespace Ellipse.Server;
 
@@ -37,7 +40,7 @@ public static class Program
     public static async ValueTask ConfigureServices(WebApplicationBuilder builder)
     {
         builder.Host.UseSerilog(
-            (context, config) => config.Enrich.With<CallerEnricher>().WriteTo.Console()
+            (_, config) => config.Enrich.With<CallerEnricher>().WriteTo.Console()
         );
 
         builder.Services.AddRouting();
@@ -45,10 +48,7 @@ public static class Program
         {
             options.AddPolicy(
                 "DynamicCors",
-                policy =>
-                {
-                    policy.SetIsOriginAllowed(origin => true).AllowAnyHeader().AllowAnyMethod();
-                }
+                policy =>  policy.SetIsOriginAllowed(origin => true).AllowAnyHeader().AllowAnyMethod()
             );
         });
 
@@ -59,16 +59,40 @@ public static class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
 
-        builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
+        builder.Services.ConfigureAll<HttpClientFactoryOptions>(options => options.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromMinutes(10)));
+
+        Dictionary<string, string> env = Env.Load(Path.Join(Environment.CurrentDirectory, ".env"))
+            .ToDotEnvDictionary(CreateDictionaryOption.Throw);
+
+        string? anonKey = env.GetValueOrDefault("SUPABASE_ANON_KEY");
+        string? supabaseUrl = env.GetValueOrDefault("SUPABASE_PROJECT_URL");
+
+        ArgumentException.ThrowIfNullOrEmpty(anonKey);
+        ArgumentException.ThrowIfNullOrEmpty(supabaseUrl);
+
+        Client client = new(
+            supabaseUrl,
+            anonKey,
+            new SupabaseOptions { AutoConnectRealtime = true, AutoRefreshToken = true }
+        );
+        SupabaseStorageClient storageClient = new(client);
+
+        try
         {
-            options.HttpClientActions.Add(client =>
-            {
-                client.Timeout = TimeSpan.FromMinutes(10);
-            });
-        });
+            await client.InitializeAsync();
+            await storageClient.InitializeAsync();
+
+            builder.Services.AddSingleton(client).AddSingleton(storageClient);
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "An error occured while initializing Supabase client");
+            return;
+        }
 
         builder
-            .Services.AddSingleton<MarkerService>()
+            .Services.AddSingleton<PhotonGeocoderClient>()
+            .AddSingleton<MarkerService>()
             .AddSingleton<GeoService>()
             .AddSingleton<CensusGeocoderClient>()
             .AddSingleton<WebScraperService>()
@@ -76,27 +100,5 @@ public static class Program
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")
             );
-
-        Dictionary<string, string> env = Env.Load(Path.Join(Environment.CurrentDirectory, ".env"))
-            .ToDotEnvDictionary(CreateDictionaryOption.Throw);
-
-        string? mapboxKey = env.GetValueOrDefault("MAPBOX_API_KEY");
-        string? anonKey = env.GetValueOrDefault("SUPABASE_ANON_KEY");
-        string? supabaseUrl = env.GetValueOrDefault("SUPABASE_PROJECT_URL");
-
-        ArgumentException.ThrowIfNullOrEmpty(anonKey);
-        ArgumentException.ThrowIfNullOrEmpty(supabaseUrl);
-        ArgumentException.ThrowIfNullOrEmpty(mapboxKey);
-
-        var mapboxClient = builder.Services.AddMapBoxGeocoding();
-        mapboxClient.AddKey(mapboxKey);
-
-        Supabase.Client client = new(supabaseUrl, anonKey);
-        SupabaseStorageClient storageClient = new(client);
-
-        await client.InitializeAsync();
-        await storageClient.InitializeAsync();
-
-        builder.Services.AddSingleton(client).AddSingleton(storageClient);
     }
 }

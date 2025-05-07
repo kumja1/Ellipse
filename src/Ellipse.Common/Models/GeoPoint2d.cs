@@ -11,4 +11,19 @@ public readonly record struct GeoPoint2d(double Lon, double Lat)
         new((double)tuple.Item1, (double)tuple.Item2);
 
     public static GeoPoint2d Zero => new(0d, 0d);
+
+    public static GeoPoint2d From(string str)
+    {
+        Span<string> parts = str.Split(',');
+        if (
+            parts.Length != 2
+            || !double.TryParse(parts[0], out var lon)
+            || !double.TryParse(parts[1], out var lat)
+        )
+        {
+            return Zero;
+        }
+
+        return new GeoPoint2d(lon, lat);
+    }
 }
