@@ -1,4 +1,4 @@
-namespace Ellipse.Common.Models.Geocoding.CensusGeocoder.PhotonGeocoder;
+namespace Ellipse.Common.Models.Geocoding.PhotonGeocoder;
 
 public class Properties
 {

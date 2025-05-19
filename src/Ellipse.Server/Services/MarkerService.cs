@@ -1,9 +1,12 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Text.Json;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
+using Ellipse.Common.Models.Matrix.OpenRoute;
+using Ellipse.Common.Utils;
 using Ellipse.Server.Utils.Helpers;
-using Ellipse.Server.Utils.Objects;
+using Ellipse.Server.Utils.Objects.Clients;
 using Osrm.HttpApiClient;
 using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
@@ -14,11 +17,12 @@ namespace Ellipse.Server.Services;
 public class MarkerService(
     GeoService geocoder,
     OsrmHttpApiClient client,
+    OpenRouteClient openRouteClient,
     SupabaseStorageClient storageClient
 ) : IDisposable
 {
     private const int MaxConcurrentBatches = 4;
-    private const int MaxRetries = 5;
+    private const int MaxRetries = 20;
     private const int MatrixBatchSize = 25;
     private readonly SemaphoreSlim _semaphore = new(MaxConcurrentBatches);
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = [];
@@ -50,7 +54,11 @@ public class MarkerService(
 
         string serialized = JsonSerializer.Serialize(markerResponse);
 
-        await storageClient.Set(request.Point, StringCompressor.CompressString(serialized), FolderName);
+        await storageClient.Set(
+            request.Point,
+            StringCompressor.CompressString(serialized),
+            FolderName
+        );
 
         Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
@@ -67,13 +75,12 @@ public class MarkerService(
             return null;
         }
 
-        var addressTask = geocoder.GetAddressCached(request.Point.Lon, request.Point.Lat);
-        var routesTask = GetMatrixRoutes(request.Point, request.Schools);
-
-        string address = await addressTask.ConfigureAwait(false);
+        string address = await geocoder
+            .GetAddressCached(request.Point.Lon, request.Point.Lat)
+            .ConfigureAwait(false);
         Log.Information("Address fetched: {Address}", address);
 
-        var routes = await routesTask.ConfigureAwait(false);
+        var routes = await GetMatrixRoutes(request.Point, request.Schools).ConfigureAwait(false);
         Log.Information("Matrix routes obtained. Count: {Count}", routes.Count);
 
         if (routes.Count > 0)
@@ -106,94 +113,120 @@ public class MarkerService(
     {
         Log.Information("Called for source: {Source} with {Count} schools", source, schools.Count);
         var results = new ConcurrentDictionary<string, Route>();
-        List<SchoolData[]> batches = [.. schools.Chunk(MatrixBatchSize)];
-        Log.Information("Schools chunked into {BatchCount} batches", batches.Count);
+
+        IEnumerable<SchoolData[]> batches = schools.Chunk(MatrixBatchSize);
+        Log.Information("Schools chunked into {BatchCount} batches", MatrixBatchSize);
 
         await Task.WhenAll(
-            batches.Select(async (batch, token) => await GetMatrixBatch(source, batch, results))
+            batches.Select(async (batch, token) => await GetMatrixBatched(source, batch, results))
         );
 
         Log.Information("All batch tasks completed.");
         return results.ToDictionary();
     }
 
-    private async Task GetMatrixBatch(
+    private async Task GetMatrixBatched(
         GeoPoint2d source,
         SchoolData[] batch,
         ConcurrentDictionary<string, Route> results
     )
     {
-        for (int retry = 0; retry <= MaxRetries; retry++)
-        {
-            Log.Information(
-                "Batch attempt {Retry} for batch with {Count} schools",
-                retry,
-                batch.Length
-            );
-            await _semaphore.WaitAsync().ConfigureAwait(false);
-            try
+        _ = await FuncHelper.RetryIfInvalid(
+            success => success,
+            async (attempt) =>
             {
-                List<GeoPoint2d> destinationList = [.. batch.Select(s => s.LatLng)];
                 Log.Information(
-                    "Calling GetMatrixBatch for {Count} destinations",
-                    destinationList.Count
+                    "Batch attempt {Retry} for batch with {Count} schools",
+                    attempt,
+                    batch.Length
                 );
-                var response = await GetMatrixRoute(source, destinationList).ConfigureAwait(false);
-                Log.Information("Received matrix response");
-
-                for (int i = 0; i < batch.Length; i++)
+                await _semaphore.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    var school = batch[i];
-                    var distance = response.Distances[0][i];
-                    var duration = response.Durations[0][i];
-                    if (!distance.HasValue || !duration.HasValue)
+                    GeoPoint2d[] destinations = [.. batch.Select(s => s.LatLng)];
+                    Log.Information(
+                        "Calling GetMatrixBatch for {Count} destinations",
+                        destinations.Length
+                    );
+                    var response = await GetMatrixRoute(source, destinations).ConfigureAwait(false);
+
+                    double[]? distances = response
+                        ?.Distances[0]
+                        .Select(x => (double)(x ?? 0))
+                        .ToArray();
+
+                    double[]? durations = response
+                        ?.Durations[0]
+                        .Select(x => (double)(x ?? 0))
+                        .ToArray();
+
+                    if (response == null || distances == null || durations == null)
                     {
-                        Log.Warning("Failed to calculate route for {School}", school.Name);
-                        continue;
+                        var openRouteResponse = await GetMatrixRouteWithOpenRoute(
+                                source,
+                                destinations
+                            )
+                            .ConfigureAwait(false);
+
+                        if (
+                            openRouteResponse == null
+                            || openRouteResponse.Distances == null
+                            || openRouteResponse.Durations == null
+                        )
+                        {
+                            Log.Error("Invalid matrix response received.");
+                            throw new InvalidOperationException("Invalid matrix response");
+                        }
+
+                        distances = openRouteResponse?.Distances[0];
+                        durations = openRouteResponse?.Durations[0];
                     }
 
-                    results[school.Name] = new Route
+                    for (int i = 0; i < batch.Length; i++)
                     {
-                        Distance = MetersToMiles(distance.Value),
-                        Duration = duration.Value,
-                    };
-                    Log.Information(
-                        "School: {School} => Distance: {Distance}, Duration: {Duration}",
-                        school.Name,
-                        distance,
-                        duration
-                    );
+                        var school = batch[i];
+                        var distance = distances[i];
+                        var duration = durations[i];
+
+                        results[school.Name] = new Route
+                        {
+                            Distance = MetersToMiles(distance),
+                            Duration = duration,
+                        };
+                        Log.Information(
+                            "School: {School} => Distance: {Distance}, Duration: {Duration}",
+                            school.Name,
+                            distance,
+                            duration
+                        );
+                    }
+
+                    return true;
                 }
-
-                break;
-            }
-            catch (Exception ex) when (retry < MaxRetries)
-            {
-                Log.Warning(ex, "Matrix API call failed on attempt {Attempt}", retry + 1);
-                int delayMs = 500 * (int)Math.Pow(2, retry);
-
-                Log.Information("Waiting {Delay}ms before retrying.", delayMs);
-                await Task.Delay(delayMs).ConfigureAwait(false);
-            }
-            finally
-            {
-                _semaphore.Release();
-                Log.Information("Semaphore released.");
-            }
-        }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Error occurred while processing batch: {Batch}", ex.Message);
+                    return false;
+                }
+                finally
+                {
+                    _semaphore.Release();
+                    Log.Information("Semaphore released.");
+                }
+            },
+            false,
+            MaxRetries,
+            500
+        );
     }
 
-    private async Task<TableResponse?> GetMatrixRoute(
-        GeoPoint2d source,
-        List<GeoPoint2d> destinations
-    )
+    private async Task<TableResponse?> GetMatrixRoute(GeoPoint2d source, GeoPoint2d[] destinations)
     {
         Log.Information(
             "Called for source: {Source} with {Count} destinations.",
             source,
-            destinations.Count
+            destinations.Length
         );
-        Log.Information("Destinations: {Destinations}", string.Join("\n", destinations));
 
         if (destinations.Contains(GeoPoint2d.Zero))
             return null;
@@ -208,13 +241,55 @@ public class MarkerService(
                     ]
                 )
             )
-            .Destinations([.. Enumerable.Range(1, destinations.Count)])
+            .Destinations([.. Enumerable.Range(1, destinations.Length)])
             .Sources(0)
             .Annotations(TableAnnotations.DurationAndDistance)
             .Build();
 
         Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
         var response = await client.GetTableAsync(request);
+        Log.Information("{Response}", response);
+
+        if (response == null || response?.Durations == null || response?.Distances == null)
+        {
+            Log.Error("Invalid matrix response received.");
+            throw new InvalidOperationException("Invalid matrix response");
+        }
+
+        Log.Information("Matrix response successfully received.");
+        return response;
+    }
+
+    private async Task<OpenRouteMatrixResponse?> GetMatrixRouteWithOpenRoute(
+        GeoPoint2d source,
+        GeoPoint2d[] destinations
+    )
+    {
+        Log.Information(
+            "Called for source: {Source} with {Count} destinations.",
+            source,
+            destinations.Length
+        );
+
+        if (destinations.Contains(GeoPoint2d.Zero))
+            return null;
+
+        var request = new OpenRouteMatrixRequest
+        {
+            Locations =
+            [
+                [source.Lon, source.Lat],
+                .. destinations.Select(dest => new double[] { dest.Lon, dest.Lat }),
+            ],
+            Sources = [0],
+            Destinations = [.. Enumerable.Range(1, destinations.Length)],
+            Metrics = ["distance", "duration"],
+            Units = "m",
+            Profile = Profile.DrivingCar,
+        };
+
+        Log.Information("Request prepared. Calling OpenRouteClient.GetMatrixAsync...");
+        var response = await openRouteClient.GetMatrix(request);
         Log.Information("{Response}", response);
 
         if (response == null || response?.Durations == null || response?.Distances == null)
@@ -247,7 +322,12 @@ public class MarkerService(
             : sorted[left] + (sorted[right] - sorted[left]) * (position - left);
     }
 
-    private static double MetersToMiles(double meters) => meters * 0.000621371;
+    private static double MetersToMiles(double meters) => meters * 0.000621371192;
 
-    public void Dispose() => _semaphore.Dispose();
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        _currentTasks.Clear();
+        _semaphore.Dispose();
+    }
 }

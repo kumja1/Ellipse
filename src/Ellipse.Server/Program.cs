@@ -1,11 +1,9 @@
-using AngleSharp.Common;
 using DotNetEnv;
 using DotNetEnv.Extensions;
 using Ellipse.Server.Services;
 using Ellipse.Server.Utils.Objects;
-using Geo.ArcGIS;
-using Geo.ArcGIS.Services;
-using Geo.Extensions.DependencyInjection;
+using Ellipse.Server.Utils.Objects.Clients;
+using Ellipse.Server.Utils.Objects.Clients.Geocoding;
 using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 using Serilog;
@@ -48,7 +46,8 @@ public static class Program
         {
             options.AddPolicy(
                 "DynamicCors",
-                policy =>  policy.SetIsOriginAllowed(origin => true).AllowAnyHeader().AllowAnyMethod()
+                policy =>
+                    policy.SetIsOriginAllowed(origin => true).AllowAnyHeader().AllowAnyMethod()
             );
         });
 
@@ -59,16 +58,20 @@ public static class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
 
-        builder.Services.ConfigureAll<HttpClientFactoryOptions>(options => options.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromMinutes(10)));
+        builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
+            options.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromMinutes(10))
+        );
 
         Dictionary<string, string> env = Env.Load(Path.Join(Environment.CurrentDirectory, ".env"))
             .ToDotEnvDictionary(CreateDictionaryOption.Throw);
 
         string? anonKey = env.GetValueOrDefault("SUPABASE_ANON_KEY");
         string? supabaseUrl = env.GetValueOrDefault("SUPABASE_PROJECT_URL");
+        string? openRouteApiKey = env.GetValueOrDefault("OPENROUTE_API_KEY");
 
         ArgumentException.ThrowIfNullOrEmpty(anonKey);
         ArgumentException.ThrowIfNullOrEmpty(supabaseUrl);
+        ArgumentException.ThrowIfNullOrEmpty(openRouteApiKey);
 
         Client client = new(
             supabaseUrl,
@@ -95,6 +98,10 @@ public static class Program
             .AddSingleton<MarkerService>()
             .AddSingleton<GeoService>()
             .AddSingleton<CensusGeocoderClient>()
+            .AddSingleton(sp => new OpenRouteClient(
+                sp.GetRequiredService<HttpClient>(),
+                openRouteApiKey
+            ))
             .AddSingleton<WebScraperService>()
             .AddHttpClient<OsrmHttpApiClient>(
                 "OsrmClient",

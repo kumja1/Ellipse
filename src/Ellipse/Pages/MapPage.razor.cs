@@ -30,7 +30,7 @@ partial class MapPage : ComponentBase
         Marker? closestMarker = null;
         await foreach (var marker in SchoolSiteFinder.GetMarkers())
         {
-            double markerDistance = marker.Properties["Distances"]["Average Distance"].Distance;
+            double markerDistance = marker.Properties["Routes"]["Average Distance"].Distance;
 
             if (closestMarker == null)
             {
@@ -40,7 +40,7 @@ partial class MapPage : ComponentBase
             else
             {
                 double closestDistance = closestMarker
-                    .Properties["Distances"]["Average Distance"]
+                    .Properties["Routes"]["Average Distance"]
                     .Distance;
                 if (markerDistance < closestDistance)
                 {

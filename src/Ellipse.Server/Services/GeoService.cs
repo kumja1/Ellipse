@@ -1,21 +1,18 @@
-using System.Collections.Concurrent;
 using System.Text;
 using AngleSharp.Text;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
-using Ellipse.Common.Models.Geocoding.CensusGeocoder.PhotonGeocoder;
-using Ellipse.Server.Utils.Objects;
-using Geo.ArcGIS;
-using Geo.ArcGIS.Models;
-using Geo.ArcGIS.Models.Parameters;
-using Geo.ArcGIS.Models.Responses;
+using Ellipse.Common.Models.Geocoding.OpenRoute;
+using Ellipse.Common.Models.Snapping.OpenRoute;
+using Ellipse.Server.Utils.Objects.Clients;
+using Ellipse.Server.Utils.Objects.Clients.Geocoding;
 
 namespace Ellipse.Server.Services;
 
 public class GeoService(
     CensusGeocoderClient censusGeocoder,
-    PhotonGeocoderClient photonGeocoder,
+    OpenRouteClient openRouteClient,
     SupabaseStorageClient storageClient
 ) : IDisposable
 {
@@ -43,11 +40,19 @@ public class GeoService(
 
         var address = await GetAddress(longitude, latitude);
         if (string.IsNullOrEmpty(address))
-            address = await GetAddressWithArcGIS(longitude, latitude);
+            address = await GetAddressWithOpenRoute(longitude, latitude);
 
         Console.WriteLine(
             $"[GetAddressCached] Caching address for {longitude}, {latitude}: {address}"
         );
+
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            Console.WriteLine(
+                $"[GetAddressCached] No address found for coordinates: {longitude}, {latitude}"
+            );
+            return string.Empty;
+        }
 
         await storageClient.Set(latLng, address, FolderName);
         return address;
@@ -60,7 +65,7 @@ public class GeoService(
             Console.WriteLine(
                 $"[GetAddress] Initiating reverse geocoding for coordinates: Longitude={longitude}, Latitude={latitude}"
             );
-            var request = new ReverseGeocodingRequest
+            var request = new CensusReverseGeocodingRequest
             {
                 X = longitude,
                 Y = latitude,
@@ -81,11 +86,16 @@ public class GeoService(
             if (string.IsNullOrWhiteSpace(address))
             {
                 Console.WriteLine(
-                 $"[GetAddress] No address found for coordinates: {longitude}, {latitude}"
-             );
+                    $"[GetAddress] No address found for coordinates: {longitude}, {latitude}"
+                );
+                SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
+                if (snapped == null || string.IsNullOrWhiteSpace(snapped.Name))
+                    return string.Empty;
             }
             else
-            { Console.WriteLine($"[GetAdditress] Address found: {address}"); }
+            {
+                Console.WriteLine($"[GetAdditress] Address found: {address}");
+            }
 
             return address;
         }
@@ -98,15 +108,26 @@ public class GeoService(
         }
     }
 
-    private async Task<string> GetAddressWithArcGIS(double longitude, double latitude)
+    private async Task<string> GetAddressWithOpenRoute(double longitude, double latitude)
     {
         Console.WriteLine($"[GetLatLng] No address found for coordinates: {longitude}, {latitude}");
         Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
-        var response = await photonGeocoder.ReverseGeocodeAsync(
-            new PhotonReverseGeocodeRequest
+
+        SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
+        if (snapped == null || string.IsNullOrWhiteSpace(snapped.Name))
+        {
+            Console.WriteLine(
+                $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
+            );
+            return string.Empty;
+        }
+
+        var response = await openRouteClient.ReverseGeocode(
+            new OpenRouteReverseGeocodingRequest
             {
-                Longitude = longitude,
-                Latitude = latitude
+                Longitude = snapped.Location[0],
+                Latitude = snapped.Location[1],
+                Size = 10,
             }
         );
 
@@ -118,22 +139,16 @@ public class GeoService(
             return string.Empty;
         }
 
-        var props = response.Features[0].Properties;
-        var addressParts = StringBuilderPool.Obtain();
+        var props = response.Features.OrderBy(f => f.Properties.Confidence).FirstOrDefault();
+        if (props == null)
+        {
+            Console.WriteLine(
+                $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
+            );
+            return string.Empty;
+        }
 
-        if (!string.IsNullOrWhiteSpace(props.Street))
-            addressParts.Append(props.Street);
-
-        if (!string.IsNullOrWhiteSpace(props.Postcode))
-            addressParts.Append(props.Postcode);
-
-        if (!string.IsNullOrWhiteSpace(props.City))
-            addressParts.Append(props.City);
-
-        if (!string.IsNullOrWhiteSpace(props.Country))
-            addressParts.Append(props.Country);
-
-        return addressParts.ToString();
+        return props.Properties.Label;
     }
 
     public async Task<GeoPoint2d> GetLatLngCached(string address)
@@ -163,11 +178,19 @@ public class GeoService(
 
         latLng = await GetLatLng(address);
         if (latLng == GeoPoint2d.Zero)
-            latLng = await GetLatLngWithArcGIS(address);
+            latLng = await GetLatLngWithOpenRoute(address);
 
         Console.WriteLine(
             $"[GetLatLngCached] Caching coordinates for address: {address} as: {latLng}"
         );
+
+        if (latLng == GeoPoint2d.Zero)
+        {
+            Console.WriteLine(
+                $"[GetLatLngCached] No coordinates found for address: {address}. Returning GeoPoint2d.Zero."
+            );
+            return GeoPoint2d.Zero;
+        }
 
         await storageClient.Set(address, latLng.ToString(), FolderName);
         return latLng;
@@ -178,7 +201,7 @@ public class GeoService(
         try
         {
             Console.WriteLine($"[GetLatLng] Initiating forward geocoding for address: {address}");
-            var request = new GeocodingRequest
+            var request = new CensusGeocodingRequest
             {
                 Address = address,
                 SearchType = SearchType.OnelineAddress,
@@ -213,29 +236,34 @@ public class GeoService(
         }
     }
 
-    private async Task<GeoPoint2d> GetLatLngWithArcGIS(string address)
+    private async Task<GeoPoint2d> GetLatLngWithOpenRoute(string address)
     {
         try
         {
             Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
             Console.WriteLine("[GetLatLng] Switching to Mapbox geocoder");
 
-            var geocodeResponse = await photonGeocoder.GeocodeAsync(new PhotonGeocodeRequest
-            {
-                Query = address
-            });
+            var geocodeResponse = await openRouteClient.Geocode(
+                new OpenRouteGeocodingRequest { Query = address, Size = 10 }
+            );
 
             if (geocodeResponse == null)
                 return GeoPoint2d.Zero;
 
-            var location = geocodeResponse.Features[0];
+            var location = geocodeResponse
+                .Features.OrderBy(f => f.Properties.Confidence)
+                .FirstOrDefault();
+
             if (location == null)
             {
                 Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
                 return GeoPoint2d.Zero;
             }
 
-            return new GeoPoint2d(location.Geometry.Coordinates[0], location.Geometry.Coordinates[1]);
+            return new GeoPoint2d(
+                location.Geometry.Coordinates[0],
+                location.Geometry.Coordinates[1]
+            );
         }
         catch (Exception ex)
         {
@@ -244,6 +272,25 @@ public class GeoService(
             );
             return GeoPoint2d.Zero;
         }
+    }
+
+    private async Task<SnappedLocation?> SnapCoordinatesToRoad(double longitude, double latitude)
+    {
+        var request = new OpenRouteSnappingRequest
+        {
+            Locations =
+            [
+                [longitude, latitude],
+            ],
+            Radius = 350,
+        };
+
+        var response = await openRouteClient.SnapToRoads(request, Profile.DrivingCar);
+        if (response == null || response.Locations.Count == 0)
+            return null;
+
+        var snapPoint = response.Locations.OrderBy(snap => snap?.SnappedDistance).LastOrDefault();
+        return snapPoint;
     }
 
     public void Dispose()

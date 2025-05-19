@@ -95,8 +95,8 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
                 isValid: c => c != GeoPoint2d.Zero,
                 func: async _ => await geoService.GetLatLngCached(address),
                 defaultValue: GeoPoint2d.Zero,
-                10, 
-                200
+                20,
+                500
             )
             .ConfigureAwait(false);
 

@@ -4,7 +4,7 @@
 
 @namespace Ellipse.Components.MarkerMenu
 
-<MudDrawer @bind-Open="MenuOpen" Anchor="Anchor.Left" Elevation="8" Class="@_Class"
+<MudDrawer @bind-Open="MenuOpen" Anchor="Anchor.Left" Elevation="8" Class="@_class"
     Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
     <!-- Drawer Header -->
     <MudDrawerHeader
@@ -22,9 +22,6 @@
     </MudDrawerHeader>
 
     <!-- Drawer Content -->
-
-
-
     @if (IsListMode)
     {
         @if (_markers.Count == 0)
