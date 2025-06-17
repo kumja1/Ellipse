@@ -9,7 +9,7 @@ public sealed class CallerEnricher : ILogEventEnricher
 {
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory factory)
     {
-        StackTrace trace = new StackTrace();
+        StackTrace trace = new();
         StackFrame? frame = trace.GetFrame(2);
         MethodBase? method = frame?.GetMethod();
 

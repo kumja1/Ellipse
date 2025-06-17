@@ -1,16 +1,20 @@
 using System.Globalization;
 using System.Text;
-using System.Text.Json;
 using Ellipse.Common.Enums.Geocoding;
+using Ellipse.Common.Interfaces;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
-namespace Ellipse.Server.Services;
+namespace Ellipse.Server.Utils.Objects.Clients.Geocoding;
 
-public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
+public sealed class CensusGeocoderClient(HttpClient client)
+    : WebClient(client, "https://geocoding.geo.census.gov/geocoder/"),
+        IGeocoderClient<
+            CensusGeocodingRequest,
+            CensusReverseGeocodingRequest,
+            CensusGeocodingResponse
+        >
 {
-    private const string BaseUrl = "https://geocoding.geo.census.gov/geocoder/";
-
-    public async Task<GeocodingResponse> Geocode(GeocodingRequest request)
+    public async Task<CensusGeocodingResponse> Geocode(CensusGeocodingRequest request)
     {
         var returnType = request.ReturnType.ToString().ToLowerInvariant();
         var searchType = request.SearchType switch
@@ -23,11 +27,13 @@ public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
             ),
         };
 
-        var url = $"{BaseUrl}{returnType}/{searchType}?{BuildQueryParams(request)}";
-        return await GetResponse(url);
+        return await GetRequestAsync<CensusGeocodingRequest, CensusGeocodingResponse>(
+            BuildQueryParams(request, BuildGeocodeQueryParams),
+            $"{returnType}/{searchType}"
+        );
     }
 
-    public async Task<GeocodingResponse> ReverseGeocode(ReverseGeocodingRequest request)
+    public async Task<CensusGeocodingResponse> ReverseGeocode(CensusReverseGeocodingRequest request)
     {
         if (request.ReturnType != ReturnType.Geographies)
             throw new ArgumentOutOfRangeException(
@@ -39,33 +45,13 @@ public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
                 $"Search type {request.SearchType} must be SearchType.Coordinates for this request"
             );
 
-        var url =
-            $"{BaseUrl}{request.ReturnType.ToString().ToLowerInvariant()}/{request.SearchType.ToString().ToLowerInvariant()}?{BuildQueryParams(request)}";
-        return await GetResponse(url);
+        return await GetRequestAsync<CensusGeocodingRequest, CensusGeocodingResponse>(
+            BuildQueryParams(request, BuildReverseGeocodeQueryParams),
+            $"{request.ReturnType.ToString().ToLowerInvariant()}/{request.SearchType.ToString().ToLowerInvariant()}"
+        );
     }
 
-    public async Task<GeocodingResponse> GetResponse(string url)
-    {
-        var response = await client.GetAsync(url);
-        response.EnsureSuccessStatusCode();
-
-        return await response.Content.ReadFromJsonAsync<GeocodingResponse>()
-            ?? throw new JsonException("'response.Content' could not be parsed");
-    }
-
-    public static string BuildQueryParams(GeocodingRequest request)
-    {
-        StringBuilder builder = new();
-        return request switch
-        {
-            GeocodingRequest geocodeRequest => BuildGeocodeQueryParams(geocodeRequest, builder),
-            _ when request is ReverseGeocodingRequest reverseGeocodeRequest =>
-                BuildReverseGeocodeQueryParams(reverseGeocodeRequest, builder),
-            _ => throw new ArgumentException("Unknown request type", nameof(request)),
-        };
-    }
-
-    private static string BuildGeocodeQueryParams(GeocodingRequest request, StringBuilder builder)
+    public string BuildGeocodeQueryParams(CensusGeocodingRequest request, StringBuilder builder)
     {
         AppendParam(builder, "benchmark", request.Benchmark);
         AppendParam(builder, "vintage", request.Vintage);
@@ -102,8 +88,8 @@ public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
         return builder.ToString().TrimEnd('&');
     }
 
-    private static string BuildReverseGeocodeQueryParams(
-        ReverseGeocodingRequest request,
+    public string BuildReverseGeocodeQueryParams(
+        CensusReverseGeocodingRequest request,
         StringBuilder builder
     )
     {
@@ -131,12 +117,4 @@ public sealed class CensusGeocoderClient(HttpClient client) : IDisposable
 
         return builder.ToString().TrimEnd('&');
     }
-
-    private static void AppendParam(StringBuilder builder, string key, string value)
-    {
-        if (!string.IsNullOrEmpty(value))
-            builder.Append($"{key}={Uri.EscapeDataString(value)}&"); // Use Uri.EscapeDataString to make the parameter URL-safe.
-    }
-
-    public void Dispose() => client.Dispose();
 }

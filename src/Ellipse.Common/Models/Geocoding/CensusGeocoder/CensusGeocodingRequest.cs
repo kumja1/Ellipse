@@ -6,7 +6,7 @@ namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 /// <summary>
 /// Base request model encapsulating properties common to all types of geocoding requests.
 /// </summary>
-public class GeocodingRequest
+public record CensusGeocodingRequest
 {
     [JsonPropertyName("returntype")]
     public ReturnType ReturnType { get; set; }

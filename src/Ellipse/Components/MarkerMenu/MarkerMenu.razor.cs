@@ -18,7 +18,7 @@ partial class MarkerMenu : ComponentBase
     [Parameter]
     public string Class { get; set; }
 
-    private string _Class =>
+    private string _class =>
         CssBuilder
             .Default("shadow-2xl bg-white rounded-r-lg overflow-auto")
             .AddClass(Class, !string.IsNullOrWhiteSpace(Class))
@@ -26,7 +26,7 @@ partial class MarkerMenu : ComponentBase
 
     private string _selectedRouteName = "Average Distance";
 
-    private readonly List<Marker>? _markers = [];
+    private readonly List<Marker> _markers = [];
 
     private Marker? CurrentMarker;
 
@@ -49,5 +49,9 @@ partial class MarkerMenu : ComponentBase
         IsListMode = false;
     }
 
-    public void AddMarker(Marker marker) => _markers.Add(marker);
+    public void AddMarker(Marker marker)
+    {
+        _markers.Add(marker);
+        StateHasChanged();
+    }
 }

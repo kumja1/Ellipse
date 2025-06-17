@@ -3,7 +3,7 @@ using Serilog;
 using Supabase.Storage;
 using Supabase.Storage.Interfaces;
 
-namespace Ellipse.Server.Utils.Objects;
+namespace Ellipse.Server.Utils.Objects.Clients;
 
 public sealed class SupabaseStorageClient(Supabase.Client client)
 {
@@ -47,8 +47,6 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
     }
 
-    private static string BuildPath(string key, string folder) => string.IsNullOrWhiteSpace(folder) ? $"{key}.txt" : $"{folder.TrimEnd('/')}/{key}.txt";
-
     public async ValueTask Set(
         object obj,
         string content,
@@ -83,7 +81,8 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
     }
 
-    public async ValueTask Remove(object obj, string folder = "") => await Remove(obj.ToString(), folder);
+    public async ValueTask Remove(object obj, string folder = "") =>
+        await Remove(obj.ToString(), folder);
 
     public async ValueTask Remove(string key, string folder = "")
     {
@@ -99,7 +98,8 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         }
     }
 
-    public async Task<string> Get(object obj, string folder = "") => await Get(obj.ToString(), folder);
+    public async Task<string> Get(object obj, string folder = "") =>
+        await Get(obj.ToString(), folder);
 
     public async Task<string> Get(string key, string folder = "")
     {
@@ -116,4 +116,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
             return string.Empty;
         }
     }
+
+    private static string BuildPath(string key, string folder) =>
+        string.IsNullOrWhiteSpace(folder) ? $"{key}.txt" : $"{folder.TrimEnd('/')}/{key}.txt";
 }

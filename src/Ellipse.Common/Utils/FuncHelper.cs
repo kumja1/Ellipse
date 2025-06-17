@@ -24,7 +24,7 @@ public static class FuncHelper
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
-            
+
             retries++;
             await Task.Delay((int)(delayMs * Math.Pow(2, retries)));
         }
