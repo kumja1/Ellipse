@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Ellipse.Server.Utils.Helpers;
 
-internal static class StringCompressor
+internal static class StringHelper
 {
     /// <summary>
     /// Compresses the string.
@@ -15,8 +15,8 @@ internal static class StringCompressor
         try
         {
             byte[] buffer = Encoding.UTF8.GetBytes(text);
-            var memoryStream = new MemoryStream();
-            using var gZipStream = new GZipStream(
+            MemoryStream memoryStream = new();
+            using GZipStream gZipStream = new(
                 memoryStream,
                 CompressionMode.Compress,
                 leaveOpen: true
@@ -26,10 +26,10 @@ internal static class StringCompressor
             gZipStream.Flush();
             memoryStream.Position = 0;
 
-            var compressedData = new byte[memoryStream.Length];
+            byte[] compressedData = new byte[memoryStream.Length];
             memoryStream.ReadExactly(compressedData, 0, compressedData.Length);
 
-            var gZipBuffer = new byte[compressedData.Length + 4];
+            byte[] gZipBuffer = new byte[compressedData.Length + 4];
             Buffer.BlockCopy(compressedData, 0, gZipBuffer, 4, compressedData.Length);
             Buffer.BlockCopy(BitConverter.GetBytes(buffer.Length), 0, gZipBuffer, 0, 4);
             return Convert.ToBase64String(gZipBuffer);
@@ -51,14 +51,14 @@ internal static class StringCompressor
         try
         {
             byte[] gZipBuffer = Convert.FromBase64String(compressedText);
-            using var memoryStream = new MemoryStream();
+            using MemoryStream memoryStream = new MemoryStream();
 
             int dataLength = BitConverter.ToInt32(gZipBuffer, 0);
             memoryStream.Write(gZipBuffer, 4, gZipBuffer.Length - 4);
 
             memoryStream.Position = 0;
-            using var gZipStream = new GZipStream(memoryStream, CompressionMode.Decompress);
-            using var reader = new StreamReader(gZipStream);
+            using GZipStream gZipStream = new GZipStream(memoryStream, CompressionMode.Decompress);
+            using StreamReader reader = new StreamReader(gZipStream);
             return reader.ReadToEnd();
         }
         catch (Exception _)

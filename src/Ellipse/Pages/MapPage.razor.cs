@@ -28,7 +28,7 @@ partial class MapPage : ComponentBase
     private async Task SortMarkers()
     {
         Marker? closestMarker = null;
-        await foreach (var marker in SchoolSiteFinder.GetMarkers())
+        await foreach (Marker marker in SchoolSiteFinder.GetMarkers())
         {
             double markerDistance = marker.Properties["Routes"]["Average Distance"].Distance;
 

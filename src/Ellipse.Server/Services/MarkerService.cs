@@ -5,8 +5,8 @@ using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
 using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Common.Utils;
+using Ellipse.Server.Utils.Clients;
 using Ellipse.Server.Utils.Helpers;
-using Ellipse.Server.Utils.Objects.Clients;
 using Osrm.HttpApiClient;
 using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
@@ -36,8 +36,8 @@ public class MarkerService(
         if (!string.IsNullOrEmpty(cachedData) && !request.OverrideCache)
         {
             Log.Information("Cache hit for point: {Point}", request.Point);
-            var deserialized = JsonSerializer.Deserialize<MarkerResponse>(
-                StringCompressor.DecompressString(cachedData)
+            MarkerResponse deserialized = JsonSerializer.Deserialize<MarkerResponse>(
+                StringHelper.DecompressString(cachedData)
             )!;
             Log.Information("Returning cached MarkerResponse");
             return deserialized;
@@ -45,7 +45,7 @@ public class MarkerService(
 
         Log.Information("Cache miss for point: {Point}", request.Point);
 
-        var markerResponse = await _currentTasks
+        MarkerResponse? markerResponse = await _currentTasks
             .GetOrAdd(request.Point, _ => ProcessMarkerRequestAsync(request))
             .ConfigureAwait(false);
 
@@ -56,7 +56,7 @@ public class MarkerService(
 
         await storageClient.Set(
             request.Point,
-            StringCompressor.CompressString(serialized),
+            StringHelper.CompressString(serialized),
             FolderName
         );
 
@@ -148,7 +148,7 @@ public class MarkerService(
                         "Calling GetMatrixBatch for {Count} destinations",
                         destinations.Length
                     );
-                    var response = await GetMatrixRoute(source, destinations).ConfigureAwait(false);
+                    TableResponse? response = await GetMatrixRoute(source, destinations).ConfigureAwait(false);
 
                     double[]? distances = response
                         ?.Distances[0]
@@ -162,7 +162,7 @@ public class MarkerService(
 
                     if (response == null || distances == null || durations == null)
                     {
-                        var openRouteResponse = await GetMatrixRouteWithOpenRoute(
+                        OpenRouteMatrixResponse? openRouteResponse = await GetMatrixRouteWithOpenRoute(
                                 source,
                                 destinations
                             )
@@ -184,9 +184,9 @@ public class MarkerService(
 
                     for (int i = 0; i < batch.Length; i++)
                     {
-                        var school = batch[i];
-                        var distance = distances[i];
-                        var duration = durations[i];
+                        SchoolData school = batch[i];
+                        double distance = distances[i];
+                        double duration = durations[i];
 
                         results[school.Name] = new Route
                         {
@@ -247,7 +247,7 @@ public class MarkerService(
             .Build();
 
         Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
-        var response = await client.GetTableAsync(request);
+        TableResponse? response = await client.GetTableAsync(request);
         Log.Information("{Response}", response);
 
         if (response == null || response?.Durations == null || response?.Distances == null)
@@ -274,7 +274,7 @@ public class MarkerService(
         if (destinations.Contains(GeoPoint2d.Zero))
             return null;
 
-        var request = new OpenRouteMatrixRequest
+        OpenRouteMatrixRequest request = new OpenRouteMatrixRequest
         {
             Locations =
             [
@@ -289,7 +289,7 @@ public class MarkerService(
         };
 
         Log.Information("Request prepared. Calling OpenRouteClient.GetMatrixAsync...");
-        var response = await openRouteClient.GetMatrix(request);
+        OpenRouteMatrixResponse? response = await openRouteClient.GetMatrix(request);
         Log.Information("{Response}", response);
 
         if (response == null || response?.Durations == null || response?.Distances == null)

@@ -3,11 +3,10 @@ using Serilog;
 using Supabase.Storage;
 using Supabase.Storage.Interfaces;
 
-namespace Ellipse.Server.Utils.Objects.Clients;
+namespace Ellipse.Server.Utils.Clients;
 
 public sealed class SupabaseStorageClient(Supabase.Client client)
 {
-    private readonly Supabase.Client _client = client;
     private IStorageFileApi<FileObject>? _bucketApi;
 
     public async ValueTask InitializeAsync()
@@ -17,7 +16,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
             Bucket? bucket = await GetOrCreateBucket("server_cache");
             ArgumentNullException.ThrowIfNull(bucket);
 
-            _bucketApi = _client.Storage.From(bucket.Id!);
+            _bucketApi = client.Storage.From(bucket.Id!);
         }
         catch (Exception e)
         {
@@ -29,16 +28,16 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
     {
         try
         {
-            Bucket? bucket = await _client.Storage.GetBucket(name);
+            Bucket? bucket = await client.Storage.GetBucket(name);
             if (bucket != null)
                 return bucket;
 
-            await _client.Storage.CreateBucket(
+            await client.Storage.CreateBucket(
                 name,
                 new BucketUpsertOptions { FileSizeLimit = "30MB", AllowedMimes = ["text/plain"] }
             );
 
-            return await _client.Storage.GetBucket(name);
+            return await client.Storage.GetBucket(name);
         }
         catch (Exception e)
         {

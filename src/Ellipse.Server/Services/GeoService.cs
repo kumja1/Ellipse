@@ -5,8 +5,8 @@ using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 using Ellipse.Common.Models.Geocoding.OpenRoute;
 using Ellipse.Common.Models.Snapping.OpenRoute;
-using Ellipse.Server.Utils.Objects.Clients;
-using Ellipse.Server.Utils.Objects.Clients.Geocoding;
+using Ellipse.Server.Utils.Clients;
+using Ellipse.Server.Utils.Clients.Geocoding;
 
 namespace Ellipse.Server.Services;
 
@@ -20,7 +20,7 @@ public class GeoService(
 
     public async Task<string> GetAddressCached(double longitude, double latitude)
     {
-        var latLng = new GeoPoint2d(longitude, latitude);
+        GeoPoint2d latLng = new GeoPoint2d(longitude, latitude);
         Console.WriteLine(
             $"[GetAddressCached] Searching cache for coordinates: {longitude}, {latitude}"
         );
@@ -38,7 +38,7 @@ public class GeoService(
             $"[GetAddressCached] Cache miss for {longitude}, {latitude}. Invoking GetAddress."
         );
 
-        var address = await GetAddress(longitude, latitude);
+        string address = await GetAddress(longitude, latitude);
         if (string.IsNullOrEmpty(address))
             address = await GetAddressWithOpenRoute(longitude, latitude);
 
@@ -65,7 +65,7 @@ public class GeoService(
             Console.WriteLine(
                 $"[GetAddress] Initiating reverse geocoding for coordinates: Longitude={longitude}, Latitude={latitude}"
             );
-            var request = new CensusReverseGeocodingRequest
+            CensusReverseGeocodingRequest request = new CensusReverseGeocodingRequest
             {
                 X = longitude,
                 Y = latitude,
@@ -74,14 +74,14 @@ public class GeoService(
             };
 
             Console.WriteLine($"[GetAddress] ReverseGeocodeRequest created: {request}");
-            var response = await censusGeocoder.ReverseGeocode(request);
+            CensusGeocodingResponse? response = await censusGeocoder.ReverseGeocode(request);
             Console.WriteLine($"[GetAddress] Received response: {response}");
 
             if (response == null)
                 return string.Empty;
 
-            var addressMatch = response.Result.AddressMatches.FirstOrDefault();
-            var address = addressMatch != null ? addressMatch.MatchedAddress : string.Empty;
+            AddressMatch? addressMatch = response.Result.AddressMatches.FirstOrDefault();
+            string address = addressMatch != null ? addressMatch.MatchedAddress : string.Empty;
 
             if (string.IsNullOrWhiteSpace(address))
             {
@@ -122,7 +122,7 @@ public class GeoService(
             return string.Empty;
         }
 
-        var response = await openRouteClient.ReverseGeocode(
+        OpenRouteGeocodingResponse? response = await openRouteClient.ReverseGeocode(
             new OpenRouteReverseGeocodingRequest
             {
                 Longitude = snapped.Location[0],
@@ -139,7 +139,7 @@ public class GeoService(
             return string.Empty;
         }
 
-        var props = response.Features.OrderBy(f => f.Properties.Confidence).FirstOrDefault();
+        Feature? props = response.Features.OrderBy(f => f.Properties.Confidence).FirstOrDefault();
         if (props == null)
         {
             Console.WriteLine(
@@ -201,7 +201,7 @@ public class GeoService(
         try
         {
             Console.WriteLine($"[GetLatLng] Initiating forward geocoding for address: {address}");
-            var request = new CensusGeocodingRequest
+            CensusGeocodingRequest request = new CensusGeocodingRequest
             {
                 Address = address,
                 SearchType = SearchType.OnelineAddress,
@@ -211,15 +211,15 @@ public class GeoService(
             };
 
             Console.WriteLine($"[GetLatLng] ForwardGeocodeRequest created: {request}");
-            var response = await censusGeocoder.Geocode(request);
+            CensusGeocodingResponse? response = await censusGeocoder.Geocode(request);
             Console.WriteLine($"[GetLatLng] Received response: {response}");
 
             if (response == null || response.Result.AddressMatches.Count == 0)
                 return GeoPoint2d.Zero;
 
-            var firstResult = response.Result.AddressMatches.FirstOrDefault();
+            AddressMatch? firstResult = response.Result.AddressMatches.FirstOrDefault();
             Console.WriteLine($"[GetLatLng] First geocoding result: {firstResult}");
-            var resultPoint =
+            GeoPoint2d resultPoint =
                 firstResult != null
                     ? new GeoPoint2d(firstResult.Coordinates.X, firstResult.Coordinates.Y)
                     : GeoPoint2d.Zero;
@@ -243,14 +243,14 @@ public class GeoService(
             Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
             Console.WriteLine("[GetLatLng] Switching to Mapbox geocoder");
 
-            var geocodeResponse = await openRouteClient.Geocode(
+            OpenRouteGeocodingResponse? geocodeResponse = await openRouteClient.Geocode(
                 new OpenRouteGeocodingRequest { Query = address, Size = 10 }
             );
 
             if (geocodeResponse == null)
                 return GeoPoint2d.Zero;
 
-            var location = geocodeResponse
+            Feature? location = geocodeResponse
                 .Features.OrderBy(f => f.Properties.Confidence)
                 .FirstOrDefault();
 
@@ -276,7 +276,7 @@ public class GeoService(
 
     private async Task<SnappedLocation?> SnapCoordinatesToRoad(double longitude, double latitude)
     {
-        var request = new OpenRouteSnappingRequest
+        OpenRouteSnappingRequest request = new OpenRouteSnappingRequest
         {
             Locations =
             [
@@ -285,11 +285,11 @@ public class GeoService(
             Radius = 350,
         };
 
-        var response = await openRouteClient.SnapToRoads(request, Profile.DrivingCar);
+        OpenRouteSnappingResponse? response = await openRouteClient.SnapToRoads(request, Profile.DrivingCar);
         if (response == null || response.Locations.Count == 0)
             return null;
 
-        var snapPoint = response.Locations.OrderBy(snap => snap?.SnappedDistance).LastOrDefault();
+        SnappedLocation? snapPoint = response.Locations.OrderBy(snap => snap?.SnappedDistance).LastOrDefault();
         return snapPoint;
     }
 

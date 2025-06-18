@@ -1,15 +1,16 @@
-using Ellipse;
 using Ellipse.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Http;
 using MudBlazor.Services;
 
+namespace Ellipse;
+
 partial class Program
 {
     public static async Task Main(string[] args)
     {
-        var builder = WebAssemblyHostBuilder.CreateDefault(args);
+        WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
 
         Setup(builder);
         await builder.Build().RunAsync();

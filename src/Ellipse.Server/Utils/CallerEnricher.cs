@@ -3,7 +3,7 @@ using System.Reflection;
 using Serilog.Core;
 using Serilog.Events;
 
-namespace Ellipse.Server.Utils.Objects;
+namespace Ellipse.Server.Utils;
 
 public sealed class CallerEnricher : ILogEventEnricher
 {

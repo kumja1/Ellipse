@@ -35,7 +35,7 @@ partial class MarkerMenu : ComponentBase
         as Dictionary<string, (double Distance, string Duration)>;
 
     private (double Distance, string Duration) SelectedRouteProps =>
-        Routes != null && Routes.TryGetValue(_selectedRouteName, out var value)
+        Routes != null && Routes.TryGetValue(_selectedRouteName, out (double Distance, string Duration) value)
             ? value
             : (Distance: 0d, Duration: string.Empty);
 

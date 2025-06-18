@@ -17,14 +17,14 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
             yield break;
 
         var latLngs = schools.Select(school => school.LatLng).ToList();
-        var boundingBox = new BoundingBox(latLngs);
+        BoundingBox boundingBox = new BoundingBox(latLngs);
 
-        for (var x = boundingBox.MinLng; x <= boundingBox.MaxLng; x += StepSize)
+        for (double x = boundingBox.MinLng; x <= boundingBox.MaxLng; x += StepSize)
         {
-            for (var y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += StepSize)
+            for (double y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += StepSize)
             {
                 Console.WriteLine($"X:{x}, Y:{y}");
-                var marker = await GetMarker(x, y, schools).ConfigureAwait(false);
+                MarkerResponse? marker = await GetMarker(x, y, schools).ConfigureAwait(false);
                 if (marker != null)
                     yield return new Marker(
                         MarkerType.MarkerAwesome,
@@ -42,7 +42,7 @@ public class SiteFinderService(HttpClient httpClient, SchoolFetcherService schoo
     {
         try
         {
-            var response = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
+            HttpResponseMessage? response = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
                 r => r != null && r.IsSuccessStatusCode,
                 async _ =>
                     await httpClient

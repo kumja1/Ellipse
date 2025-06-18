@@ -6,7 +6,7 @@ using Ellipse.Common.Models.Geocoding.OpenRoute;
 using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Common.Models.Snapping.OpenRoute;
 
-namespace Ellipse.Server.Utils.Objects.Clients;
+namespace Ellipse.Server.Utils.Clients;
 
 public sealed class OpenRouteClient(HttpClient client, string apiKey)
     : WebClient(client, "https://api.openrouteservice.org", apiKey),
@@ -20,8 +20,8 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
 {
     public async Task<OpenRouteGeocodingResponse> Geocode(OpenRouteGeocodingRequest request)
     {
-        var queryParams = BuildQueryParams(request, BuildGeocodeQueryParams);
-        return await GetRequestAsync<OpenRouteGeocodingRequest, OpenRouteGeocodingResponse>(
+        string queryParams = BuildQueryParams(request, BuildGeocodeQueryParams);
+        return await GetRequestAsync<OpenRouteGeocodingResponse>(
             queryParams,
             "geocode/search"
         );
@@ -31,8 +31,8 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         OpenRouteReverseGeocodingRequest request
     )
     {
-        var queryParams = BuildQueryParams(request, BuildReverseGeocodeQueryParams);
-        return await GetRequestAsync<OpenRouteGeocodingRequest, OpenRouteGeocodingResponse>(
+        string queryParams = BuildQueryParams(request, BuildReverseGeocodeQueryParams);
+        return await GetRequestAsync<OpenRouteGeocodingResponse>(
             queryParams,
             "geocode/reverse"
         );
@@ -42,8 +42,8 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     {
         AppendParam(builder, "api_key", apiKey);
         AppendParam(builder, "text", request.Query);
-        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture));
-        return builder.ToString().TrimEnd('&');
+        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture), false);
+        return builder.ToString();
     }
 
     public string BuildReverseGeocodeQueryParams(
@@ -54,8 +54,8 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         AppendParam(builder, "api_key", apiKey);
         AppendParam(builder, "point.lon", request.Longitude.ToString(CultureInfo.InvariantCulture));
         AppendParam(builder, "point.lat", request.Latitude.ToString(CultureInfo.InvariantCulture));
-        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture));
-        return builder.ToString().TrimEnd('&');
+        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture), false);
+        return builder.ToString();
     }
 
     public Task<OpenRouteSnappingResponse> SnapToRoads(
@@ -70,8 +70,8 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         );
     }
 
-    public Task<OpenRouteMatrixResponse> GetMatrix(OpenRouteMatrixRequest request) =>
-        PostRequestAsync<OpenRouteMatrixRequest, OpenRouteMatrixResponse>(
+    public async Task<OpenRouteMatrixResponse> GetMatrix(OpenRouteMatrixRequest request) =>
+        await PostRequestAsync<OpenRouteMatrixRequest, OpenRouteMatrixResponse>(
             request,
             "v2/matrix",
             request.Profile.ToProfileString()

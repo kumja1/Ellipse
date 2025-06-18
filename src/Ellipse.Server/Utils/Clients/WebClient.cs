@@ -3,7 +3,7 @@ using System.Text.Json;
 using AngleSharp.Text;
 using Serilog;
 
-namespace Ellipse.Server.Utils.Objects.Clients;
+namespace Ellipse.Server.Utils.Clients;
 
 public abstract class WebClient(HttpClient client, string baseUrl, string apiKey = "") : IDisposable
 {
@@ -29,7 +29,7 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         builder.Append(key).Append('=').Append(Uri.EscapeDataString(value));
     }
 
-    protected static void AppendParam(StringBuilder builder, string value)
+    private static void AppendParam(StringBuilder builder, string value)
     {
         if (string.IsNullOrEmpty(value))
             return;
@@ -37,7 +37,7 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         builder.Append(value);
     }
 
-    protected static void AppendPath(StringBuilder builder, string path, bool appendSlash = true)
+    private static void AppendPath(StringBuilder builder, string path, bool appendSlash = true)
     {
         if (string.IsNullOrEmpty(path))
             return;
@@ -51,7 +51,7 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         builder.Append(path);
     }
 
-    protected async Task<T> SendRequestAsync<T>(HttpRequestMessage? request = null)
+    private async Task<T> SendRequestAsync<T>(HttpRequestMessage? request = null)
     {
         request ??= new HttpRequestMessage(HttpMethod.Get, baseUrl);
         if (!string.IsNullOrEmpty(apiKey))
@@ -60,19 +60,19 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         Log.Information("Request: {Request}", request);
         Log.Information("Request URL: {Url}", request.RequestUri);
 
-        var response = await client.SendAsync(request);
+        HttpResponseMessage response = await client.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<T>()
             ?? throw new JsonException("'response.Content' could not be parsed");
     }
 
-    protected async Task<TResponse> GetRequestAsync<TRequest, TResponse>(
+    protected async Task<TResponse> GetRequestAsync<TResponse>(
         string parameters = "",
         params string[] additionalArgs
     )
     {
-        var url = BuildUrl(additionalArgs, parameters);
+        string url = BuildUrl(additionalArgs, parameters);
         return await SendRequestAsync<TResponse>(new HttpRequestMessage(HttpMethod.Get, url));
     }
 
@@ -81,11 +81,11 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         params string[] additionalArgs
     )
     {
-        var url = BuildUrl(additionalArgs);
+        string url = BuildUrl(additionalArgs);
         Log.Information("Request URL: {Url}", url);
-        var json = JsonSerializer.Serialize(request);
+        string json = JsonSerializer.Serialize(request);
         Log.Information("Request JSON: {Json}", json);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
         try
         {
             return await SendRequestAsync<TResponse>(
@@ -108,13 +108,13 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         return buildParams(request, builder);
     }
 
-    protected string BuildUrl(string[] additionalArgs, string parameters = "")
+    private string BuildUrl(string[] additionalArgs, string parameters = "")
     {
         StringBuilder builder = StringBuilderPool.Obtain();
         AppendPath(builder, baseUrl, false);
 
         if (additionalArgs.Length > 0)
-            AppendPath(builder, string.Join("/", additionalArgs), true);
+            AppendPath(builder, string.Join("/", additionalArgs));
 
         if (parameters != null)
             AppendParam(builder, parameters);
@@ -125,6 +125,6 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        client?.Dispose();
+        client.Dispose();
     }
 }

@@ -45,11 +45,11 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
         {
             Console.WriteLine($"[ProcessDivision] Starting {name}");
 
-            HttpResponseMessage result = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
-                r => r != null && r.IsSuccessStatusCode,
+            HttpResponseMessage? result = await FuncHelper.RetryIfInvalid<HttpResponseMessage>(
+                r => r is { IsSuccessStatusCode: true },
                 async _ =>
                 {
-                    var request = new HttpRequestMessage(
+                    HttpRequestMessage request = new(
                         HttpMethod.Post,
                         $"{Settings.ServerUrl}schools/get-schools"
                     );
@@ -63,7 +63,10 @@ public sealed class SchoolFetcherService(HttpClient httpClient) : IDisposable
                 maxRetries: 5,
                 delayMs: 300
             );
-
+            
+            if (result == null)
+                return null;
+            
             var schools = await result
                 .Content.ReadFromJsonAsync<List<SchoolData>>()
                 .ConfigureAwait(false);

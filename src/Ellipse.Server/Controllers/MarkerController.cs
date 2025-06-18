@@ -13,7 +13,7 @@ public class MarkerController(MarkerService markerService) : ControllerBase
     [HttpPost("get-markers")]
     public async Task<IActionResult> PostMarker([FromBody] MarkerRequest request)
     {
-        var response = await markerService.GetMarkerByLocation(request);
+        MarkerResponse? response = await markerService.GetMarkerByLocation(request);
         if (response == null)
             return NotFound();
         return Ok(response);

@@ -31,7 +31,7 @@
         else
         {
             <MudList T="Marker">
-                @foreach (var marker in _markers)
+                @foreach (Marker marker in _markers)
                 {
                     <MudListItem>
                         <MarkerMenuItem Marker="marker" OnSelect="SelectMarker" />
@@ -63,7 +63,7 @@
                  Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
                  @if (Routes != null)
                 {
-                    @foreach (var (routeName, _) in Routes)
+                    @foreach ((string routeName, (double Distance, string Duration) _) in Routes)
                     {
                         <MudSelectItem Value="routeName">
                             @routeName

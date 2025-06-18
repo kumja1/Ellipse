@@ -1,9 +1,9 @@
 using DotNetEnv;
 using DotNetEnv.Extensions;
 using Ellipse.Server.Services;
-using Ellipse.Server.Utils.Objects;
-using Ellipse.Server.Utils.Objects.Clients;
-using Ellipse.Server.Utils.Objects.Clients.Geocoding;
+using Ellipse.Server.Utils;
+using Ellipse.Server.Utils.Clients;
+using Ellipse.Server.Utils.Clients.Geocoding;
 using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 using Serilog;
@@ -17,10 +17,10 @@ public static class Program
     {
         try
         {
-            var builder = WebApplication.CreateBuilder(args);
+            WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
             await ConfigureServices(builder);
 
-            var app = builder.Build();
+            WebApplication app = builder.Build();
 
             app.UseRouting();
             app.UseCors("DynamicCors");

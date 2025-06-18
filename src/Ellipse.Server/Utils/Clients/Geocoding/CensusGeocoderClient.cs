@@ -4,7 +4,7 @@ using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Interfaces;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
-namespace Ellipse.Server.Utils.Objects.Clients.Geocoding;
+namespace Ellipse.Server.Utils.Clients.Geocoding;
 
 public sealed class CensusGeocoderClient(HttpClient client)
     : WebClient(client, "https://geocoding.geo.census.gov/geocoder/"),
@@ -16,8 +16,8 @@ public sealed class CensusGeocoderClient(HttpClient client)
 {
     public async Task<CensusGeocodingResponse> Geocode(CensusGeocodingRequest request)
     {
-        var returnType = request.ReturnType.ToString().ToLowerInvariant();
-        var searchType = request.SearchType switch
+        string returnType = request.ReturnType.ToString().ToLowerInvariant();
+        string searchType = request.SearchType switch
         {
             SearchType.OnelineAddress => "onelineaddress",
             SearchType.Address => "address",
@@ -27,7 +27,7 @@ public sealed class CensusGeocoderClient(HttpClient client)
             ),
         };
 
-        return await GetRequestAsync<CensusGeocodingRequest, CensusGeocodingResponse>(
+        return await GetRequestAsync<CensusGeocodingResponse>(
             BuildQueryParams(request, BuildGeocodeQueryParams),
             $"{returnType}/{searchType}"
         );
@@ -45,7 +45,7 @@ public sealed class CensusGeocoderClient(HttpClient client)
                 $"Search type {request.SearchType} must be SearchType.Coordinates for this request"
             );
 
-        return await GetRequestAsync<CensusGeocodingRequest, CensusGeocodingResponse>(
+        return await GetRequestAsync<CensusGeocodingResponse>(
             BuildQueryParams(request, BuildReverseGeocodeQueryParams),
             $"{request.ReturnType.ToString().ToLowerInvariant()}/{request.SearchType.ToString().ToLowerInvariant()}"
         );

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
@@ -10,11 +9,11 @@ using Ellipse.Common.Utils;
 using Ellipse.Server.Services;
 using Serilog;
 
-namespace Ellipse.Server.Utils.Objects;
+namespace Ellipse.Server.Utils;
 
 public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 {
-    private const string BaseUrl = "https://schoolquality.virginia.gov/virginia-schools";
+    private const string SchoolListUrl = $"https://schoolquality.virginia.gov/virginia-schools";
     private const string SchoolInfoUrl = "https://schoolquality.virginia.gov/schools";
 
     [GeneratedRegex(@"[.\s/]+")]
@@ -28,37 +27,34 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
     public async Task<string> ScrapeAsync()
     {
-        var sw = Stopwatch.StartNew();
-        var (firstPageSchools, totalPages) = await ProcessPageAsync(1).ConfigureAwait(false);
-        var queue = new ConcurrentQueue<SchoolData>(firstPageSchools);
+        Stopwatch sw = Stopwatch.StartNew();
+        var (intialSchools, totalPages) = await ProcessPageAsync(1).ConfigureAwait(false);
 
         if (totalPages > 1)
         {
             await Task.WhenAll(
                 Enumerable
                     .Range(2, totalPages - 1)
-                    .Select(
-                        async (page, _) =>
+                    .Select(async (page, _) =>
                         {
                             var (schools, _) = await ProcessPageAsync(page).ConfigureAwait(false);
-                            foreach (var school in schools)
-                                queue.Enqueue(school);
+                            intialSchools.AddRange(schools);
                         }
                     )
             );
         }
 
         sw.Stop();
-        return JsonSerializer.Serialize(queue.ToList());
+        return JsonSerializer.Serialize(intialSchools);
     }
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ProcessPageAsync(int page)
     {
-        var url = $"{BaseUrl}/page/{page}?division={divisionCode}";
+        string url = $"{SchoolListUrl}/page/{page}?division={divisionCode}";
         IDocument? document = null;
-        List<IElement> rows = await FuncHelper
+        List<IElement>? rows = await FuncHelper
             .RetryIfInvalid(
-                isValid: l => l.Count > 0,
+                isValid: l => l?.Count > 0,
                 func: async _ =>
                 {
                     document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
@@ -72,6 +68,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
         var tasks = rows.Select(ProcessRowAsync);
         var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+        
         var schools = results.Where(s => s != null).Cast<SchoolData>().ToList();
         int totalPages = ParseTotalPages(document!);
         return (schools, totalPages);
@@ -79,18 +76,22 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
 
     private async Task<SchoolData?> ProcessRowAsync(IElement row)
     {
-        var nameCell = row.QuerySelector("td:first-child");
+        IElement? nameCell = row.QuerySelector("td:first-child");
         if (nameCell == null)
             return null;
 
-        var name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
-        var cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
+        string name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
+        string cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
 
-        var cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
-        var cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
+        string cell2 = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
+        string cell3 = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
 
-        var address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
-        var geoLocation = await FuncHelper
+        string? address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
+
+        if (address == null)
+            return null;
+
+        GeoPoint2d geoLocation = await FuncHelper
             .RetryIfInvalid(
                 isValid: c => c != GeoPoint2d.Zero,
                 func: async _ => await geoService.GetLatLngCached(address),
@@ -110,14 +111,14 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         };
     }
 
-    private async Task<string> FetchAddressAsync(string cleanedName)
+    private async Task<string?> FetchAddressAsync(string cleanedName)
     {
         try
         {
-            string address = await FuncHelper
+            string? address = await FuncHelper
                 .RetryIfInvalid(
                     isValid: s => !string.IsNullOrEmpty(s),
-                    func: async (attempt) =>
+                    func: async attempt =>
                     {
                         try
                         {
@@ -127,35 +128,31 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
                                 cleanedName
                             );
 
-                            string fetchedAddress = string.Empty;
                             await _semaphore.WaitAsync().ConfigureAwait(false);
-                            try
-                            {
-                                var url = $"{SchoolInfoUrl}/{cleanedName}";
-                                Log.Information("Requesting: {Url}", url);
 
-                                var doc = await _browsingContext
-                                    .OpenAsync(url)
-                                    .ConfigureAwait(false);
+                            string url = $"{SchoolInfoUrl}/{cleanedName}";
+                            Log.Information("Requesting: {Url}", url);
 
-                                var el = doc.QuerySelector(
-                                    "[itemtype='http://schema.org/PostalAddress']"
-                                );
+                            IDocument doc = await _browsingContext
+                                .OpenAsync(url)
+                                .ConfigureAwait(false);
 
-                                fetchedAddress = WebUtility
-                                    .HtmlDecode(el?.TextContent ?? "")
-                                    .Trim();
-                            }
-                            finally
-                            {
-                                _semaphore.Release();
-                            }
-                            return fetchedAddress;
+                            IElement? el = doc.QuerySelector(
+                                "[itemtype='http://schema.org/PostalAddress']"
+                            );
+
+                            return WebUtility
+                                .HtmlDecode(el?.TextContent ?? "")
+                                .Trim();
                         }
                         catch (Exception ex)
                         {
                             Log.Warning(ex, "Error fetching from page");
                             return string.Empty;
+                        }
+                        finally
+                        {
+                            _semaphore.Release();
                         }
                     },
                     defaultValue: "",
@@ -177,7 +174,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
     {
         int totalPages = document
             .QuerySelectorAll("a.page-numbers")
-            .Select(e => int.TryParse(e.TextContent, out var p) ? p : 0)
+            .Select(e => int.TryParse(e.TextContent, out int p) ? p : 0)
             .Append(1)
             .Max();
         return totalPages;

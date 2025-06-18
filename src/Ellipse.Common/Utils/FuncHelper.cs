@@ -2,16 +2,16 @@ namespace Ellipse.Common.Utils;
 
 public static class FuncHelper
 {
-    public static async Task<TResult> RetryIfInvalid<TResult>(
-        Func<TResult, bool> isValid,
+    public static async Task<TResult?> RetryIfInvalid<TResult>(
+        Func<TResult?, bool> isValid,
         Func<int, Task<TResult>> func,
-        TResult defaultValue = default,
+        TResult? defaultValue = default,
         int maxRetries = 3,
         int delayMs = 100
     )
     {
         int retries = 0;
-        TResult value = defaultValue;
+        TResult? value = defaultValue;
         while (retries < maxRetries && !isValid(value))
         {
             try

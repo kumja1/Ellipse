@@ -20,7 +20,7 @@ public class SchoolsController(GeoService geoService, WebScraperService scraperS
         if (divisionCode <= 0)
             return BadRequest("Error: Missing or invalid required field 'divisionCode'.");
 
-        var result = await scraperService.StartNewAsync(divisionCode, overrideCache);
+        string result = await scraperService.StartNewAsync(divisionCode, overrideCache);
         return Content(result, "application/json");
     }
 }

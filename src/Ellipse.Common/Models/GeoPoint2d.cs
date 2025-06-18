@@ -17,8 +17,8 @@ public readonly record struct GeoPoint2d(double Lon, double Lat)
         Span<string> parts = str.Split(',');
         if (
             parts.Length != 2
-            || !double.TryParse(parts[0], out var lon)
-            || !double.TryParse(parts[1], out var lat)
+            || !double.TryParse(parts[0], out double lon)
+            || !double.TryParse(parts[1], out double lat)
         )
         {
             return Zero;
