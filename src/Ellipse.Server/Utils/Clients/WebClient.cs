@@ -85,7 +85,7 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         Log.Information("Request URL: {Url}", url);
         string json = JsonSerializer.Serialize(request);
         Log.Information("Request JSON: {Json}", json);
-        StringContent content = new StringContent(json, Encoding.UTF8, "application/json");
+        StringContent content = new(json, Encoding.UTF8, "application/json");
         try
         {
             return await SendRequestAsync<TResponse>(

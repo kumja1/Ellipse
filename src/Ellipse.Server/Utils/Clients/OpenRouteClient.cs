@@ -21,10 +21,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     public async Task<OpenRouteGeocodingResponse> Geocode(OpenRouteGeocodingRequest request)
     {
         string queryParams = BuildQueryParams(request, BuildGeocodeQueryParams);
-        return await GetRequestAsync<OpenRouteGeocodingResponse>(
-            queryParams,
-            "geocode/search"
-        );
+        return await GetRequestAsync<OpenRouteGeocodingResponse>(queryParams, "geocode/search");
     }
 
     public async Task<OpenRouteGeocodingResponse> ReverseGeocode(
@@ -32,10 +29,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     )
     {
         string queryParams = BuildQueryParams(request, BuildReverseGeocodeQueryParams);
-        return await GetRequestAsync<OpenRouteGeocodingResponse>(
-            queryParams,
-            "geocode/reverse"
-        );
+        return await GetRequestAsync<OpenRouteGeocodingResponse>(queryParams, "geocode/reverse");
     }
 
     public string BuildGeocodeQueryParams(OpenRouteGeocodingRequest request, StringBuilder builder)
@@ -66,7 +60,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         return PostRequestAsync<OpenRouteSnappingRequest, OpenRouteSnappingResponse>(
             request,
             "v2/snap",
-            profile.ToProfileString()
+            profile.AsString()
         );
     }
 
@@ -74,6 +68,6 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         await PostRequestAsync<OpenRouteMatrixRequest, OpenRouteMatrixResponse>(
             request,
             "v2/matrix",
-            request.Profile.ToProfileString()
+            request.Profile.AsString()
         );
 }

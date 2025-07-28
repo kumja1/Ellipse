@@ -30,15 +30,14 @@ partial class Program
             options.HttpClientActions.Add(client =>
             {
                 client.Timeout = TimeSpan.FromMinutes(10);
+                client.BaseAddress = new Uri("https://6000-kumja1-ellipse-4ue1emakwz.app.codeanywhere.com");
             });
         });
 
         builder
             .Services.AddMudServices()
-            .AddScoped<SiteFinderService>()
-            .AddHttpClient<SchoolFetcherService>(client =>
-            {
-                client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
-            });
+            .AddHttpClient()
+            .AddSingleton<SchoolService>()
+            .AddSingleton<MarkerService>();
     }
 }

@@ -12,7 +12,7 @@ partial class MapPage : ComponentBase
     private MapDisplay _mapDisplay;
 
     [Inject]
-    private SiteFinderService SchoolSiteFinder { get; set; }
+    private MarkerService SchoolSiteFinder { get; set; }
 
     [Inject]
     private NavigationManager NavigationManager { get; set; }

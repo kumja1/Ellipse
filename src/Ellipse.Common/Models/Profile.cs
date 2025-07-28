@@ -13,9 +13,8 @@ public enum Profile
 
 public static class ProfileExtensions
 {
-    public static string ToProfileString(this Profile profile)
-    {
-        return profile switch
+    public static string AsString(this Profile profile) =>
+        profile switch
         {
             Profile.DrivingCar => "driving-car",
             Profile.DrivingHgv => "driving-hgv",
@@ -23,5 +22,4 @@ public static class ProfileExtensions
             Profile.CyclingRegular => "cycling-regular",
             _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, null),
         };
-    }
 }

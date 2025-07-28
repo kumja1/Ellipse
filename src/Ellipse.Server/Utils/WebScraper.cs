@@ -52,7 +52,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
     {
         string url = $"{SchoolListUrl}/page/{page}?division={divisionCode}";
         IDocument? document = null;
-        List<IElement>? rows = await FuncHelper
+        List<IElement>? rows = await Common.Utils.Util
             .RetryIfInvalid(
                 isValid: l => l?.Count > 0,
                 func: async _ =>
@@ -91,7 +91,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
         if (address == null)
             return null;
 
-        GeoPoint2d geoLocation = await FuncHelper
+        GeoPoint2d geoLocation = await Common.Utils.Util
             .RetryIfInvalid(
                 isValid: c => c != GeoPoint2d.Zero,
                 func: async _ => await geoService.GetLatLngCached(address),
@@ -115,7 +115,7 @@ public sealed partial class WebScraper(int divisionCode, GeoService geoService)
     {
         try
         {
-            string? address = await FuncHelper
+            string? address = await Common.Utils.Util
                 .RetryIfInvalid(
                     isValid: s => !string.IsNullOrEmpty(s),
                     func: async attempt =>

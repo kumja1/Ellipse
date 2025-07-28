@@ -26,9 +26,9 @@ public class MarkerService(
     private const int MatrixBatchSize = 25;
     private readonly SemaphoreSlim _semaphore = new(MaxConcurrentBatches);
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = [];
-    private const string FolderName = "markers_cache";
+    private const string FolderName = "marker_cache";
 
-    public async Task<MarkerResponse?> GetMarkerByLocation(MarkerRequest request)
+    public async Task<MarkerResponse?> GetMarker(MarkerRequest request)
     {
         Log.Information("Called for point: {Point}", request.Point);
 
@@ -46,7 +46,7 @@ public class MarkerService(
         Log.Information("Cache miss for point: {Point}", request.Point);
 
         MarkerResponse? markerResponse = await _currentTasks
-            .GetOrAdd(request.Point, _ => ProcessMarkerRequestAsync(request))
+            .GetOrAdd(request.Point, _ => ProcessMarkerRequest(request))
             .ConfigureAwait(false);
 
         if (markerResponse == null)
@@ -54,18 +54,14 @@ public class MarkerService(
 
         string serialized = JsonSerializer.Serialize(markerResponse);
 
-        await storageClient.Set(
-            request.Point,
-            StringHelper.CompressString(serialized),
-            FolderName
-        );
+        await storageClient.Set(request.Point, StringHelper.CompressString(serialized), FolderName);
 
         Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
         return markerResponse;
     }
 
-    private async Task<MarkerResponse?> ProcessMarkerRequestAsync(MarkerRequest request)
+    private async Task<MarkerResponse?> ProcessMarkerRequest(MarkerRequest request)
     {
         Log.Information("Processing MarkerRequest for point: {Point}", request.Point);
 
@@ -112,7 +108,7 @@ public class MarkerService(
     )
     {
         Log.Information("Called for source: {Source} with {Count} schools", source, schools.Count);
-        var results = new ConcurrentDictionary<string, Route>();
+        Dictionary<string, Route> results = [];
 
         IEnumerable<SchoolData[]> batches = schools.Chunk(MatrixBatchSize);
         Log.Information("Schools chunked into {BatchCount} batches", MatrixBatchSize);
@@ -128,10 +124,9 @@ public class MarkerService(
     private async Task GetMatrixBatched(
         GeoPoint2d source,
         SchoolData[] batch,
-        ConcurrentDictionary<string, Route> results
-    )
-    {
-        _ = await FuncHelper.RetryIfInvalid(
+        Dictionary<string, Route> results
+    ) =>
+        _ = await Util.RetryIfInvalid(
             success => success,
             async (attempt) =>
             {
@@ -148,7 +143,8 @@ public class MarkerService(
                         "Calling GetMatrixBatch for {Count} destinations",
                         destinations.Length
                     );
-                    TableResponse? response = await GetMatrixRoute(source, destinations).ConfigureAwait(false);
+                    TableResponse? response = await GetMatrixRoute(source, destinations)
+                        .ConfigureAwait(false);
 
                     double[]? distances = response
                         ?.Distances[0]
@@ -162,11 +158,9 @@ public class MarkerService(
 
                     if (response == null || distances == null || durations == null)
                     {
-                        OpenRouteMatrixResponse? openRouteResponse = await GetMatrixRouteWithOpenRoute(
-                                source,
-                                destinations
-                            )
-                            .ConfigureAwait(false);
+                        OpenRouteMatrixResponse? openRouteResponse =
+                            await GetMatrixRouteWithOpenRoute(source, destinations)
+                                .ConfigureAwait(false);
 
                         if (
                             openRouteResponse == null
@@ -218,7 +212,6 @@ public class MarkerService(
             MaxRetries,
             500
         );
-    }
 
     private async Task<TableResponse?> GetMatrixRoute(GeoPoint2d source, GeoPoint2d[] destinations)
     {
@@ -228,7 +221,7 @@ public class MarkerService(
             destinations.Length
         );
 
-        if (destinations.Contains(GeoPoint2d.Zero))
+        if (destinations.All(dest => dest == GeoPoint2d.Zero))
             return null;
 
         var request = OsrmServices

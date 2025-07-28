@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Ellipse.Common/1.0.0": {
+        "runtime": {
+          "Ellipse.Common.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Ellipse.Common/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

@@ -10,11 +10,11 @@ namespace Ellipse.Server.Controllers;
 public class SchoolsController(GeoService geoService, WebScraperService scraperService)
     : ControllerBase
 {
-    // POST api/schools/get-schools
-    [HttpPost("get-schools")]
+    // GET api/schools
+    [HttpGet]
     public async Task<IActionResult> GetSchools(
-        [FromForm] int divisionCode,
-        [FromForm] bool overrideCache = false
+        [FromQuery] int divisionCode,
+        [FromQuery] bool overrideCache = false
     )
     {
         if (divisionCode <= 0)
