@@ -1,11 +1,10 @@
 using System.Net.Http.Json;
 using Ellipse.Common.Models;
 using Ellipse.Common.Utils;
-using Microsoft.AspNetCore.Components.WebAssembly.Http;
 
 namespace Ellipse.Services;
 
-public sealed class SchoolService(HttpClient httpClient) : IDisposable
+public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
 {
     private readonly Dictionary<string, int> _divisionCodes = new()
     {
@@ -26,26 +25,28 @@ public sealed class SchoolService(HttpClient httpClient) : IDisposable
         ["Sussex County"] = 91,
     };
 
-    public async Task<List<SchoolData>> GetSchools()
+    // Gets all schools in the specified divisions
+    public async Task<List<SchoolData>> GetAllSchools()
     {
-        Console.WriteLine("[GetSchools] Starting school data collection");
+        Console.WriteLine("[GeSchools] Starting school data collection");
 
-        var tasks = _divisionCodes.Select(kvp => ProcessDivision(kvp.Key, kvp.Value)).ToList();
-
-        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-        var schools = results.Where(x => x is not null).SelectMany(x => x);
+        var results = await Task.WhenAll(
+                _divisionCodes.Select(kvp => GetDivisionSchools(kvp.Key, kvp.Value))
+            )
+            .ConfigureAwait(false);
+        var schools = results.Where(x => x is not null).SelectMany(x => x!);
 
         Console.WriteLine("[GetSchools] Completed.");
         return [.. schools];
     }
 
-    private async Task<List<SchoolData>?> ProcessDivision(string name, int code)
+    private async Task<List<SchoolData>?> GetDivisionSchools(string divisionName, int code)
     {
         try
         {
-            Console.WriteLine($"[ProcessDivision] Starting {name}");
+            Console.WriteLine($"[GetDivisionSchools] Starting {divisionName}");
 
-            List<SchoolData>? result = await Util.RetryIfInvalid<List<SchoolData>?>(
+            List<SchoolData>? result = await CallbackHelper.RetryIfInvalid(
                 r => r != null && r.Count != 0,
                 async _ =>
                     await httpClient.GetFromJsonAsync<List<SchoolData>>(

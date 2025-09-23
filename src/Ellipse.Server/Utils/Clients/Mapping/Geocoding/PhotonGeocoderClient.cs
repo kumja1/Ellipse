@@ -3,7 +3,7 @@ using System.Text;
 using Ellipse.Common.Interfaces;
 using Ellipse.Common.Models.Geocoding.PhotonGeocoder;
 
-namespace Ellipse.Server.Utils.Clients.Geocoding;
+namespace Ellipse.Server.Utils.Clients.Mapping.Geocoding;
 
 public sealed class PhotonGeocoderClient(HttpClient client)
     : WebClient(client, "https://photon.komoot.io"),
@@ -28,7 +28,7 @@ public sealed class PhotonGeocoderClient(HttpClient client)
         PhotonReverseGeocodingRequest request
     ) =>
         await GetRequestAsync<PhotonGeocodingResponse>(
-             BuildQueryParams(request, BuildReverseGeocodeQueryParams),
+            BuildQueryParams(request, BuildReverseGeocodeQueryParams),
             "reverse"
         );
 
@@ -49,7 +49,12 @@ public sealed class PhotonGeocoderClient(HttpClient client)
     )
     {
         AppendParam(builder, "lat", request.Latitude.ToString(CultureInfo.InvariantCulture));
-        AppendParam(builder, "lon", request.Longitude.ToString(CultureInfo.InvariantCulture), false);
+        AppendParam(
+            builder,
+            "lon",
+            request.Longitude.ToString(CultureInfo.InvariantCulture),
+            false
+        );
         return builder.ToString();
     }
 }

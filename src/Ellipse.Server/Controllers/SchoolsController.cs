@@ -7,7 +7,7 @@ namespace Ellipse.Server.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [RequestTimeout("ResponseTimeout")]
-public class SchoolsController(GeoService geoService, WebScraperService scraperService)
+public class SchoolsController(GeocodingService geoService, WebScraperService scraperService)
     : ControllerBase
 {
     // GET api/schools

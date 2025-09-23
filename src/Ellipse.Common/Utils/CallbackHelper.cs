@@ -1,17 +1,19 @@
 namespace Ellipse.Common.Utils;
 
-public static class Util
+public static class CallbackHelper
 {
     public static async Task<TResult?> RetryIfInvalid<TResult>(
-        Func<TResult?, bool> isValid,
+        Func<TResult?, bool>? isValid,
         Func<int, Task<TResult>> func,
         TResult? defaultValue = default,
-        int maxRetries = 3,
+        int maxRetries = 5,
         int delayMs = 100
     )
     {
         int retries = 0;
         TResult? value = defaultValue;
+
+        isValid ??= v => v != null && !v.Equals(defaultValue);
         while (retries < maxRetries && !isValid(value))
         {
             try
@@ -28,6 +30,7 @@ public static class Util
             retries++;
             await Task.Delay((int)(delayMs * Math.Pow(2, retries)));
         }
+
         if (retries >= maxRetries)
             Console.WriteLine($"Max retries reached. Returning default value: {defaultValue}");
 

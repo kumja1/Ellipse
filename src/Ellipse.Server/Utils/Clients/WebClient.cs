@@ -69,19 +69,18 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
 
     protected async Task<TResponse> GetRequestAsync<TResponse>(
         string parameters = "",
-        params string[] additionalArgs
-    )
-    {
-        string url = BuildUrl(additionalArgs, parameters);
-        return await SendRequestAsync<TResponse>(new HttpRequestMessage(HttpMethod.Get, url));
-    }
+        params string[] paths
+    ) =>
+        await SendRequestAsync<TResponse>(
+            new HttpRequestMessage(HttpMethod.Get, BuildUrl(paths, parameters))
+        );
 
     protected async Task<TResponse> PostRequestAsync<TRequest, TResponse>(
         TRequest request,
-        params string[] additionalArgs
+        params string[] paths
     )
     {
-        string url = BuildUrl(additionalArgs);
+        string url = BuildUrl(paths);
         Log.Information("Request URL: {Url}", url);
         string json = JsonSerializer.Serialize(request);
         Log.Information("Request JSON: {Json}", json);
@@ -108,13 +107,13 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         return buildParams(request, builder);
     }
 
-    private string BuildUrl(string[] additionalArgs, string parameters = "")
+    private string BuildUrl(string[] paths, string parameters = "")
     {
         StringBuilder builder = StringBuilderPool.Obtain();
         AppendPath(builder, baseUrl, false);
 
-        if (additionalArgs.Length > 0)
-            AppendPath(builder, string.Join("/", additionalArgs));
+        if (paths.Length > 0)
+            AppendPath(builder, string.Join("/", paths));
 
         if (parameters != null)
             AppendParam(builder, parameters);

@@ -6,18 +6,18 @@ using OpenLayers.Blazor;
 
 namespace Ellipse.Services;
 
-public class MarkerService(HttpClient httpClient, SchoolService schoolService)
+public class MarkerService(HttpClient httpClient, SchoolDivisionService schoolService)
 {
     private const double StepSize = 0.1;
 
     public async IAsyncEnumerable<Marker> GetMarkers()
     {
-        var schools = await schoolService.GetSchools().ConfigureAwait(false);
+        var schools = await schoolService.GetAllSchools().ConfigureAwait(false);
         if (schools.Count == 0)
             yield break;
 
         var latLngs = schools.Select(school => school.LatLng).ToList();
-        BoundingBox boundingBox = new BoundingBox(latLngs);
+        BoundingBox boundingBox = new(latLngs);
 
         for (double x = boundingBox.MinLng; x <= boundingBox.MaxLng; x += StepSize)
         for (double y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += StepSize)
@@ -40,7 +40,7 @@ public class MarkerService(HttpClient httpClient, SchoolService schoolService)
     {
         try
         {
-            HttpResponseMessage? response = await Util.RetryIfInvalid<HttpResponseMessage>(
+            HttpResponseMessage? response = await CallbackHelper.RetryIfInvalid(
                 r => r != null && r.IsSuccessStatusCode,
                 async _ =>
                     await httpClient
@@ -51,7 +51,7 @@ public class MarkerService(HttpClient httpClient, SchoolService schoolService)
                         .ConfigureAwait(false)
             );
 
-            MarkerResponse? markerResponse = await response
+            MarkerResponse? markerResponse = await response!
                 .Content.ReadFromJsonAsync<MarkerResponse>()
                 .ConfigureAwait(false);
 

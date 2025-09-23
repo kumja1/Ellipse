@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 
-namespace Ellipse.Server.Utils.Helpers;
+namespace Ellipse.Server.Utils;
 
 internal static class StringHelper
 {
@@ -10,7 +10,7 @@ internal static class StringHelper
     /// </summary>
     /// <param name="text">The text.</param>
     /// <returns></returns>
-    public static string CompressString(string text)
+    public static string Compress(string text)
     {
         try
         {
@@ -46,19 +46,19 @@ internal static class StringHelper
     /// </summary>
     /// <param name="compressedText">The compressed text.</param>
     /// <returns></returns>
-    public static string DecompressString(string compressedText)
+    public static string Decompress(string compressedText)
     {
         try
         {
             byte[] gZipBuffer = Convert.FromBase64String(compressedText);
-            using MemoryStream memoryStream = new MemoryStream();
+            using MemoryStream memoryStream = new();
 
             int dataLength = BitConverter.ToInt32(gZipBuffer, 0);
             memoryStream.Write(gZipBuffer, 4, gZipBuffer.Length - 4);
 
             memoryStream.Position = 0;
-            using GZipStream gZipStream = new GZipStream(memoryStream, CompressionMode.Decompress);
-            using StreamReader reader = new StreamReader(gZipStream);
+            using GZipStream gZipStream = new(memoryStream, CompressionMode.Decompress);
+            using StreamReader reader = new(gZipStream);
             return reader.ReadToEnd();
         }
         catch (Exception _)

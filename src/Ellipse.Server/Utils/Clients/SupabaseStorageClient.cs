@@ -13,7 +13,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
     {
         try
         {
-            Bucket? bucket = await GetOrCreateBucket("server_cache");
+            Bucket? bucket = await GetOrCreateBucket("storage");
             ArgumentNullException.ThrowIfNull(bucket);
 
             _bucketApi = client.Storage.From(bucket.Id!);
@@ -60,12 +60,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
         Supabase.Storage.FileOptions? options = null
     )
     {
-        options ??= new Supabase.Storage.FileOptions
-        {
-            ContentType = "text/plain",
-            Upsert = true,
-            CacheControl = "3600",
-        };
+        options ??= new Supabase.Storage.FileOptions { ContentType = "text/plain", Upsert = true };
 
         byte[] data = Encoding.UTF8.GetBytes(content);
         string path = BuildPath(key, folder);
@@ -118,4 +113,6 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
 
     private static string BuildPath(string key, string folder) =>
         string.IsNullOrWhiteSpace(folder) ? $"{key}.txt" : $"{folder.TrimEnd('/')}/{key}.txt";
+
+  
 }

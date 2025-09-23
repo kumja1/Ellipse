@@ -10,8 +10,17 @@ public partial class MapDisplay
 
     private OpenStreetMap _map { get; set; }
 
-    public void AddMarker(Marker marker) => _map.MarkersList.Add(marker);
+    public async ValueTask UpdateOrAddMarker(Marker marker)
+    {
+        if (!_map.MarkersList.Contains(marker))
+        {
+            _map.MarkersList.Add(marker);
+            return;
+        }
 
-    public async void SelectMarker(Marker marker) =>
+        await _map.UpdateShape(marker);
+    }
+
+    public async ValueTask SelectMarker(Marker marker) =>
         await _map.SetCoordinates(marker, marker.Coordinates);
 }

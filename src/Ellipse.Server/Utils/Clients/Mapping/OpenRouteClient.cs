@@ -6,7 +6,7 @@ using Ellipse.Common.Models.Geocoding.OpenRoute;
 using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Common.Models.Snapping.OpenRoute;
 
-namespace Ellipse.Server.Utils.Clients;
+namespace Ellipse.Server.Utils.Clients.Mapping;
 
 public sealed class OpenRouteClient(HttpClient client, string apiKey)
     : WebClient(client, "https://api.openrouteservice.org", apiKey),
@@ -55,14 +55,12 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     public Task<OpenRouteSnappingResponse> SnapToRoads(
         OpenRouteSnappingRequest request,
         Profile profile
-    )
-    {
-        return PostRequestAsync<OpenRouteSnappingRequest, OpenRouteSnappingResponse>(
+    ) =>
+        PostRequestAsync<OpenRouteSnappingRequest, OpenRouteSnappingResponse>(
             request,
             "v2/snap",
             profile.AsString()
         );
-    }
 
     public async Task<OpenRouteMatrixResponse> GetMatrix(OpenRouteMatrixRequest request) =>
         await PostRequestAsync<OpenRouteMatrixRequest, OpenRouteMatrixResponse>(

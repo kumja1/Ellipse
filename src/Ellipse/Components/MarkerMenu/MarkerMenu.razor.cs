@@ -10,10 +10,16 @@ partial class MarkerMenu : ComponentBase
     public bool MenuOpen { get; set; }
 
     [Parameter]
-    public Action? OnButtonClick { get; set; }
+    public bool IsList { get; set; }
 
     [Parameter]
-    public bool IsListMode { get; set; }
+    public RenderFragment<(
+        Marker? Marker,
+        Dictionary<string, (double Distance, string Duration)>? Routes
+    )> ItemView { get; set; }
+
+    [Parameter]
+    public RenderFragment<List<Marker>> ListView { get; set; }
 
     [Parameter]
     public string Class { get; set; }
@@ -24,29 +30,22 @@ partial class MarkerMenu : ComponentBase
             .AddClass(Class, !string.IsNullOrWhiteSpace(Class))
             .Build();
 
-    private string _selectedRouteName = "Average Distance";
-
     private readonly List<Marker> _markers = [];
 
-    private Marker? CurrentMarker;
+    public Marker? SelectedMarker { get; private set; }
 
-    private Dictionary<string, (double Distance, string Duration)>? Routes =>
-        CurrentMarker?.Properties["Routes"]
+    public Dictionary<string, (double Distance, string Duration)>? SelectedMarkerRoutes =>
+        SelectedMarker?.Properties["Routes"]
         as Dictionary<string, (double Distance, string Duration)>;
-
-    private (double Distance, string Duration) SelectedRouteProps =>
-        Routes != null && Routes.TryGetValue(_selectedRouteName, out (double Distance, string Duration) value)
-            ? value
-            : (Distance: 0d, Duration: string.Empty);
 
     public void ToggleMenu() => MenuOpen = !MenuOpen;
 
-    public void ToggleMode() => IsListMode = !IsListMode;
+    public void ToggleMode() => IsList = !IsList;
 
     public void SelectMarker(Marker marker)
     {
-        CurrentMarker = marker;
-        IsListMode = false;
+        SelectedMarker = marker;
+        IsList = false;
     }
 
     public void AddMarker(Marker marker)

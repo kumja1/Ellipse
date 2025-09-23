@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Ellipse.Components.MapDisplay;
 using Ellipse.Components.MarkerMenu;
 using Ellipse.Services;
@@ -12,12 +13,12 @@ partial class MapPage : ComponentBase
     private MapDisplay _mapDisplay;
 
     [Inject]
-    private MarkerService SchoolSiteFinder { get; set; }
+    private MarkerService MarkerService { get; set; }
 
     [Inject]
     private NavigationManager NavigationManager { get; set; }
 
-    private Marker? SelectedMarker { get; set; }
+    private string _selectedRouteName = "Average Distance";
 
     protected override async Task OnInitializedAsync()
     {
@@ -28,38 +29,27 @@ partial class MapPage : ComponentBase
     private async Task SortMarkers()
     {
         Marker? closestMarker = null;
-        await foreach (Marker marker in SchoolSiteFinder.GetMarkers())
+        await foreach (Marker marker in MarkerService.GetMarkers())
         {
-            double markerDistance = marker.Properties["Routes"]["Average Distance"].Distance;
-
-            if (closestMarker == null)
+            closestMarker ??= marker;
+            double markerDistance = marker.Properties["Routes"]["Total Distance"].Distance;
+            double closestDistance = closestMarker.Properties["Routes"]["Total Distance"].Distance;
+            if (markerDistance > closestDistance)
             {
-                closestMarker = marker;
+                closestMarker.PinColor = PinColor.Red;
+
                 marker.PinColor = PinColor.Blue;
+                closestMarker = marker;
             }
             else
             {
-                double closestDistance = closestMarker
-                    .Properties["Routes"]["Average Distance"]
-                    .Distance;
-                if (markerDistance < closestDistance)
-                {
-                    closestMarker.PinColor = PinColor.Red;
-                    marker.PinColor = PinColor.Blue;
-                    closestMarker = marker;
-                    continue;
-                }
                 marker.PinColor = PinColor.Red;
             }
 
             _menu.AddMarker(marker);
-            _mapDisplay.AddMarker(marker);
+            await _mapDisplay.UpdateOrAddMarker(marker);
         }
     }
 
-    public void OnMarkerItemClick(Marker marker)
-    {
-        SelectedMarker = marker;
-        _menu?.SelectMarker(marker);
-    }
+    public void SelectMarker(Marker marker) => _menu?.SelectMarker(marker);
 }

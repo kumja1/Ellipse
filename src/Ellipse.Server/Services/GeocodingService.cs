@@ -1,16 +1,15 @@
-using System.Text;
-using AngleSharp.Text;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 using Ellipse.Common.Models.Geocoding.OpenRoute;
 using Ellipse.Common.Models.Snapping.OpenRoute;
 using Ellipse.Server.Utils.Clients;
-using Ellipse.Server.Utils.Clients.Geocoding;
+using Ellipse.Server.Utils.Clients.Mapping;
+using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
 
 namespace Ellipse.Server.Services;
 
-public class GeoService(
+public class GeocodingService(
     CensusGeocoderClient censusGeocoder,
     OpenRouteClient openRouteClient,
     SupabaseStorageClient storageClient
@@ -20,7 +19,7 @@ public class GeoService(
 
     public async Task<string> GetAddressCached(double longitude, double latitude)
     {
-        GeoPoint2d latLng = new GeoPoint2d(longitude, latitude);
+        GeoPoint2d latLng = new(longitude, latitude);
         Console.WriteLine(
             $"[GetAddressCached] Searching cache for coordinates: {longitude}, {latitude}"
         );
@@ -38,7 +37,7 @@ public class GeoService(
             $"[GetAddressCached] Cache miss for {longitude}, {latitude}. Invoking GetAddress."
         );
 
-        string address = await GetAddress(longitude, latitude);
+        string address = await GetAddressWithCensus(longitude, latitude);
         if (string.IsNullOrEmpty(address))
             address = await GetAddressWithOpenRoute(longitude, latitude);
 
@@ -58,14 +57,14 @@ public class GeoService(
         return address;
     }
 
-    private async Task<string> GetAddress(double longitude, double latitude)
+    private async Task<string> GetAddressWithCensus(double longitude, double latitude)
     {
         try
         {
             Console.WriteLine(
                 $"[GetAddress] Initiating reverse geocoding for coordinates: Longitude={longitude}, Latitude={latitude}"
             );
-            CensusReverseGeocodingRequest request = new CensusReverseGeocodingRequest
+            CensusReverseGeocodingRequest request = new()
             {
                 X = longitude,
                 Y = latitude,
@@ -162,21 +161,13 @@ public class GeoService(
         }
 
         Console.WriteLine($"[GetLatLngCached] Searching cache for address: {address}");
-        GeoPoint2d latLng = GeoPoint2d.From(await storageClient.Get(address, FolderName));
+        GeoPoint2d? latLng = GeoPoint2d.TryParse(
+            await storageClient.Get(address, FolderName),
+            out GeoPoint2d? cached
+        )
+            ? cached
+            : await GetLatLngWithCensus(address);
 
-        if (latLng != GeoPoint2d.Zero)
-        {
-            Console.WriteLine(
-                $"[GetLatLngCached] Cache hit for address: {address}. Coordinates: {latLng}"
-            );
-            return latLng;
-        }
-
-        Console.WriteLine(
-            $"[GetLatLngCached] Cache miss for address: {address}. Invoking GetLatLng."
-        );
-
-        latLng = await GetLatLng(address);
         if (latLng == GeoPoint2d.Zero)
             latLng = await GetLatLngWithOpenRoute(address);
 
@@ -192,16 +183,16 @@ public class GeoService(
             return GeoPoint2d.Zero;
         }
 
-        await storageClient.Set(address, latLng.ToString(), FolderName);
-        return latLng;
+        await storageClient.Set(address, latLng!.Value.ToString(), FolderName);
+        return latLng.Value;
     }
 
-    private async Task<GeoPoint2d> GetLatLng(string address)
+    private async Task<GeoPoint2d> GetLatLngWithCensus(string address)
     {
         try
         {
             Console.WriteLine($"[GetLatLng] Initiating forward geocoding for address: {address}");
-            CensusGeocodingRequest request = new CensusGeocodingRequest
+            CensusGeocodingRequest request = new()
             {
                 Address = address,
                 SearchType = SearchType.OnelineAddress,
@@ -276,7 +267,7 @@ public class GeoService(
 
     private async Task<SnappedLocation?> SnapCoordinatesToRoad(double longitude, double latitude)
     {
-        OpenRouteSnappingRequest request = new OpenRouteSnappingRequest
+        OpenRouteSnappingRequest request = new()
         {
             Locations =
             [
@@ -285,11 +276,17 @@ public class GeoService(
             Radius = 350,
         };
 
-        OpenRouteSnappingResponse? response = await openRouteClient.SnapToRoads(request, Profile.DrivingCar);
+        OpenRouteSnappingResponse? response = await openRouteClient.SnapToRoads(
+            request,
+            Profile.DrivingCar
+        );
+
         if (response == null || response.Locations.Count == 0)
             return null;
 
-        SnappedLocation? snapPoint = response.Locations.OrderBy(snap => snap?.SnappedDistance).LastOrDefault();
+        SnappedLocation? snapPoint = response
+            .Locations.OrderBy(snap => snap?.SnappedDistance)
+            .LastOrDefault();
         return snapPoint;
     }
 
@@ -297,5 +294,6 @@ public class GeoService(
     {
         GC.SuppressFinalize(this);
         censusGeocoder.Dispose();
+        openRouteClient.Dispose();
     }
 }

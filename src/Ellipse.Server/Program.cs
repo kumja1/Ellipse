@@ -1,9 +1,10 @@
 using DotNetEnv;
 using DotNetEnv.Extensions;
 using Ellipse.Server.Services;
-using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients;
-using Ellipse.Server.Utils.Clients.Geocoding;
+using Ellipse.Server.Utils.Clients.Mapping;
+using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
+using Ellipse.Server.Utils.Logging;
 using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 using Serilog;
@@ -62,7 +63,7 @@ public static class Program
             options.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromMinutes(10))
         );
 
-        Dictionary<string, string> env = Env.Load(Path.Join(Environment.CurrentDirectory, ".env"))
+        Dictionary<string, string> env = Env.Load(".env")
             .ToDotEnvDictionary(CreateDictionaryOption.Throw);
 
         string? anonKey = env.GetValueOrDefault("SUPABASE_ANON_KEY");
@@ -96,7 +97,7 @@ public static class Program
         builder
             .Services.AddSingleton<PhotonGeocoderClient>()
             .AddSingleton<MarkerService>()
-            .AddSingleton<GeoService>()
+            .AddSingleton<GeocodingService>()
             .AddSingleton<CensusGeocoderClient>()
             .AddSingleton(sp => new OpenRouteClient(
                 sp.GetRequiredService<HttpClient>(),

@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Ellipse.Common.Models;
 
 namespace Ellipse.Common.Models.Matrix.OpenRoute;
 

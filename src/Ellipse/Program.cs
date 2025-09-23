@@ -1,3 +1,5 @@
+using DotNetEnv;
+using DotNetEnv.Extensions;
 using Ellipse.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -25,19 +27,21 @@ partial class Program
 
     public static void ConfigureServices(WebAssemblyHostBuilder builder)
     {
+
+        string? apiUrl = "https://probable-space-lamp-j6q7g45457vc74j-6000.app.github.dev/api/";
         builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
         {
             options.HttpClientActions.Add(client =>
             {
                 client.Timeout = TimeSpan.FromMinutes(10);
-                client.BaseAddress = new Uri("https://6000-kumja1-ellipse-4ue1emakwz.app.codeanywhere.com");
+                client.BaseAddress = new Uri(apiUrl);
             });
         });
 
         builder
             .Services.AddMudServices()
             .AddHttpClient()
-            .AddSingleton<SchoolService>()
+            .AddSingleton<SchoolDivisionService>()
             .AddSingleton<MarkerService>();
     }
 }

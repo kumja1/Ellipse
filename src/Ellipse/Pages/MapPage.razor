@@ -8,11 +8,95 @@
 
 <div class="w-screen h-screen overflow-hidden">
     <div class="absolute inset-0 z-0">
-        <MapDisplay @ref="_mapDisplay" OnMarkerClick="OnMarkerItemClick" />
+        <MapDisplay @ref="_mapDisplay" OnMarkerClick="SelectMarker" />
     </div>
 
     <div class="relative z-10">
-        <MarkerMenu MenuOpen="true" @ref="_menu" IsListMode="true" />
+        <MarkerMenu MenuOpen="true" @ref="_menu" IsList="true">
+            <ListView Context="markers">
+                <MudList T="Marker">
+                    @foreach (var item in markers)
+                    {
+                        <MudListItem>
+                            <MudCard>
+                                <MudCardHeader>
+                                    <CardHeaderActions>
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                            OnClick="@(() => SelectMarker(item))" />
+                                    </CardHeaderActions>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6" Color="Color.Dark" Align="Align.Start">
+                                            @item.Text
+                                        </MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <div class="text-grey-400">
+                                        <MudText>
+                                            Distance: @item.Properties["Routes"]["Average Distance"].Distance
+                                        </MudText>
+                                        <MudText>
+                                            Duration: @item.Properties["Routes"]["Average Distance"].Duration
+                                        </MudText>
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudListItem>
+                    }
+                </MudList>
+            </ListView>
+            <ItemView Context="marker">
+                <MudStack Class="p-6 space-y-4">
+                    <!-- Marker Details -->
+                    <MudText Typo="Typo.h6" Class="font-semibold text-blue-700 text-xl">
+                        @((string?)marker.Marker.Text)
+                    </MudText>
+                    <MudDivider />
+
+                    <!-- Actions -->
+                    <MudStack Justify="Justify.FlexStart" Row Spacing="2">
+                        <MudButton Variant="Variant.Filled"
+                            Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg">
+                            Open in LandSearch
+                        </MudButton>
+                    </MudStack>
+                    <MudDivider />
+
+                    <!-- Route Selection -->
+                    <MudSelect Label="Select Mode" Dense Outlined @bind-Value="_selectedRouteName"
+                        Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
+                        @if (marker.Routes != null)
+                        {
+                            @foreach ((string routeName, (double Distance, string Duration) _) in marker.Routes)
+                            {
+                                @if (routeName != "Total Distance")
+                                {
+                                    <MudSelectItem Value="routeName">
+                                        @routeName
+                                    </MudSelectItem>
+                                }
+                            }
+                        }
+                    </MudSelect>
+
+                    <!-- Route Details -->
+                    <MudStack Spacing="2" Class="text-gray-600">
+                        <MudText Typo="Typo.body1" Class="font-medium">
+                            Distance:
+                            <span class="font-normal text-blue-600">
+                                @(Math.Round(marker.Routes[_selectedRouteName].Distance)) miles
+                            </span>
+                        </MudText>
+                        <MudText Typo="Typo.body1" Class="font-medium">
+                            Duration:
+                            <span class="font-normal text-blue-600">
+                                @(marker.Routes[_selectedRouteName].Duration)
+                            </span>
+                        </MudText>
+                    </MudStack>
+                </MudStack>
+            </ItemView>
+        </MarkerMenu>
 
         <MudFab Size="Size.Medium" StartIcon="@Icons.Material.Filled.Menu" OnClick="@(() => _menu.ToggleMenu())"
             Class="fixed left-2 bottom-2 z-20 bg-blue-600 hover:bg-blue-700 text-white border border-white" />

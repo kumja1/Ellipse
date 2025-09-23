@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
+using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients;
-using Ellipse.Server.Utils.Helpers;
-using WebScraper = Ellipse.Server.Utils.WebScraper;
 
 namespace Ellipse.Server.Services;
 
-public sealed class WebScraperService(GeoService geoService, SupabaseStorageClient storageClient)
+public sealed class WebScraperService(
+    GeocodingService geoService,
+    SupabaseStorageClient storageClient
+)
 {
     private readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
@@ -15,11 +17,11 @@ public sealed class WebScraperService(GeoService geoService, SupabaseStorageClie
     {
         string cachedData = await storageClient.Get($"division_{divisionCode}", FolderName);
         if (!string.IsNullOrEmpty(cachedData) && !overrideCache)
-            return StringHelper.DecompressString(cachedData!);
-        
+            return StringHelper.Decompress(cachedData!);
+
         var task = _scrapingTasks.GetOrAdd(divisionCode, _ => StartScraperAsync(divisionCode));
         string result = await task.ConfigureAwait(false);
-        
+
         ArgumentException.ThrowIfNullOrEmpty(result, nameof(result));
         return result;
     }
@@ -28,12 +30,12 @@ public sealed class WebScraperService(GeoService geoService, SupabaseStorageClie
     {
         try
         {
-            WebScraper scraper = new WebScraper(divisionCode, geoService);
+            WebScraper scraper = new(divisionCode, geoService);
             string result = await scraper.ScrapeAsync().ConfigureAwait(false);
 
             await storageClient.Set(
                 $"division_{divisionCode}",
-                StringHelper.CompressString(result),
+                StringHelper.Compress(result),
                 FolderName
             );
             return result;

@@ -12,7 +12,13 @@ public readonly record struct GeoPoint2d(double Lon, double Lat)
 
     public static GeoPoint2d Zero => new(0d, 0d);
 
-    public static GeoPoint2d From(string str)
+    public static bool TryParse(string str, out GeoPoint2d? result)
+    {
+        result = Parse(str);
+        return result is not null;
+    }
+
+    public static GeoPoint2d? Parse(string str)
     {
         Span<string> parts = str.Split(',');
         if (
@@ -21,7 +27,7 @@ public readonly record struct GeoPoint2d(double Lon, double Lat)
             || !double.TryParse(parts[1], out double lat)
         )
         {
-            return Zero;
+            return null;
         }
 
         return new GeoPoint2d(lon, lat);
