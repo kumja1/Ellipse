@@ -23,7 +23,7 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
 
     private readonly SemaphoreSlim _semaphore = new(20, 20);
 
-    public async Task<string> ScrapeAsync()
+    public async Task<string> Scrape()
     {
         var (schools, totalPages) = await ParsePage(1).ConfigureAwait(false);
         if (totalPages > 1)

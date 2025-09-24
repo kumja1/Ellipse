@@ -50,11 +50,11 @@ public class MarkerService(
         MarkerResponse? markerResponse = await _currentTasks
             .GetOrAdd(request.Point, _ => ProcessMarkerRequest(request))
             .ConfigureAwait(false);
-
+        
+        _currentTasks.TryRemove(request.Point, out _);
         if (markerResponse == null)
         {
             Log.Warning("MarkerResponse is null for point: {Point}", request.Point);
-            _currentTasks.TryRemove(request.Point, out _);
             return null;
         }
 
@@ -123,8 +123,6 @@ public class MarkerService(
         Log.Information("Called for source: {Source} with {Count} schools", source, schools.Count);
         Dictionary<string, Route> results = [];
 
-        Log.Information("Schools chunked into {BatchCount} batches", MatrixBatchSize);
-
         await Task.WhenAll(
             schools
                 .Chunk(MatrixBatchSize)
@@ -151,10 +149,6 @@ public class MarkerService(
                 );
 
                 GeoPoint2d[] destinations = [.. batch.Select(s => s.LatLng)];
-                Log.Information(
-                    "Calling GetMatrixBatch for {Count} destinations",
-                    destinations.Length
-                );
                 try
                 {
                     await _semaphore.WaitAsync().ConfigureAwait(false);
