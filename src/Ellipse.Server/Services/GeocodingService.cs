@@ -100,7 +100,7 @@ public class GeocodingService(
         Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
 
         SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
-        if (snapped == null || string.IsNullOrWhiteSpace(snapped.Name))
+        if (snapped == null)
         {
             Console.WriteLine(
                 $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"

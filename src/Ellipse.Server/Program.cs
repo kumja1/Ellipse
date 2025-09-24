@@ -63,12 +63,9 @@ public static class Program
             options.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromMinutes(10))
         );
 
-        Dictionary<string, string> env = Env.Load(".env")
-            .ToDotEnvDictionary(CreateDictionaryOption.Throw);
-
-        string? anonKey = env.GetValueOrDefault("SUPABASE_ANON_KEY");
-        string? supabaseUrl = env.GetValueOrDefault("SUPABASE_PROJECT_URL");
-        string? openRouteApiKey = env.GetValueOrDefault("OPENROUTE_API_KEY");
+        string? anonKey = Environment.GetEnvironmentVariable("SUPABASE_ANON_KEY");
+        string? supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE_PROJECT_URL");
+        string? openRouteApiKey = Environment.GetEnvironmentVariable("OPENROUTE_API_KEY");
 
         ArgumentException.ThrowIfNullOrEmpty(anonKey);
         ArgumentException.ThrowIfNullOrEmpty(supabaseUrl);

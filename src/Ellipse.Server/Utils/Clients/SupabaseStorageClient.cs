@@ -13,7 +13,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
     {
         try
         {
-            Bucket? bucket = await GetOrCreateBucket("storage");
+            Bucket? bucket = await GetOrCreateBucket("v");
             ArgumentNullException.ThrowIfNull(bucket);
 
             _bucketApi = client.Storage.From(bucket.Id!);
