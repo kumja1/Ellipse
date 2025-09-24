@@ -23,7 +23,7 @@ public class MarkerService(
 {
     private const int MaxConcurrentBatches = 4;
     private const int MaxRetries = 20;
-    private const int MatrixBatchSize = 25;
+    private const int MatrixBatchSize = 100;
 
     private const string FolderName = "marker_cache";
 

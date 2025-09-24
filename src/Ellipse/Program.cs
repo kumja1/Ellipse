@@ -25,14 +25,14 @@ partial class Program
 
     public static void ConfigureServices(WebAssemblyHostBuilder builder)
     {
-
-        string? apiUrl = "https://probable-space-lamp-j6q7g45457vc74j-6000.app.github.dev/api/";
         builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
         {
             options.HttpClientActions.Add(client =>
             {
                 client.Timeout = TimeSpan.FromMinutes(10);
-                client.BaseAddress = new Uri(apiUrl);
+                client.BaseAddress = new Uri(
+                    "https://doubtful-beatrix-lum-studios-0cd001db.koyeb.app/api/"
+                );
             });
         });
 
