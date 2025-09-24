@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -82,10 +81,17 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
 
         string division = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
         string gradeSpan = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
+        Log.Information("{School} Division: {Division}", name, division);
+        Log.Information("{School} Grade Span: {GradeSpan}", name, gradeSpan);
 
         string? address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
         if (address == null)
+        {
+            Log.Warning("Address not found for school: {School}", name);
             return null;
+        }
+
+        Log.Information("Fetching coordinates for school: {School}", name);
 
         GeoPoint2d latLng = await CallbackHelper
             .RetryIfInvalid(
@@ -96,6 +102,14 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
                 500
             )
             .ConfigureAwait(false);
+
+        Log.Information(
+            "{School} Address: {Address}, Lon: {Lon}, Lat: {Lat}",
+            name,
+            address,
+            latLng.Lon,
+            latLng.Lat
+        );
 
         return new SchoolData
         {
@@ -156,7 +170,8 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
         }
     }
 
-    private static int ParseTotalPages(IDocument document) => document
+    private static int ParseTotalPages(IDocument document) =>
+        document
             .QuerySelectorAll("a.page-numbers")
             .Select(e => int.TryParse(e.TextContent, out int p) ? p : 0)
             .Append(1)

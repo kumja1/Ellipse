@@ -1,9 +1,9 @@
 @using MudBlazor
 @using OpenLayers.Blazor
 
-@namespace Ellipse.Components.MarkerMenu
+@namespace Ellipse.Components.Menu
 
-<MudDrawer @bind-Open="MenuOpen" Anchor="Anchor.Left" Elevation="8" Class="@_class"
+<MudDrawer @bind-Open="Open" Anchor="Anchor.Left" Elevation="8" Class="@_class"
     Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
     <!-- Drawer Header -->
     <MudDrawerHeader
@@ -11,11 +11,11 @@
         <MudText Typo="Typo.h5" Class="font-bold tracking-wide">
             Location Details
         </MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.Close" @onclick="ToggleMenu" Edge="Edge.End"
+        <MudIconButton Icon="@Icons.Material.Filled.Close" @onclick="ToggleMenuOpen" Edge="Edge.End"
             Class="text-white hover:text-gray-300 transition-colors duration-200" />
         @if (!IsList)
         {
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="ToggleMode" Edge="Edge.Start"
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="ToggleMenuView" Edge="Edge.Start"
                 Class="text-white hover:text-gray-300 transition-colors duration-200" />
         }
     </MudDrawerHeader>
@@ -23,7 +23,7 @@
     <!-- Drawer Content -->
     @if (IsList)
     {
-        @ListView(_markers)
+        @ListView(Markers)
     }
     else
     {

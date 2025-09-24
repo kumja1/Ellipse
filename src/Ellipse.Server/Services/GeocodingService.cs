@@ -64,6 +64,7 @@ public class GeocodingService(
             Console.WriteLine(
                 $"[GetAddress] Initiating reverse geocoding for coordinates: Longitude={longitude}, Latitude={latitude}"
             );
+
             CensusReverseGeocodingRequest request = new()
             {
                 X = longitude,
@@ -81,20 +82,6 @@ public class GeocodingService(
 
             AddressMatch? addressMatch = response.Result.AddressMatches.FirstOrDefault();
             string address = addressMatch != null ? addressMatch.MatchedAddress : string.Empty;
-
-            if (string.IsNullOrWhiteSpace(address))
-            {
-                Console.WriteLine(
-                    $"[GetAddress] No address found for coordinates: {longitude}, {latitude}"
-                );
-                SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
-                if (snapped == null || string.IsNullOrWhiteSpace(snapped.Name))
-                    return string.Empty;
-            }
-            else
-            {
-                Console.WriteLine($"[GetAdditress] Address found: {address}");
-            }
 
             return address;
         }
@@ -137,8 +124,11 @@ public class GeocodingService(
             );
             return string.Empty;
         }
+        Console.WriteLine($"[GetLatLng] Received response: {response}");
+        Feature? props = response
+            .Features.OrderByDescending(f => f.Properties.Confidence)
+            .FirstOrDefault();
 
-        Feature? props = response.Features.OrderBy(f => f.Properties.Confidence).FirstOrDefault();
         if (props == null)
         {
             Console.WriteLine(
@@ -161,19 +151,12 @@ public class GeocodingService(
         }
 
         Console.WriteLine($"[GetLatLngCached] Searching cache for address: {address}");
-        GeoPoint2d? latLng = GeoPoint2d.TryParse(
-            await storageClient.Get(address, FolderName),
-            out GeoPoint2d? cached
-        )
-            ? cached
-            : await GetLatLngWithCensus(address);
+        _ = GeoPoint2d.TryParse(await storageClient.Get(address, FolderName), out GeoPoint2d latLng)
+            ? latLng
+            : latLng = await GetLatLngWithCensus(address);
 
         if (latLng == GeoPoint2d.Zero)
             latLng = await GetLatLngWithOpenRoute(address);
-
-        Console.WriteLine(
-            $"[GetLatLngCached] Caching coordinates for address: {address} as: {latLng}"
-        );
 
         if (latLng == GeoPoint2d.Zero)
         {
@@ -182,9 +165,11 @@ public class GeocodingService(
             );
             return GeoPoint2d.Zero;
         }
-
-        await storageClient.Set(address, latLng!.Value.ToString(), FolderName);
-        return latLng.Value;
+        Console.WriteLine(
+            $"[GetLatLngCached] Caching coordinates for address: {address} as: {latLng}"
+        );
+        await storageClient.Set(address, latLng.ToString(), FolderName);
+        return latLng;
     }
 
     private async Task<GeoPoint2d> GetLatLngWithCensus(string address)
@@ -242,7 +227,7 @@ public class GeocodingService(
                 return GeoPoint2d.Zero;
 
             Feature? location = geocodeResponse
-                .Features.OrderBy(f => f.Properties.Confidence)
+                .Features.OrderByDescending(f => f.Properties.Confidence)
                 .FirstOrDefault();
 
             if (location == null)
@@ -286,7 +271,7 @@ public class GeocodingService(
 
         SnappedLocation? snapPoint = response
             .Locations.OrderBy(snap => snap?.SnappedDistance)
-            .LastOrDefault();
+            .FirstOrDefault();
         return snapPoint;
     }
 

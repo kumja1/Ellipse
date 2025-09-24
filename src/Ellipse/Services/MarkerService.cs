@@ -10,30 +10,47 @@ public class MarkerService(HttpClient httpClient, SchoolDivisionService schoolSe
 {
     private const double StepSize = 0.1;
 
-    public async IAsyncEnumerable<Marker> GetMarkers()
+    public async Task<List<Marker?>> GetMarkers()
     {
         var schools = await schoolService.GetAllSchools().ConfigureAwait(false);
         if (schools.Count == 0)
-            yield break;
+            return [];
 
         var latLngs = schools.Select(school => school.LatLng).ToList();
         BoundingBox boundingBox = new(latLngs);
+        Console.WriteLine($"Bounding box calculation:");
+        Console.WriteLine($"Min Lat: {boundingBox.MinLat}");
+        Console.WriteLine($"Max Lat: {boundingBox.MaxLat}");
+        Console.WriteLine($"Min Lng: {boundingBox.MinLng}");
+        Console.WriteLine($"Max Lng: {boundingBox.MaxLng}");
 
-        for (double x = boundingBox.MinLng; x <= boundingBox.MaxLng; x += StepSize)
-        for (double y = boundingBox.MinLat; y <= boundingBox.MaxLat; y += StepSize)
-        {
-            Console.WriteLine($"X:{x}, Y:{y}");
-            MarkerResponse? marker = await RequestMarker(x, y, schools).ConfigureAwait(false);
-            if (marker != null)
-                yield return new Marker(
-                    MarkerType.MarkerAwesome,
-                    new Coordinate(x, y),
-                    marker.Address
+        return
+        [
+            .. await Task.WhenAll(
+                    GenerateGrid(boundingBox, StepSize)
+                        .Select(async coord =>
+                        {
+                            MarkerResponse? marker = await RequestMarker(coord.X, coord.Y, schools)
+                                .ConfigureAwait(false);
+                            if (marker == null)
+                                return null;
+
+                            return new Marker(
+                                MarkerType.MarkerAwesome,
+                                new Coordinate(coord.X, coord.Y),
+                                marker.Address
+                            )
+                            {
+                                Properties =
+                                {
+                                    ["Name"] = marker.Address,
+                                    ["Routes"] = marker.Routes,
+                                },
+                            };
+                        })
                 )
-                {
-                    Properties = { ["Name"] = marker.Address, ["Routes"] = marker.Routes },
-                };
-        }
+                .ConfigureAwait(false),
+        ];
     }
 
     private async Task<MarkerResponse?> RequestMarker(double x, double y, List<SchoolData> schools)
@@ -55,12 +72,19 @@ public class MarkerService(HttpClient httpClient, SchoolDivisionService schoolSe
                 .Content.ReadFromJsonAsync<MarkerResponse>()
                 .ConfigureAwait(false);
 
-            return markerResponse;
+            return markerResponse!;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error calling server for marker at ({x},{y}): {ex.Message}");
             return null;
         }
+    }
+
+    private IEnumerable<(double X, double Y)> GenerateGrid(BoundingBox box, double step)
+    {
+        for (double y = box.MinLat; y <= box.MaxLat; y += step)
+        for (double x = box.MinLng; x <= box.MaxLng; x += step)
+            yield return (x, y);
     }
 }

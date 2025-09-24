@@ -260,6 +260,7 @@ public class MarkerService(
         }
 
         Log.Information("Matrix response successfully received.");
+        Log.Information("Matrix Response: {Response}", response);
         return response;
     }
 

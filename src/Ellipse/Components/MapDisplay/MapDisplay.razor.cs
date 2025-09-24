@@ -8,19 +8,13 @@ public partial class MapDisplay
     [Parameter]
     public required Action<Marker> OnMarkerClick { get; set; }
 
-    private OpenStreetMap _map { get; set; }
+    [Parameter]
+    public required List<Marker> Markers { get; set; }
 
-    public async ValueTask UpdateOrAddMarker(Marker marker)
-    {
-        if (!_map.MarkersList.Contains(marker))
-        {
-            _map.MarkersList.Add(marker);
-            return;
-        }
-
-        await _map.UpdateShape(marker);
-    }
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+    private OpenStreetMap Map { get; set; }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
     public async ValueTask SelectMarker(Marker marker) =>
-        await _map.SetCoordinates(marker, marker.Coordinates);
+        await Map.SetCoordinates(marker, marker.Coordinates);
 }

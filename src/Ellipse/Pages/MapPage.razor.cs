@@ -1,6 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
-using Ellipse.Components.MapDisplay;
-using Ellipse.Components.MarkerMenu;
+using Ellipse.Components.Menu;
 using Ellipse.Services;
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
@@ -9,47 +7,39 @@ namespace Ellipse.Pages;
 
 partial class MapPage : ComponentBase
 {
-    private MarkerMenu _menu;
-    private MapDisplay _mapDisplay;
+    private Menu _menu;
 
     [Inject]
-    private MarkerService MarkerService { get; set; }
+    private MarkerService? MarkerService { get; set; }
 
     [Inject]
-    private NavigationManager NavigationManager { get; set; }
+    private NavigationManager? NavigationManager { get; set; }
 
     private string _selectedRouteName = "Average Distance";
+    private readonly List<Marker> _markers = [];
 
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        await SortMarkers();
-    }
 
-    private async Task SortMarkers()
-    {
         Marker? closestMarker = null;
-        await foreach (Marker marker in MarkerService.GetMarkers())
+        foreach (var marker in await MarkerService!.GetMarkers())
         {
+            if (marker == null)
+                continue;
+
             closestMarker ??= marker;
-            double markerDistance = marker.Properties["Routes"]["Total Distance"].Distance;
-            double closestDistance = closestMarker.Properties["Routes"]["Total Distance"].Distance;
-            if (markerDistance > closestDistance)
-            {
-                closestMarker.PinColor = PinColor.Red;
-
-                marker.PinColor = PinColor.Blue;
-                closestMarker = marker;
-            }
-            else
-            {
-                marker.PinColor = PinColor.Red;
-            }
-
-            _menu.AddMarker(marker);
-            await _mapDisplay.UpdateOrAddMarker(marker);
+            double currentDistance = (double)
+                closestMarker.Properties["Routes"]["Total Distance"].Distance;
+            double newDistance = (double)marker.Properties["Routes"]["Total Distance"].Distance;
+            if (newDistance >= currentDistance)
+                continue;
+                
+            closestMarker.PinColor = PinColor.Blue;
+            marker.PinColor = PinColor.Green;
+            closestMarker = marker;
         }
     }
 
-    public void SelectMarker(Marker marker) => _menu?.SelectMarker(marker);
+    public void SelectMarker(Marker marker) => _menu.SelectMarker(marker);
 }

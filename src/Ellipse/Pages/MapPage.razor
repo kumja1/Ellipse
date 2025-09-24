@@ -1,5 +1,5 @@
 @page "/map"
-@using Ellipse.Components.MarkerMenu
+@using Ellipse.Components.Menu
 @using Ellipse.Components.MapDisplay
 
 @namespace Ellipse.Pages
@@ -8,11 +8,11 @@
 
 <div class="w-screen h-screen overflow-hidden">
     <div class="absolute inset-0 z-0">
-        <MapDisplay @ref="_mapDisplay" OnMarkerClick="SelectMarker" />
+        <MapDisplay Markers="_markers" OnMarkerClick="SelectMarker" />
     </div>
 
     <div class="relative z-10">
-        <MarkerMenu MenuOpen="true" @ref="_menu" IsList="true">
+        <Menu @ref="_menu" Open="true" IsList="true" Markers="_markers">
             <ListView Context="markers">
                 <MudList T="Marker">
                     @foreach (var item in markers)
@@ -96,9 +96,9 @@
                     </MudStack>
                 </MudStack>
             </ItemView>
-        </MarkerMenu>
+        </Menu>
 
-        <MudFab Size="Size.Medium" StartIcon="@Icons.Material.Filled.Menu" OnClick="@(() => _menu.ToggleMenu())"
+        <MudFab Size="Size.Medium" StartIcon="@Icons.Material.Filled.Menu" OnClick="@(() => _menu?.ToggleMenuOpen())"
             Class="fixed left-2 bottom-2 z-20 bg-blue-600 hover:bg-blue-700 text-white border border-white" />
     </div>
 </div>

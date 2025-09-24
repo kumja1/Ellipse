@@ -36,7 +36,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     {
         AppendParam(builder, "api_key", apiKey);
         AppendParam(builder, "text", request.Query);
-        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture), false);
+        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture));
         return builder.ToString();
     }
 
@@ -48,7 +48,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         AppendParam(builder, "api_key", apiKey);
         AppendParam(builder, "point.lon", request.Longitude.ToString(CultureInfo.InvariantCulture));
         AppendParam(builder, "point.lat", request.Latitude.ToString(CultureInfo.InvariantCulture));
-        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture), false);
+        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture));
         return builder.ToString();
     }
 

@@ -7,7 +7,7 @@ namespace Ellipse.Server.Services;
 public sealed class WebScraperService(
     GeocodingService geoService,
     SupabaseStorageClient storageClient
-)
+) : IDisposable
 {
     private readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
@@ -44,5 +44,11 @@ public sealed class WebScraperService(
         {
             _scrapingTasks.TryRemove(divisionCode, out _);
         }
+    }
+
+    public void Dispose()
+    {
+        _scrapingTasks.Clear();
+        geoService.Dispose();
     }
 }

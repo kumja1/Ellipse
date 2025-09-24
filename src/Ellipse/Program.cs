@@ -1,5 +1,3 @@
-using DotNetEnv;
-using DotNetEnv.Extensions;
 using Ellipse.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;

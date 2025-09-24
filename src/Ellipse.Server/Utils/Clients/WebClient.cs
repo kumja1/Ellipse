@@ -115,8 +115,8 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         if (paths.Length > 0)
             AppendPath(builder, string.Join("/", paths));
 
-        if (parameters != null)
-            AppendParam(builder, parameters);
+        if (!string.IsNullOrEmpty(parameters))
+            AppendParam(builder, parameters.TrimEnd('&'));
 
         return builder.ToString();
     }
