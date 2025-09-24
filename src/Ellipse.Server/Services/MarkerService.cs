@@ -21,13 +21,9 @@ public class MarkerService(
     SupabaseStorageClient storageClient
 ) : IDisposable
 {
-    private const int MaxConcurrentBatches = 4;
     private const int MaxRetries = 20;
-    private const int MatrixBatchSize = 250;
-
     private const string FolderName = "marker_cache";
 
-    private readonly SemaphoreSlim _semaphore = new(MaxConcurrentBatches);
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = [];
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request)
@@ -50,7 +46,7 @@ public class MarkerService(
         MarkerResponse? markerResponse = await _currentTasks
             .GetOrAdd(request.Point, _ => ProcessMarkerRequest(request))
             .ConfigureAwait(false);
-        
+
         _currentTasks.TryRemove(request.Point, out _);
         if (markerResponse == null)
         {
@@ -123,11 +119,7 @@ public class MarkerService(
         Log.Information("Called for source: {Source} with {Count} schools", source, schools.Count);
         Dictionary<string, Route> results = [];
 
-        await Task.WhenAll(
-            schools
-                .Chunk(MatrixBatchSize)
-                .Select(async (batch, token) => await GetMatrixRoute(source, batch, results))
-        );
+        await GetMatrixRoute(source, schools, results);
 
         Log.Information("All batch tasks completed.");
         return results.ToDictionary();
@@ -135,7 +127,7 @@ public class MarkerService(
 
     private async Task<bool> GetMatrixRoute(
         GeoPoint2d source,
-        SchoolData[] batch,
+        List<SchoolData> schools,
         Dictionary<string, Route> results
     ) =>
         _ = await CallbackHelper.RetryIfInvalid(
@@ -145,70 +137,60 @@ public class MarkerService(
                 Log.Information(
                     "Batch attempt {Retry} for batch with {Count} schools",
                     attempt,
-                    batch.Length
+                    schools.Count
                 );
 
-                GeoPoint2d[] destinations = [.. batch.Select(s => s.LatLng)];
-                try
+                GeoPoint2d[] destinations = [.. schools.Select(s => s.LatLng)];
+
+                TableResponse? response = await GetMatrixRouteWithOSRM(source, destinations)
+                    .ConfigureAwait(false);
+
+                double[]? distances = response
+                    ?.Distances[0]
+                    .Select(x => (double)(x ?? 0))
+                    .ToArray();
+
+                double[]? durations = response
+                    ?.Durations[0]
+                    .Select(x => (double)(x ?? 0))
+                    .ToArray();
+
+                if (response == null || distances == null || durations == null)
                 {
-                    await _semaphore.WaitAsync().ConfigureAwait(false);
-                    TableResponse? response = await GetMatrixRouteWithOSRM(source, destinations)
+                    OpenRouteMatrixResponse? openRouteResponse = await GetMatrixRouteWithOpenRoute(
+                            source,
+                            destinations
+                        )
                         .ConfigureAwait(false);
 
-                    double[]? distances = response
-                        ?.Distances[0]
-                        .Select(x => (double)(x ?? 0))
-                        .ToArray();
+                    ArgumentNullException.ThrowIfNull(openRouteResponse);
+                    ArgumentNullException.ThrowIfNull(openRouteResponse.Distances);
+                    ArgumentNullException.ThrowIfNull(openRouteResponse.Durations);
 
-                    double[]? durations = response
-                        ?.Durations[0]
-                        .Select(x => (double)(x ?? 0))
-                        .ToArray();
-
-                    if (response == null || distances == null || durations == null)
-                    {
-                        OpenRouteMatrixResponse? openRouteResponse =
-                            await GetMatrixRouteWithOpenRoute(source, destinations)
-                                .ConfigureAwait(false);
-
-                        ArgumentNullException.ThrowIfNull(openRouteResponse);
-                        ArgumentNullException.ThrowIfNull(openRouteResponse.Distances);
-                        ArgumentNullException.ThrowIfNull(openRouteResponse.Durations);
-
-                        distances = openRouteResponse.Distances[0];
-                        durations = openRouteResponse.Durations[0];
-                    }
-
-                    for (int i = 0; i < batch.Length; i++)
-                    {
-                        SchoolData school = batch[i];
-                        double distance = distances[i];
-                        double duration = durations[i];
-
-                        results[school.Name] = new Route
-                        {
-                            Distance = distance / 1609,
-                            Duration = duration,
-                        };
-
-                        Log.Information(
-                            "School: {School} => Distance: {Distance}, Duration: {Duration}",
-                            school.Name,
-                            distance,
-                            duration
-                        );
-                    }
-                    return true;
+                    distances = openRouteResponse.Distances[0];
+                    durations = openRouteResponse.Durations[0];
                 }
-                catch (Exception ex)
+
+                for (int i = 0; i < schools.Count; i++)
                 {
-                    Log.Error(ex, "Error in GetMatrixRoute for batch");
-                    return false;
+                    SchoolData school = schools[i];
+                    double distance = distances[i];
+                    double duration = durations[i];
+
+                    results[school.Name] = new Route
+                    {
+                        Distance = distance / 1609,
+                        Duration = duration,
+                    };
+
+                    Log.Information(
+                        "School: {School} => Distance: {Distance}, Duration: {Duration}",
+                        school.Name,
+                        distance,
+                        duration
+                    );
                 }
-                finally
-                {
-                    _semaphore.Release();
-                }
+                return true;
             },
             maxRetries: MaxRetries,
             delayMs: 500
@@ -324,6 +306,5 @@ public class MarkerService(
     {
         GC.SuppressFinalize(this);
         _currentTasks.Clear();
-        _semaphore.Dispose();
     }
 }
