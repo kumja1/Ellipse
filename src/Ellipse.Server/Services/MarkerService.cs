@@ -23,8 +23,9 @@ public class MarkerService(
 {
     private const int MaxRetries = 20;
     private const string FolderName = "marker_cache";
-
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = [];
+
+    private readonly SemaphoreSlim _semaphore = new(5, 5);
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request)
     {
@@ -141,56 +142,62 @@ public class MarkerService(
                 );
 
                 GeoPoint2d[] destinations = [.. schools.Select(s => s.LatLng)];
+                await _semaphore.WaitAsync();
 
-                TableResponse? response = await GetMatrixRouteWithOSRM(source, destinations)
-                    .ConfigureAwait(false);
-
-                double[]? distances = response
-                    ?.Distances[0]
-                    .Select(x => (double)(x ?? 0))
-                    .ToArray();
-
-                double[]? durations = response
-                    ?.Durations[0]
-                    .Select(x => (double)(x ?? 0))
-                    .ToArray();
-
-                if (response == null || distances == null || durations == null)
+                try
                 {
-                    OpenRouteMatrixResponse? openRouteResponse = await GetMatrixRouteWithOpenRoute(
-                            source,
-                            destinations
-                        )
+                    TableResponse? response = await GetMatrixRouteWithOSRM(source, destinations)
                         .ConfigureAwait(false);
 
-                    ArgumentNullException.ThrowIfNull(openRouteResponse);
-                    ArgumentNullException.ThrowIfNull(openRouteResponse.Distances);
-                    ArgumentNullException.ThrowIfNull(openRouteResponse.Durations);
+                    double[]? distances = response
+                        ?.Distances[0]
+                        .Select(x => (double)(x ?? 0))
+                        .ToArray();
 
-                    distances = openRouteResponse.Distances[0];
-                    durations = openRouteResponse.Durations[0];
-                }
+                    double[]? durations = response
+                        ?.Durations[0]
+                        .Select(x => (double)(x ?? 0))
+                        .ToArray();
 
-                for (int i = 0; i < schools.Count; i++)
-                {
-                    SchoolData school = schools[i];
-                    double distance = distances[i];
-                    double duration = durations[i];
-
-                    results[school.Name] = new Route
+                    if (response == null || distances == null || durations == null)
                     {
-                        Distance = distance / 1609,
-                        Duration = duration,
-                    };
+                        OpenRouteMatrixResponse? openRouteResponse =
+                            await GetMatrixRouteWithOpenRoute(source, destinations)
+                                .ConfigureAwait(false);
 
-                    Log.Information(
-                        "School: {School} => Distance: {Distance}, Duration: {Duration}",
-                        school.Name,
-                        distance,
-                        duration
-                    );
+                        ArgumentNullException.ThrowIfNull(openRouteResponse);
+                        ArgumentNullException.ThrowIfNull(openRouteResponse.Distances);
+                        ArgumentNullException.ThrowIfNull(openRouteResponse.Durations);
+
+                        distances = openRouteResponse.Distances[0];
+                        durations = openRouteResponse.Durations[0];
+                    }
+
+                    for (int i = 0; i < schools.Count; i++)
+                    {
+                        SchoolData school = schools[i];
+                        double distance = distances[i];
+                        double duration = durations[i];
+
+                        results[school.Name] = new Route
+                        {
+                            Distance = distance / 1609,
+                            Duration = duration,
+                        };
+
+                        Log.Information(
+                            "School: {School} => Distance: {Distance}, Duration: {Duration}",
+                            school.Name,
+                            distance,
+                            duration
+                        );
+                    }
+                    return true;
                 }
-                return true;
+                finally
+                {
+                    _semaphore.Release();
+                }
             },
             maxRetries: MaxRetries,
             delayMs: 500
