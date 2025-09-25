@@ -2,36 +2,26 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
-using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Common.Utils;
 using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients;
-using Ellipse.Server.Utils.Clients.Mapping;
-using Osrm.HttpApiClient;
 using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
 using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(
-    GeocodingService geocodingService,
-    OsrmHttpApiClient client,
-    OpenRouteClient openRouteClient,
-    SupabaseCache cache
-) : IDisposable
+public class MarkerService(GeocodingService geocodingService, SupabaseCache cache) : IDisposable
 {
-    private const int MaxRetries = 20;
-    private const string FolderName = "marker_cache";
-    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _currentTasks = [];
-
-    private readonly SemaphoreSlim _semaphore = new(5, 5);
+    private const string CacheFolderName = "markers";
+    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
+    private readonly SemaphoreSlim _semaphore = new(20, 20);
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request)
     {
         Log.Information("Called for point: {Point}", request.Point);
 
-        string? cachedData = await cache.Get(request.Point, FolderName);
+        string? cachedData = await cache.Get(request.Point, CacheFolderName);
         if (!string.IsNullOrEmpty(cachedData) && !request.OverrideCache)
         {
             Log.Information("Cache hit for point: {Point}", request.Point);
@@ -43,29 +33,32 @@ public class MarkerService(
         }
 
         Log.Information("Cache miss for point: {Point}", request.Point);
-
-        MarkerResponse? markerResponse = await _currentTasks
-            .GetOrAdd(request.Point, _ => ProcessMarkerRequest(request))
-            .ConfigureAwait(false);
-
-        _currentTasks.TryRemove(request.Point, out _);
-        if (markerResponse == null)
+        try
         {
-            Log.Warning("MarkerResponse is null for point: {Point}", request.Point);
-            return null;
+            MarkerResponse? markerResponse = await _tasks
+                .GetOrAdd(request.Point, _ => ProcessMarkerRequest(request))
+                .ConfigureAwait(false);
+
+            if (markerResponse == null)
+            {
+                Log.Warning("MarkerResponse is null for point: {Point}", request.Point);
+                return null;
+            }
+
+            await cache.Set(request.Point, StringHelper.Compress(JsonSerializer.Serialize(markerResponse)), CacheFolderName);
+            Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
+
+            return markerResponse;
         }
-
-        string serialized = StringHelper.Compress(JsonSerializer.Serialize(markerResponse));
-        await cache.Set(request.Point, serialized, FolderName);
-        Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
-
-        return markerResponse;
+        finally
+        {
+            _tasks.TryRemove(request.Point, out _);
+        }
     }
 
     private async Task<MarkerResponse?> ProcessMarkerRequest(MarkerRequest request)
     {
         Log.Information("Processing MarkerRequest for point: {Point}", request.Point);
-
         if (request.Schools.Count == 0)
         {
             Log.Warning("No schools provided. Returning null.");
@@ -77,39 +70,29 @@ public class MarkerService(
             .ConfigureAwait(false);
 
         Log.Information("Address fetched: {Address}", address);
-
         var routes = await GetMatrixRoutes(request.Point, request.Schools).ConfigureAwait(false);
+
         Log.Information("Matrix routes obtained. Count: {Count}", routes.Count);
-
-        if (routes.Count > 0)
+        if (routes.Count == 0)
         {
-            IEnumerable<double> distances = routes.Values.Select(r => r.Distance);
-            IEnumerable<double> durations = routes.Values.Select(r => r.Duration);
-            double avgDistance = Trimean([.. distances]);
-            double avgDuration = Trimean([.. durations]);
-            routes["Average Distance"] = new Route
-            {
-                Distance = avgDistance,
-                Duration = avgDuration,
-            };
-
-            routes["Total Distance"] = new Route
-            {
-                Distance = distances.Sum(),
-                Duration = durations.Sum(),
-            };
-            Log.Information(
-                "Calculated average route: Distance={Distance}, Duration={Duration}",
-                avgDistance,
-                avgDuration
-            );
-        }
-        else
-        {
-            Log.Warning("No routes found.");
+            Log.Warning("No routes found. Returning null.");
+            return null;
         }
 
-        return routes.Count == 0 ? null : new MarkerResponse(address, routes);
+        List<double> distances = [.. routes.Values.Select(r => r.Distance)];
+        List<double> durations = [.. routes.Values.Select(r => r.Duration)];
+
+        double avgDistance = Trimean(distances);
+        double avgDuration = Trimean(durations);
+
+        routes["Average"] = new Route { Distance = avgDistance, Duration = avgDuration };
+        Log.Information(
+            "Calculated average route: Distance={Distance}, Duration={Duration}",
+            avgDistance,
+            avgDuration
+        );
+
+        return routes.Count == 0 ? null : new MarkerResponse(address, distances.Sum(), routes);
     }
 
     private async Task<Dictionary<string, Route>> GetMatrixRoutes(
@@ -121,8 +104,7 @@ public class MarkerService(
         Dictionary<string, Route> results = [];
 
         await GetMatrixRoute(source, schools, results);
-
-        Log.Information("All batch tasks completed.");
+        Log.Information("All tasks completed.");
         return results.ToDictionary();
     }
 
@@ -135,50 +117,20 @@ public class MarkerService(
             null,
             async (attempt) =>
             {
-                Log.Information(
-                    "Batch attempt {Retry} for batch with {Count} schools",
-                    attempt,
-                    schools.Count
-                );
-
+                Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
                 GeoPoint2d[] destinations = [.. schools.Select(s => s.LatLng)];
-                await _semaphore.WaitAsync();
 
+                await _semaphore.WaitAsync();
                 try
                 {
-                    TableResponse? response = await geocodingService
-                        .GetMatrixWithOSRM(source, destinations)
-                        .ConfigureAwait(false);
-
-                    double[]? distances = response
-                        ?.Distances[0]
-                        .Select(x => (double)(x ?? 0))
-                        .ToArray();
-
-                    double[]? durations = response
-                        ?.Durations[0]
-                        .Select(x => (double)(x ?? 0))
-                        .ToArray();
-
-                    if (response == null || distances == null || durations == null)
-                    {
-                        OpenRouteMatrixResponse? openRouteResponse = await geocodingService
-                            .GetMatrixWithOpenRoute(source, destinations)
-                            .ConfigureAwait(false);
-
-                        ArgumentNullException.ThrowIfNull(openRouteResponse);
-                        ArgumentNullException.ThrowIfNull(openRouteResponse.Distances);
-                        ArgumentNullException.ThrowIfNull(openRouteResponse.Durations);
-
-                        distances = openRouteResponse.Distances[0];
-                        durations = openRouteResponse.Durations[0];
-                    }
+                    (double[] distances, double[] durations) =
+                        await geocodingService.GetMatrixCached(source, destinations);
 
                     for (int i = 0; i < schools.Count; i++)
                     {
                         SchoolData school = schools[i];
-                        double distance = distances[i];
-                        double duration = durations[i];
+                        double distance = distances![i];
+                        double duration = durations![i];
 
                         results[school.Name] = new Route
                         {
@@ -193,6 +145,7 @@ public class MarkerService(
                             duration
                         );
                     }
+
                     return true;
                 }
                 finally
@@ -200,7 +153,7 @@ public class MarkerService(
                     _semaphore.Release();
                 }
             },
-            maxRetries: MaxRetries,
+            maxRetries: 20,
             delayMs: 500
         );
 
@@ -227,6 +180,6 @@ public class MarkerService(
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        _currentTasks.Clear();
+        _tasks.Clear();
     }
 }

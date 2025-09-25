@@ -48,5 +48,6 @@ public partial class Menu : ComponentBase
     {
         SelectedMarker = marker;
         IsList = false;
+        StateHasChanged();
     }
 }

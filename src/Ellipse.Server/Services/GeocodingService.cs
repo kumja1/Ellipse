@@ -16,21 +16,21 @@ public class GeocodingService(
     CensusGeocoderClient censusGeocoder,
     OpenRouteClient openRouteClient,
     OsrmHttpApiClient osrmClient,
-    SupabaseCache storageClient
+    SupabaseCache cache
 ) : IDisposable
 {
-    private const string FolderName = "geocoding_cache";
+    private const string CacheFolderName = "geocoding";
 
     public async Task<string> GetAddressCached(double longitude, double latitude)
     {
-        GeoPoint2d latLng = new(longitude, latitude);
+        string cacheKey = $"address_{longitude}_{latitude}";
         Log.Information(
             "[GetAddressCached] Searching cache for coordinates: {Longitude}, {Latitude}",
             longitude,
             latitude
         );
 
-        string? cachedAddress = await storageClient.Get(latLng, FolderName);
+        string? cachedAddress = await cache.Get(cacheKey, CacheFolderName);
         if (!string.IsNullOrEmpty(cachedAddress))
         {
             Log.Information(
@@ -69,7 +69,7 @@ public class GeocodingService(
             return string.Empty;
         }
 
-        await storageClient.Set(latLng, address, FolderName);
+        await cache.Set(cacheKey, address, CacheFolderName);
         return address;
     }
 
@@ -179,8 +179,10 @@ public class GeocodingService(
             return GeoPoint2d.Zero;
         }
 
+        string cacheKey = $"latlng_{address.ToLower().Replace(" ", "_")}";
         Log.Information("[GetLatLngCached] Searching cache for address: {Address}", address);
-        _ = GeoPoint2d.TryParse(await storageClient.Get(address, FolderName), out GeoPoint2d latLng)
+
+        _ = GeoPoint2d.TryParse(await cache.Get(cacheKey, CacheFolderName), out GeoPoint2d latLng)
             ? latLng
             : latLng = await GetLatLngWithCensus(address);
 
@@ -200,7 +202,8 @@ public class GeocodingService(
             address,
             latLng
         );
-        await storageClient.Set(address, latLng.ToString(), FolderName);
+
+        await cache.Set(cacheKey, latLng.ToString(), CacheFolderName);
         return latLng;
     }
 
@@ -279,6 +282,80 @@ public class GeocodingService(
             Log.Error(ex, "[GetLatLng] Error getting coordinates for address: {Address}", address);
             return GeoPoint2d.Zero;
         }
+    }
+
+    public async Task<(double[] Destinations, double[] Durations)> GetMatrixCached(
+        GeoPoint2d source,
+        GeoPoint2d[] destinations
+    )
+    {
+        Log.Information(
+            "[GetMatrixCached] Searching cache for source: {Source} with {Count} destinations",
+            source,
+            destinations.Length
+        );
+
+        HashCode hash = new();
+        hash.Add(source);
+        foreach (var dest in destinations)
+            hash.Add(dest);
+
+        string cacheKey = $"matrix_{hash.ToHashCode()}";
+        string cachedMatrix = await cache.Get(CacheFolderName, cacheKey);
+
+        if (!string.IsNullOrEmpty(cachedMatrix))
+        {
+            Log.Information(
+                "[GetMatrixCached] Cache hit for source: {Source} with {Count} destinations",
+                source,
+                destinations.Length
+            );
+            string[] parts = cachedMatrix.Split(';');
+            double[] cachedDistances = Array.ConvertAll(
+                parts[0].Split(','),
+                s => double.TryParse(s, out double d) ? d : 0
+            );
+            double[] cachedDurations = Array.ConvertAll(
+                parts[1].Split(','),
+                s => double.TryParse(s, out double d) ? d : 0
+            );
+
+            return (cachedDistances, cachedDurations);
+        }
+
+        TableResponse? response = await GetMatrixWithOSRM(source, destinations)
+            .ConfigureAwait(false);
+
+        double[]? distances = response?.Distances[0].Select(x => (double)(x ?? 0)).ToArray();
+        double[]? durations = response?.Durations[0].Select(x => (double)(x ?? 0)).ToArray();
+
+        if (response is not TableResponse { Distances: not null, Durations: not null })
+        {
+            OpenRouteMatrixResponse? openRouteResponse = await GetMatrixWithOpenRoute(
+                    source,
+                    destinations
+                )
+                .ConfigureAwait(false);
+
+            if (
+                openRouteResponse
+                is not OpenRouteMatrixResponse { Distances: not null, Durations: not null }
+            )
+            {
+                Log.Warning("Both OSRM and OpenRouteMatrix responses are null or invalid.");
+                return default;
+            }
+
+            distances = openRouteResponse.Distances[0];
+            durations = openRouteResponse.Durations[0];
+        }
+
+        await cache.Set(
+            CacheFolderName,
+            cacheKey,
+            $"{string.Join(',', distances!)};{string.Join(',', durations!)}"
+        );
+        return (distances, durations);
     }
 
     public async Task<TableResponse?> GetMatrixWithOSRM(

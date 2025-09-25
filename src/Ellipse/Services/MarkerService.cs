@@ -12,6 +12,9 @@ public class MarkerService(HttpClient httpClient)
 
     public async IAsyncEnumerable<Marker> GetMarkers(BoundingBox box, List<SchoolData> schools)
     {
+        if (schools.Count == 0)
+            yield break;
+
         for (double x = box.MinLng; x <= box.MaxLng; x += StepSize)
         for (double y = box.MinLat; y <= box.MaxLat; y += StepSize)
         {
@@ -21,7 +24,12 @@ public class MarkerService(HttpClient httpClient)
 
             yield return new Marker(MarkerType.MarkerAwesome, new Coordinate(x, y), marker.Address)
             {
-                Properties = { ["Name"] = marker.Address, ["Routes"] = marker.Routes },
+                Properties =
+                {
+                    ["Name"] = marker.Address,
+                    ["Routes"] = marker.Routes,
+                    ["TotalDistance"] = marker.TotalDistance,
+                },
             };
         }
     }

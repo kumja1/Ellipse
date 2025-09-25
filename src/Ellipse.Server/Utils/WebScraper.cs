@@ -10,16 +10,16 @@ using Serilog;
 
 namespace Ellipse.Server.Utils;
 
-public sealed partial class WebScraper(int divisionCode, GeocodingService geoService)
+public sealed partial class WebScraper(
+    int divisionCode,
+    GeocodingService geoService,
+    IBrowsingContext context
+)
 {
     private const string VirginiaSchoolsUrl = "https://schoolquality.virginia.gov/schools";
 
     [GeneratedRegex(@"[.\s/]+")]
-    private static partial Regex CleanNameRegex();
-
-    private readonly IBrowsingContext _browsingContext = BrowsingContext.New(
-        Configuration.Default.WithDefaultLoader().WithXPath()
-    );
+    private static partial Regex SchoolNameRegex();
 
     private readonly SemaphoreSlim _semaphore = new(20, 20);
 
@@ -53,7 +53,7 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
                 isValid: l => l?.Count > 0,
                 func: async _ =>
                 {
-                    document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
+                    document = await context.OpenAsync(url).ConfigureAwait(false);
                     return document.QuerySelectorAll("table > tbody > tr").ToList();
                 },
                 defaultValue: [],
@@ -77,14 +77,14 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
             return null;
 
         string name = WebUtility.HtmlDecode(nameCell.TextContent).Trim();
-        string cleanedName = CleanNameRegex().Replace(name.ToLower(), "-");
+        string schoolName = SchoolNameRegex().Replace(name.ToLower(), "-");
 
         string division = row.QuerySelector("td:nth-child(2)")?.TextContent.Trim() ?? "";
         string gradeSpan = row.QuerySelector("td:nth-child(3)")?.TextContent.Trim() ?? "";
         Log.Information("{School} Division: {Division}", name, division);
         Log.Information("{School} Grade Span: {GradeSpan}", name, gradeSpan);
 
-        string? address = await FetchAddressAsync(cleanedName).ConfigureAwait(false);
+        string? address = await FetchAddressAsync(schoolName).ConfigureAwait(false);
         if (address == null)
         {
             Log.Warning("Address not found for school: {School}", name);
@@ -92,14 +92,12 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
         }
 
         Log.Information("Fetching coordinates for school: {School}", name);
-
         GeoPoint2d latLng = await CallbackHelper
             .RetryIfInvalid(
                 isValid: c => c != GeoPoint2d.Zero,
-                func: async _ => await geoService.GetLatLngCached(address),
-                defaultValue: GeoPoint2d.Zero,
-                20,
-                500
+                async _ => await geoService.GetLatLngCached(address),
+                maxRetries: 20,
+                delayMs: 500
             )
             .ConfigureAwait(false);
 
@@ -143,9 +141,7 @@ public sealed partial class WebScraper(int divisionCode, GeocodingService geoSer
                             string url = $"{VirginiaSchoolsUrl}/{schoolName}";
                             Log.Information("Requesting: {Url}", url);
 
-                            IDocument doc = await _browsingContext
-                                .OpenAsync(url)
-                                .ConfigureAwait(false);
+                            IDocument doc = await context.OpenAsync(url).ConfigureAwait(false);
 
                             IElement? el = doc.QuerySelector(
                                 "[itemtype='http://schema.org/PostalAddress']"

@@ -1,5 +1,3 @@
-using DotNetEnv;
-using DotNetEnv.Extensions;
 using Ellipse.Server.Services;
 using Ellipse.Server.Utils.Clients;
 using Ellipse.Server.Utils.Clients.Mapping;

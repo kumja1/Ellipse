@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using AngleSharp;
 using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients;
 
@@ -7,41 +8,51 @@ namespace Ellipse.Server.Services;
 public sealed class WebScraperService(GeocodingService geoService, SupabaseCache cache)
     : IDisposable
 {
-    private readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
+    private readonly ConcurrentDictionary<int, Task<string>> _tasks = new();
 
-    private const string FolderName = "webscraper_cache";
+    private readonly IBrowsingContext _browsingContext = BrowsingContext.New(
+        Configuration.Default.WithDefaultLoader().WithXPath()
+    );
+
+    private const string CacheFolderName = "scraper";
 
     public async Task<string> StartNew(int divisionCode, bool overrideCache)
     {
-        string cachedData = await cache.Get($"division_{divisionCode}", FolderName);
+        string cachedData = await cache.Get($"division_{divisionCode}", CacheFolderName);
         if (!string.IsNullOrEmpty(cachedData) && !overrideCache)
             return StringHelper.Decompress(cachedData!);
+
         try
         {
-            string result = await _scrapingTasks
-                .GetOrAdd(divisionCode, _ => StartScraper(divisionCode))
+            string result = await _tasks
+                .GetOrAdd(divisionCode, StartScraper(divisionCode))
                 .ConfigureAwait(false);
 
-            await cache.Set($"division_{divisionCode}", StringHelper.Compress(result), FolderName);
+            if (string.IsNullOrEmpty(result))
+                return string.Empty;
 
-            ArgumentException.ThrowIfNullOrEmpty(result, nameof(result));
+            await cache.Set(
+                $"division_{divisionCode}",
+                StringHelper.Compress(result),
+                CacheFolderName
+            );
             return result;
         }
         finally
         {
-            _scrapingTasks.TryRemove(divisionCode, out _);
+            _tasks.TryRemove(divisionCode, out _);
         }
     }
 
     private async Task<string> StartScraper(int divisionCode)
     {
-        WebScraper scraper = new(divisionCode, geoService);
+        WebScraper scraper = new(divisionCode, geoService, _browsingContext);
         return await scraper.Scrape().ConfigureAwait(false);
     }
 
     public void Dispose()
     {
-        _scrapingTasks.Clear();
+        _tasks.Clear();
         geoService.Dispose();
     }
 }

@@ -7,11 +7,10 @@ using OpenLayers.Blazor;
 
 namespace Ellipse.Pages;
 
-partial class MapPage : ComponentBase
+partial class MapPage() : ComponentBase
 {
-    private Menu _menu;
-
-    private MapDisplay _mapDisplay;
+    private Menu? _menu;
+    private MapDisplay? _mapDisplay;
 
     [Inject]
     private MarkerService? MarkerService { get; set; }
@@ -30,6 +29,11 @@ partial class MapPage : ComponentBase
         await GetMarkers();
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Usage",
+        "BL0005:Component parameter should not be set outside of its component.",
+        Justification = "<Pending>"
+    )]
     private async Task GetMarkers()
     {
         List<SchoolData> schools = await SchoolDivisionService!
@@ -38,15 +42,15 @@ partial class MapPage : ComponentBase
 
         BoundingBox box = new(schools.Select(s => s.LatLng));
         Marker? closestMarker = null;
+
         await foreach (var marker in MarkerService!.GetMarkers(box, schools))
         {
             if (marker == null)
                 continue;
 
             closestMarker ??= marker;
-            double currentDistance = (double)
-                closestMarker.Properties["Routes"]["Total Distance"].Distance;
-            double newDistance = (double)marker.Properties["Routes"]["Total Distance"].Distance;
+            double currentDistance = closestMarker.Properties["TotalDistance"].Distance;
+            double newDistance = marker.Properties["TotalDistance"].Distance;
 
             bool similar = Math.Abs(newDistance - currentDistance) <= 1;
             if (newDistance < currentDistance)
@@ -57,10 +61,10 @@ partial class MapPage : ComponentBase
             else
                 marker.PinColor = similar ? PinColor.Blue : PinColor.Red;
 
-            await _mapDisplay.AddOrUpdateMarker(marker);
-            _menu.AddMarker(marker);
+            await _mapDisplay!.AddOrUpdateMarker(marker);
+            _menu!.AddMarker(marker);
         }
     }
 
-    public void SelectMarker(Marker marker) => _menu.SelectMarker(marker);
+    public void SelectMarker(Marker marker) => _menu!.SelectMarker(marker);
 }
