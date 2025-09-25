@@ -22,9 +22,6 @@ public partial class Menu : ComponentBase
     public RenderFragment<List<Marker>> ListView { get; set; }
 
     [Parameter]
-    public required List<Marker> Markers { get; set; }
-
-    [Parameter]
     public string Class { get; set; }
 
     private string _class =>
@@ -39,9 +36,13 @@ public partial class Menu : ComponentBase
         SelectedMarker?.Properties["Routes"]
         as Dictionary<string, (double Distance, string Duration)>;
 
+    private readonly List<Marker> _markers = [];
+
     public void ToggleMenuOpen() => Open = !Open;
 
     public void ToggleMenuView() => IsList = !IsList;
+
+    public void AddMarker(Marker marker) => _markers.Add(marker);
 
     public void SelectMarker(Marker marker)
     {

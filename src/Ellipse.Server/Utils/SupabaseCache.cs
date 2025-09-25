@@ -5,7 +5,7 @@ using Supabase.Storage.Interfaces;
 
 namespace Ellipse.Server.Utils.Clients;
 
-public sealed class SupabaseStorageClient(Supabase.Client client)
+public sealed class SupabaseCache(Supabase.Client client)
 {
     private IStorageFileApi<FileObject>? _bucketApi;
 
@@ -13,7 +13,7 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
     {
         try
         {
-            Bucket? bucket = await GetOrCreateBucket("v");
+            Bucket? bucket = await GetOrCreateBucket("cache");
             ArgumentNullException.ThrowIfNull(bucket);
 
             _bucketApi = client.Storage.From(bucket.Id!);
@@ -113,6 +113,4 @@ public sealed class SupabaseStorageClient(Supabase.Client client)
 
     private static string BuildPath(string key, string folder) =>
         string.IsNullOrWhiteSpace(folder) ? $"{key}.txt" : $"{folder.TrimEnd('/')}/{key}.txt";
-
-  
 }

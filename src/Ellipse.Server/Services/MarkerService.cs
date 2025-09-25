@@ -15,10 +15,10 @@ using Route = Ellipse.Common.Models.Directions.Route;
 namespace Ellipse.Server.Services;
 
 public class MarkerService(
-    GeocodingService geocoder,
+    GeocodingService geocodingService,
     OsrmHttpApiClient client,
     OpenRouteClient openRouteClient,
-    SupabaseStorageClient storageClient
+    SupabaseCache cache
 ) : IDisposable
 {
     private const int MaxRetries = 20;
@@ -31,7 +31,7 @@ public class MarkerService(
     {
         Log.Information("Called for point: {Point}", request.Point);
 
-        string? cachedData = await storageClient.Get(request.Point, FolderName);
+        string? cachedData = await cache.Get(request.Point, FolderName);
         if (!string.IsNullOrEmpty(cachedData) && !request.OverrideCache)
         {
             Log.Information("Cache hit for point: {Point}", request.Point);
@@ -56,7 +56,7 @@ public class MarkerService(
         }
 
         string serialized = StringHelper.Compress(JsonSerializer.Serialize(markerResponse));
-        await storageClient.Set(request.Point, serialized, FolderName);
+        await cache.Set(request.Point, serialized, FolderName);
         Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
         return markerResponse;
@@ -72,7 +72,7 @@ public class MarkerService(
             return null;
         }
 
-        string address = await geocoder
+        string address = await geocodingService
             .GetAddressCached(request.Point.Lon, request.Point.Lat)
             .ConfigureAwait(false);
 
@@ -146,7 +146,8 @@ public class MarkerService(
 
                 try
                 {
-                    TableResponse? response = await GetMatrixRouteWithOSRM(source, destinations)
+                    TableResponse? response = await geocodingService
+                        .GetMatrixWithOSRM(source, destinations)
                         .ConfigureAwait(false);
 
                     double[]? distances = response
@@ -161,9 +162,9 @@ public class MarkerService(
 
                     if (response == null || distances == null || durations == null)
                     {
-                        OpenRouteMatrixResponse? openRouteResponse =
-                            await GetMatrixRouteWithOpenRoute(source, destinations)
-                                .ConfigureAwait(false);
+                        OpenRouteMatrixResponse? openRouteResponse = await geocodingService
+                            .GetMatrixWithOpenRoute(source, destinations)
+                            .ConfigureAwait(false);
 
                         ArgumentNullException.ThrowIfNull(openRouteResponse);
                         ArgumentNullException.ThrowIfNull(openRouteResponse.Distances);
@@ -203,92 +204,6 @@ public class MarkerService(
             delayMs: 500
         );
 
-    private async Task<TableResponse?> GetMatrixRouteWithOSRM(
-        GeoPoint2d source,
-        GeoPoint2d[] destinations
-    )
-    {
-        Log.Information(
-            "Called for source: {Source} with {Count} destinations.",
-            source,
-            destinations.Length
-        );
-
-        if (destinations.All(dest => dest == GeoPoint2d.Zero))
-            return null;
-
-        var request = OsrmServices
-            .Table(
-                PredefinedProfiles.Car,
-                GeographicalCoordinates.Create(
-                    [
-                        Coordinate.Create(source.Lon, source.Lat),
-                        .. destinations.Select(dest => Coordinate.Create(dest.Lon, dest.Lat)),
-                    ]
-                )
-            )
-            .Destinations([.. Enumerable.Range(1, destinations.Length)])
-            .Sources(0)
-            .Annotations(TableAnnotations.DurationAndDistance)
-            .Build();
-
-        Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
-        TableResponse? response = await client.GetTableAsync(request);
-        Log.Information("{Response}", response);
-
-        if (response == null || response?.Durations == null || response?.Distances == null)
-        {
-            Log.Error("Invalid matrix response received.");
-            throw new InvalidOperationException("Invalid matrix response");
-        }
-
-        Log.Information("Matrix response successfully received.");
-        Log.Information("Matrix Response: {Response}", response);
-        return response;
-    }
-
-    private async Task<OpenRouteMatrixResponse?> GetMatrixRouteWithOpenRoute(
-        GeoPoint2d source,
-        GeoPoint2d[] destinations
-    )
-    {
-        Log.Information(
-            "Called for source: {Source} with {Count} destinations.",
-            source,
-            destinations.Length
-        );
-
-        if (destinations.Contains(GeoPoint2d.Zero))
-            return null;
-
-        OpenRouteMatrixRequest request = new()
-        {
-            Locations =
-            [
-                [source.Lon, source.Lat],
-                .. destinations.Select(dest => new double[] { dest.Lon, dest.Lat }),
-            ],
-            Sources = [0],
-            Destinations = [.. Enumerable.Range(1, destinations.Length)],
-            Metrics = ["distance", "duration"],
-            Units = "m",
-            Profile = Profile.DrivingCar,
-        };
-
-        Log.Information("Request prepared. Calling OpenRouteClient.GetMatrixAsync...");
-        OpenRouteMatrixResponse? response = await openRouteClient.GetMatrix(request);
-        Log.Information("{Response}", response);
-
-        if (response == null || response?.Durations == null || response?.Distances == null)
-        {
-            Log.Error("Invalid matrix response received.");
-            throw new InvalidOperationException("Invalid matrix response");
-        }
-
-        Log.Information("Matrix response successfully received.");
-        return response;
-    }
-
     private static double Trimean(List<double> data)
     {
         Log.Information("Calculating trimean for {Count} data points.", data.Count);
@@ -297,16 +212,16 @@ public class MarkerService(
         double median = WeightedPercentile(sorted, 0.5);
         double q3 = WeightedPercentile(sorted, 0.75);
         return (q1 + 2 * median + q3) / 4.0;
-    }
 
-    private static double WeightedPercentile(List<double> sorted, double percentile)
-    {
-        double position = (sorted.Count - 1) * percentile;
-        int left = (int)Math.Floor(position);
-        int right = (int)Math.Ceiling(position);
-        return left == right
-            ? sorted[left]
-            : sorted[left] + (sorted[right] - sorted[left]) * (position - left);
+        static double WeightedPercentile(List<double> sorted, double percentile)
+        {
+            double position = (sorted.Count - 1) * percentile;
+            int left = (int)Math.Floor(position);
+            int right = (int)Math.Ceiling(position);
+            return left == right
+                ? sorted[left]
+                : sorted[left] + (sorted[right] - sorted[left]) * (position - left);
+        }
     }
 
     public void Dispose()

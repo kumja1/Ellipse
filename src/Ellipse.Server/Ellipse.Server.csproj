@@ -24,6 +24,8 @@
     <PackageReference Include="Geo.MapBox" Version="2.1.2" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Postgres" Version="1.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.9" />
     <PackageReference Include="Osrm.HttpApiClient" Version="1.13.0" />
     <PackageReference Include="Pelias.NET" Version="2.0.0-20250115.15" />
     <PackageReference Include="Serilog" Version="4.2.0" />

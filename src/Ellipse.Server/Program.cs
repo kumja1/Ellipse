@@ -76,14 +76,14 @@ public static class Program
             anonKey,
             new SupabaseOptions { AutoConnectRealtime = true, AutoRefreshToken = true }
         );
-        SupabaseStorageClient storageClient = new(client);
+        SupabaseCache supabaseCache = new(client);
 
         try
         {
             await client.InitializeAsync();
-            await storageClient.InitializeAsync();
+            await supabaseCache.InitializeAsync();
 
-            builder.Services.AddSingleton(client).AddSingleton(storageClient);
+            builder.Services.AddSingleton(client).AddSingleton(supabaseCache);
         }
         catch (Exception e)
         {

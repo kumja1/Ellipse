@@ -4,10 +4,8 @@ using Ellipse.Server.Utils.Clients;
 
 namespace Ellipse.Server.Services;
 
-public sealed class WebScraperService(
-    GeocodingService geoService,
-    SupabaseStorageClient storageClient
-) : IDisposable
+public sealed class WebScraperService(GeocodingService geoService, SupabaseCache cache)
+    : IDisposable
 {
     private readonly ConcurrentDictionary<int, Task<string>> _scrapingTasks = new();
 
@@ -15,7 +13,7 @@ public sealed class WebScraperService(
 
     public async Task<string> StartNew(int divisionCode, bool overrideCache)
     {
-        string cachedData = await storageClient.Get($"division_{divisionCode}", FolderName);
+        string cachedData = await cache.Get($"division_{divisionCode}", FolderName);
         if (!string.IsNullOrEmpty(cachedData) && !overrideCache)
             return StringHelper.Decompress(cachedData!);
         try
@@ -24,11 +22,7 @@ public sealed class WebScraperService(
                 .GetOrAdd(divisionCode, _ => StartScraper(divisionCode))
                 .ConfigureAwait(false);
 
-            await storageClient.Set(
-                $"division_{divisionCode}",
-                StringHelper.Compress(result),
-                FolderName
-            );
+            await cache.Set($"division_{divisionCode}", StringHelper.Compress(result), FolderName);
 
             ArgumentException.ThrowIfNullOrEmpty(result, nameof(result));
             return result;
@@ -43,7 +37,6 @@ public sealed class WebScraperService(
     {
         WebScraper scraper = new(divisionCode, geoService);
         return await scraper.Scrape().ConfigureAwait(false);
-
     }
 
     public void Dispose()

@@ -7,9 +7,9 @@ public record BoundingBox
     public double MinLng { get; }
     public double MaxLng { get; }
 
-    public BoundingBox(List<GeoPoint2d> latLngs)
+    public BoundingBox(IEnumerable<GeoPoint2d> latLngs)
     {
-        if (latLngs.Count == 0)
+        if (!latLngs.Any())
             throw new ArgumentException("LatLngs list cannot be empty", nameof(latLngs));
 
         MinLat = latLngs.Min(latLng => latLng.Lat);

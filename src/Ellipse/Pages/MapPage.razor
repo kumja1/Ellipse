@@ -8,11 +8,11 @@
 
 <div class="w-screen h-screen overflow-hidden">
     <div class="absolute inset-0 z-0">
-        <MapDisplay Markers="_markers" OnMarkerClick="SelectMarker" />
+        <MapDisplay @ref="_mapDisplay" OnMarkerClick="SelectMarker" />
     </div>
 
     <div class="relative z-10">
-        <Menu @ref="_menu" Open="true" IsList="true" Markers="_markers">
+        <Menu @ref="_menu" Open="true" IsList="true">
             <ListView Context="markers">
                 <MudList T="Marker">
                     @foreach (var item in markers)

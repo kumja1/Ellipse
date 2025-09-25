@@ -2,17 +2,21 @@ using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 using Ellipse.Common.Models.Geocoding.OpenRoute;
+using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Common.Models.Snapping.OpenRoute;
 using Ellipse.Server.Utils.Clients;
 using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
+using Osrm.HttpApiClient;
+using Serilog;
 
 namespace Ellipse.Server.Services;
 
 public class GeocodingService(
     CensusGeocoderClient censusGeocoder,
     OpenRouteClient openRouteClient,
-    SupabaseStorageClient storageClient
+    OsrmHttpApiClient osrmClient,
+    SupabaseCache storageClient
 ) : IDisposable
 {
     private const string FolderName = "geocoding_cache";
@@ -20,35 +24,47 @@ public class GeocodingService(
     public async Task<string> GetAddressCached(double longitude, double latitude)
     {
         GeoPoint2d latLng = new(longitude, latitude);
-        Console.WriteLine(
-            $"[GetAddressCached] Searching cache for coordinates: {longitude}, {latitude}"
+        Log.Information(
+            "[GetAddressCached] Searching cache for coordinates: {Longitude}, {Latitude}",
+            longitude,
+            latitude
         );
 
         string? cachedAddress = await storageClient.Get(latLng, FolderName);
         if (!string.IsNullOrEmpty(cachedAddress))
         {
-            Console.WriteLine(
-                $"[GetAddressCached] Cache hit for {longitude}, {latitude} - Address: {cachedAddress}"
+            Log.Information(
+                "[GetAddressCached] Cache hit for {Longitude}, {Latitude} - Address: {CachedAddress}",
+                longitude,
+                latitude,
+                cachedAddress
             );
             return cachedAddress;
         }
 
-        Console.WriteLine(
-            $"[GetAddressCached] Cache miss for {longitude}, {latitude}. Invoking GetAddress."
+        Log.Information(
+            "[GetAddressCached] Cache miss for {Longitude}, {Latitude}. Invoking GetAddress.",
+            longitude,
+            latitude
         );
 
         string address = await GetAddressWithCensus(longitude, latitude);
         if (string.IsNullOrEmpty(address))
             address = await GetAddressWithOpenRoute(longitude, latitude);
 
-        Console.WriteLine(
-            $"[GetAddressCached] Caching address for {longitude}, {latitude}: {address}"
+        Log.Information(
+            "[GetAddressCached] Caching address for {Longitude}, {Latitude}: {Address}",
+            longitude,
+            latitude,
+            address
         );
 
         if (string.IsNullOrWhiteSpace(address))
         {
-            Console.WriteLine(
-                $"[GetAddressCached] No address found for coordinates: {longitude}, {latitude}"
+            Log.Information(
+                "[GetAddressCached] No address found for coordinates: {Longitude}, {Latitude}",
+                longitude,
+                latitude
             );
             return string.Empty;
         }
@@ -61,8 +77,10 @@ public class GeocodingService(
     {
         try
         {
-            Console.WriteLine(
-                $"[GetAddress] Initiating reverse geocoding for coordinates: Longitude={longitude}, Latitude={latitude}"
+            Log.Information(
+                "[GetAddress] Initiating reverse geocoding for coordinates: Longitude={Longitude}, Latitude={Latitude}",
+                longitude,
+                latitude
             );
 
             CensusReverseGeocodingRequest request = new()
@@ -73,9 +91,9 @@ public class GeocodingService(
                 Vintage = "4",
             };
 
-            Console.WriteLine($"[GetAddress] ReverseGeocodeRequest created: {request}");
+            Log.Information("[GetAddress] ReverseGeocodeRequest created: {@Request}", request);
             CensusGeocodingResponse? response = await censusGeocoder.ReverseGeocode(request);
-            Console.WriteLine($"[GetAddress] Received response: {response}");
+            Log.Information("[GetAddress] Received response: {@Response}", response);
 
             if (response == null)
                 return string.Empty;
@@ -87,8 +105,11 @@ public class GeocodingService(
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                $"[GetAddress] Error getting address for coordinates: {longitude}, {latitude}. Exception: {ex.Message}"
+            Log.Error(
+                ex,
+                "[GetAddress] Error getting address for coordinates: {Longitude}, {Latitude}",
+                longitude,
+                latitude
             );
             return string.Empty;
         }
@@ -96,14 +117,20 @@ public class GeocodingService(
 
     private async Task<string> GetAddressWithOpenRoute(double longitude, double latitude)
     {
-        Console.WriteLine($"[GetLatLng] No address found for coordinates: {longitude}, {latitude}");
-        Console.WriteLine($"[GetLatLng] Switching to Mapbox geocoder");
+        Log.Information(
+            "[GetLatLng] No address found for coordinates: {Longitude}, {Latitude}",
+            longitude,
+            latitude
+        );
+        Log.Information("[GetLatLng] Switching to Mapbox geocoder");
 
         SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
         if (snapped == null)
         {
-            Console.WriteLine(
-                $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
+            Log.Information(
+                "[GetLatLng] No address found for coordinates: {Longitude}, {Latitude}",
+                longitude,
+                latitude
             );
             return string.Empty;
         }
@@ -124,15 +151,17 @@ public class GeocodingService(
             );
             return string.Empty;
         }
-        Console.WriteLine($"[GetLatLng] Received response: {response}");
+        Log.Information("[GetLatLng] Received response: {@Response}", response);
         Feature? props = response
             .Features.OrderByDescending(f => f.Properties.Confidence)
             .FirstOrDefault();
 
         if (props == null)
         {
-            Console.WriteLine(
-                $"[GetLatLng] No address found for coordinates: {longitude}, {latitude}"
+            Log.Information(
+                "[GetLatLng] No address found for coordinates: {Longitude}, {Latitude}",
+                longitude,
+                latitude
             );
             return string.Empty;
         }
@@ -144,13 +173,13 @@ public class GeocodingService(
     {
         if (string.IsNullOrWhiteSpace(address))
         {
-            Console.WriteLine(
+            Log.Information(
                 "[GetLatLngCached] Provided address is empty or null. Returning GeoPoint2d.Zero."
             );
             return GeoPoint2d.Zero;
         }
 
-        Console.WriteLine($"[GetLatLngCached] Searching cache for address: {address}");
+        Log.Information("[GetLatLngCached] Searching cache for address: {Address}", address);
         _ = GeoPoint2d.TryParse(await storageClient.Get(address, FolderName), out GeoPoint2d latLng)
             ? latLng
             : latLng = await GetLatLngWithCensus(address);
@@ -160,13 +189,16 @@ public class GeocodingService(
 
         if (latLng == GeoPoint2d.Zero)
         {
-            Console.WriteLine(
-                $"[GetLatLngCached] No coordinates found for address: {address}. Returning GeoPoint2d.Zero."
+            Log.Information(
+                "[GetLatLngCached] No coordinates found for address: {Address}. Returning GeoPoint2d.Zero.",
+                address
             );
             return GeoPoint2d.Zero;
         }
-        Console.WriteLine(
-            $"[GetLatLngCached] Caching coordinates for address: {address} as: {latLng}"
+        Log.Information(
+            "[GetLatLngCached] Caching coordinates for address: {Address} as: {LatLng}",
+            address,
+            latLng
         );
         await storageClient.Set(address, latLng.ToString(), FolderName);
         return latLng;
@@ -176,7 +208,10 @@ public class GeocodingService(
     {
         try
         {
-            Console.WriteLine($"[GetLatLng] Initiating forward geocoding for address: {address}");
+            Log.Information(
+                "[GetLatLng] Initiating forward geocoding for address: {Address}",
+                address
+            );
             CensusGeocodingRequest request = new()
             {
                 Address = address,
@@ -186,28 +221,26 @@ public class GeocodingService(
                 Vintage = "4",
             };
 
-            Console.WriteLine($"[GetLatLng] ForwardGeocodeRequest created: {request}");
+            Log.Information("[GetLatLng] ForwardGeocodeRequest created: {@Request}", request);
             CensusGeocodingResponse? response = await censusGeocoder.Geocode(request);
-            Console.WriteLine($"[GetLatLng] Received response: {response}");
+            Log.Information("[GetLatLng] Received response: {@Response}", response);
 
             if (response == null || response.Result.AddressMatches.Count == 0)
                 return GeoPoint2d.Zero;
 
             AddressMatch? firstResult = response.Result.AddressMatches.FirstOrDefault();
-            Console.WriteLine($"[GetLatLng] First geocoding result: {firstResult}");
+            Log.Information("[GetLatLng] First geocoding result: {@FirstResult}", firstResult);
             GeoPoint2d resultPoint =
                 firstResult != null
                     ? new GeoPoint2d(firstResult.Coordinates.X, firstResult.Coordinates.Y)
                     : GeoPoint2d.Zero;
 
-            Console.WriteLine($"[GetLatLng] Returning coordinates: {resultPoint}");
+            Log.Information("[GetLatLng] Returning coordinates: {ResultPoint}", resultPoint);
             return resultPoint;
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                $"[GetLatLng] Error getting coordinates for address: {address}. Exception: {ex.Message}"
-            );
+            Log.Error(ex, "[GetLatLng] Error getting coordinates for address: {Address}", address);
             return GeoPoint2d.Zero;
         }
     }
@@ -216,8 +249,8 @@ public class GeocodingService(
     {
         try
         {
-            Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
-            Console.WriteLine("[GetLatLng] Switching to Mapbox geocoder");
+            Log.Information("[GetLatLng] No coordinates found for address: {Address}", address);
+            Log.Information("[GetLatLng] Switching to Mapbox geocoder");
 
             OpenRouteGeocodingResponse? geocodeResponse = await openRouteClient.Geocode(
                 new OpenRouteGeocodingRequest { Query = address, Size = 10 }
@@ -232,7 +265,7 @@ public class GeocodingService(
 
             if (location == null)
             {
-                Console.WriteLine($"[GetLatLng] No coordinates found for address: {address}");
+                Log.Information("[GetLatLng] No coordinates found for address: {Address}", address);
                 return GeoPoint2d.Zero;
             }
 
@@ -243,11 +276,95 @@ public class GeocodingService(
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                $"[GetLatLng] Error getting coordinates for address: {address}. Exception: {ex.Message}, {ex.StackTrace}"
-            );
+            Log.Error(ex, "[GetLatLng] Error getting coordinates for address: {Address}", address);
             return GeoPoint2d.Zero;
         }
+    }
+
+    public async Task<TableResponse?> GetMatrixWithOSRM(
+        GeoPoint2d source,
+        GeoPoint2d[] destinations
+    )
+    {
+        Log.Information(
+            "Called for source: {Source} with {Count} destinations.",
+            source,
+            destinations.Length
+        );
+
+        if (destinations.All(dest => dest == GeoPoint2d.Zero))
+            return null;
+
+        var request = OsrmServices
+            .Table(
+                PredefinedProfiles.Car,
+                GeographicalCoordinates.Create(
+                    [
+                        Coordinate.Create(source.Lon, source.Lat),
+                        .. destinations.Select(dest => Coordinate.Create(dest.Lon, dest.Lat)),
+                    ]
+                )
+            )
+            .Destinations([.. Enumerable.Range(1, destinations.Length)])
+            .Sources(0)
+            .Annotations(TableAnnotations.DurationAndDistance)
+            .Build();
+
+        Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
+        TableResponse? response = await osrmClient.GetTableAsync(request);
+        Log.Information("{Response}", response);
+
+        if (response == null || response?.Durations == null || response?.Distances == null)
+        {
+            Log.Error("Invalid matrix response received.");
+            throw new InvalidOperationException("Invalid matrix response");
+        }
+
+        Log.Information("Matrix response successfully received.");
+        Log.Information("Matrix Response: {Response}", response);
+        return response;
+    }
+
+    public async Task<OpenRouteMatrixResponse?> GetMatrixWithOpenRoute(
+        GeoPoint2d source,
+        GeoPoint2d[] destinations
+    )
+    {
+        Log.Information(
+            "Called for source: {Source} with {Count} destinations.",
+            source,
+            destinations.Length
+        );
+
+        if (destinations.Contains(GeoPoint2d.Zero))
+            return null;
+
+        OpenRouteMatrixRequest request = new()
+        {
+            Locations =
+            [
+                [source.Lon, source.Lat],
+                .. destinations.Select(dest => new double[] { dest.Lon, dest.Lat }),
+            ],
+            Sources = [0],
+            Destinations = [.. Enumerable.Range(1, destinations.Length)],
+            Metrics = ["distance", "duration"],
+            Units = "m",
+            Profile = Profile.DrivingCar,
+        };
+
+        Log.Information("Request prepared. Calling OpenRouteClient.GetMatrixAsync...");
+        OpenRouteMatrixResponse? response = await openRouteClient.GetMatrix(request);
+        Log.Information("{Response}", response);
+
+        if (response == null || response?.Durations == null || response?.Distances == null)
+        {
+            Log.Error("Invalid matrix response received.");
+            throw new InvalidOperationException("Invalid matrix response");
+        }
+
+        Log.Information("Matrix response successfully received.");
+        return response;
     }
 
     private async Task<SnappedLocation?> SnapCoordinatesToRoad(double longitude, double latitude)
