@@ -53,7 +53,7 @@ public sealed partial class WebScraper(
                 school.LatLng.Lat
             );
 
-        return JsonSerializer.Serialize(schools);
+        return JsonSerializer.Serialize(schools.Distinct());
     }
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ParsePage(int page)
