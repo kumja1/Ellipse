@@ -138,7 +138,7 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
                         double duration = durations![i];
 
                         if (
-                            results.TryAdd(
+                            !results.TryAdd(
                                 school.Name,
                                 new Route { Distance = distance / 1609, Duration = duration }
                             )
@@ -150,10 +150,7 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
                                 distance,
                                 duration
                             );
-                        }
-                        else
-                        {
-                            Log.Warning("Duplicate entry for school: {School}", school.Name);
+                            continue;
                         }
 
                         Log.Information(
