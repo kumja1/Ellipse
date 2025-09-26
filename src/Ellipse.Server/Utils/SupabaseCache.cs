@@ -9,11 +9,11 @@ public sealed class SupabaseCache(Supabase.Client client)
 {
     private IStorageFileApi<FileObject>? _bucketApi;
 
-    public async ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync(string bucketName = "cache")
     {
         try
         {
-            Bucket? bucket = await GetOrCreateBucket("cache");
+            Bucket? bucket = await GetOrCreateBucket(bucketName);
             ArgumentNullException.ThrowIfNull(bucket);
 
             _bucketApi = client.Storage.From(bucket.Id!);

@@ -413,7 +413,7 @@ public class GeocodingService(
             destinations.Length
         );
 
-        if (destinations.Contains(GeoPoint2d.Zero))
+        if (destinations.All(dest => dest == GeoPoint2d.Zero))
             return null;
 
         OpenRouteMatrixRequest request = new()

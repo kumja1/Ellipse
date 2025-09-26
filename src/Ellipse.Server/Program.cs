@@ -79,7 +79,9 @@ public static class Program
         try
         {
             await client.InitializeAsync();
-            await supabaseCache.InitializeAsync();
+            await supabaseCache.InitializeAsync(
+                Environment.GetEnvironmentVariable("SUPABASE_BUCKET_NAME")
+            );
 
             builder.Services.AddSingleton(client).AddSingleton(supabaseCache);
         }

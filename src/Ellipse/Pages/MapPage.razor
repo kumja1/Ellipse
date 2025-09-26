@@ -69,12 +69,9 @@
                         {
                             @foreach ((string routeName, (double Distance, string Duration) _) in marker.Routes)
                             {
-                                @if (routeName != "Total Distance")
-                                {
-                                    <MudSelectItem Value="routeName">
-                                        @routeName
-                                    </MudSelectItem>
-                                }
+                                <MudSelectItem Value="routeName">
+                                    @routeName
+                                </MudSelectItem>
                             }
                         }
                     </MudSelect>

@@ -32,9 +32,10 @@ public partial class Menu : ComponentBase
 
     public Marker? SelectedMarker { get; private set; }
 
-    public Dictionary<string, (double Distance, string Duration)>? SelectedMarkerRoutes =>
-        SelectedMarker?.Properties["Routes"]
-        as Dictionary<string, (double Distance, string Duration)>;
+    public Dictionary<string, (double Distance, string Duration)> SelectedMarkerRoutes =>
+        SelectedMarker != null && SelectedMarker.Properties.TryGetValue("Routes", out var routes)
+            ? routes as Dictionary<string, (double Distance, string Duration)>
+            : [];
 
     private readonly List<Marker> _markers = [];
 

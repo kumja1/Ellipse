@@ -1,3 +1,4 @@
+#pragma warning disable BL0005 // Component parameter should not be set outside of its component.
 using Ellipse.Common.Models;
 using Ellipse.Components.MapDisplay;
 using Ellipse.Components.Menu;
@@ -21,7 +22,7 @@ partial class MapPage() : ComponentBase
     [Inject]
     private NavigationManager? NavigationManager { get; set; }
 
-    private string _selectedRouteName = "Average Distance";
+    private string _selectedRouteName = "Average";
 
     protected override async Task OnInitializedAsync()
     {
@@ -29,41 +30,54 @@ partial class MapPage() : ComponentBase
         await GetMarkers();
     }
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Usage",
-        "BL0005:Component parameter should not be set outside of its component.",
-        Justification = "<Pending>"
-    )]
     private async Task GetMarkers()
     {
         List<SchoolData> schools = await SchoolDivisionService!
             .GetAllSchools()
             .ConfigureAwait(false);
-
         BoundingBox box = new(schools.Select(s => s.LatLng));
-        Marker? closestMarker = null;
 
+        double closestMarkerDistance = await FindClosestMarker(box, schools);
+        foreach (Marker marker in _mapDisplay!.Map.MarkersList.Cast<Marker>())
+        {
+            double distance = marker.Properties["TotalDistance"];
+            bool isNear = Math.Abs(distance - closestMarkerDistance) <= 100;
+            if (!isNear)
+                continue;
+
+            marker.PinColor = PinColor.Blue;
+            await _mapDisplay!.AddOrUpdateMarker(marker);
+        }
+    }
+
+    private async Task<double> FindClosestMarker(BoundingBox box, List<SchoolData> schools)
+    {
+        Marker? closestMarker = null;
         await foreach (var marker in MarkerService!.GetMarkers(box, schools))
         {
             if (marker == null)
                 continue;
 
             closestMarker ??= marker;
-            double currentDistance = closestMarker.Properties["TotalDistance"].Distance;
-            double newDistance = marker.Properties["TotalDistance"].Distance;
+            double closestDistance = closestMarker.Properties["TotalDistance"];
+            double newDistance = marker.Properties["TotalDistance"];
 
-            bool similar = Math.Abs(newDistance - currentDistance) <= 1;
-            if (newDistance < currentDistance)
+            if (newDistance >= closestDistance)
+                marker.PinColor = PinColor.Red;
+            else
             {
+                closestMarker.PinColor = PinColor.Red;
+                await _mapDisplay!.AddOrUpdateMarker(closestMarker); // Update previous closest marker
+
                 marker.PinColor = PinColor.Green;
                 closestMarker = marker;
             }
-            else
-                marker.PinColor = similar ? PinColor.Blue : PinColor.Red;
 
-            await _mapDisplay!.AddOrUpdateMarker(marker);
             _menu!.AddMarker(marker);
+            await _mapDisplay!.AddOrUpdateMarker(marker);
         }
+
+        return closestMarker?.Properties["TotalDistance"];
     }
 
     public void SelectMarker(Marker marker) => _menu!.SelectMarker(marker);
