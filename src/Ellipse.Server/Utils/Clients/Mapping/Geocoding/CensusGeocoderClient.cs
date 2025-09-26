@@ -27,7 +27,7 @@ public sealed class CensusGeocoderClient(HttpClient client)
             ),
         };
 
-        return await GetRequestAsync<CensusGeocodingResponse>(
+        return await GetRequest<CensusGeocodingResponse>(
             BuildQueryParams(request, BuildGeocodeQueryParams),
             $"{returnType}/{searchType}"
         );
@@ -45,7 +45,7 @@ public sealed class CensusGeocoderClient(HttpClient client)
                 $"Search type {request.SearchType} must be SearchType.Coordinates for this request"
             );
 
-        return await GetRequestAsync<CensusGeocodingResponse>(
+        return await GetRequest<CensusGeocodingResponse>(
             BuildQueryParams(request, BuildReverseGeocodeQueryParams),
             $"{request.ReturnType.ToString().ToLowerInvariant()}/{request.SearchType.ToString().ToLowerInvariant()}"
         );

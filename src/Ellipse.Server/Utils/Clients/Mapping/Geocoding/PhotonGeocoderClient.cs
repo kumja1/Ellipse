@@ -18,7 +18,7 @@ public sealed class PhotonGeocoderClient(HttpClient client)
         if (string.IsNullOrWhiteSpace(request.Query))
             throw new ArgumentException("Query must be provided.", nameof(request.Query));
 
-        return await GetRequestAsync<PhotonGeocodingResponse>(
+        return await GetRequest<PhotonGeocodingResponse>(
             BuildQueryParams(request, BuildGeocodeQueryParams),
             "api"
         );
@@ -27,7 +27,7 @@ public sealed class PhotonGeocoderClient(HttpClient client)
     public async Task<PhotonGeocodingResponse> ReverseGeocode(
         PhotonReverseGeocodingRequest request
     ) =>
-        await GetRequestAsync<PhotonGeocodingResponse>(
+        await GetRequest<PhotonGeocodingResponse>(
             BuildQueryParams(request, BuildReverseGeocodeQueryParams),
             "reverse"
         );

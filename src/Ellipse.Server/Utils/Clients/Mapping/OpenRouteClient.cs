@@ -21,7 +21,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     public async Task<OpenRouteGeocodingResponse> Geocode(OpenRouteGeocodingRequest request)
     {
         string queryParams = BuildQueryParams(request, BuildGeocodeQueryParams);
-        return await GetRequestAsync<OpenRouteGeocodingResponse>(queryParams, "geocode/search");
+        return await GetRequest<OpenRouteGeocodingResponse>(queryParams, "geocode/search");
     }
 
     public async Task<OpenRouteGeocodingResponse> ReverseGeocode(
@@ -29,7 +29,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     )
     {
         string queryParams = BuildQueryParams(request, BuildReverseGeocodeQueryParams);
-        return await GetRequestAsync<OpenRouteGeocodingResponse>(queryParams, "geocode/reverse");
+        return await GetRequest<OpenRouteGeocodingResponse>(queryParams, "geocode/reverse");
     }
 
     public string BuildGeocodeQueryParams(OpenRouteGeocodingRequest request, StringBuilder builder)

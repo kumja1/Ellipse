@@ -51,7 +51,7 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         builder.Append(path);
     }
 
-    private async Task<T> SendRequestAsync<T>(HttpRequestMessage? request = null)
+    private async Task<T> SendRequest<T>(HttpRequestMessage? request = null)
     {
         request ??= new HttpRequestMessage(HttpMethod.Get, baseUrl);
         if (!string.IsNullOrEmpty(apiKey))
@@ -67,11 +67,11 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
             ?? throw new JsonException("'response.Content' could not be parsed");
     }
 
-    protected async Task<TResponse> GetRequestAsync<TResponse>(
+    protected async Task<TResponse> GetRequest<TResponse>(
         string parameters = "",
         params string[] paths
     ) =>
-        await SendRequestAsync<TResponse>(
+        await SendRequest<TResponse>(
             new HttpRequestMessage(HttpMethod.Get, BuildUrl(paths, parameters))
         );
 
@@ -87,7 +87,7 @@ public abstract class WebClient(HttpClient client, string baseUrl, string apiKey
         StringContent content = new(json, Encoding.UTF8, "application/json");
         try
         {
-            return await SendRequestAsync<TResponse>(
+            return await SendRequest<TResponse>(
                 new HttpRequestMessage(HttpMethod.Post, url) { Content = content }
             );
         }

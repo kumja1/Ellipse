@@ -13,7 +13,7 @@ public sealed class WebScraperService(GeocodingService geoService, SupabaseCache
     private readonly IBrowsingContext _browsingContext = BrowsingContext.New(
         Configuration.Default.WithDefaultLoader().WithXPath()
     );
-    
+
     private const string CacheFolderName = "scraper";
 
     public async Task<string> StartNew(int divisionCode, bool overrideCache)
