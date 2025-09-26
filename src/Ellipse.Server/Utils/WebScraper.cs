@@ -42,18 +42,7 @@ public sealed partial class WebScraper(
         }
 
         Log.Information("Scraped {Count} schools from {Division}", schools.Count, divisionCode);
-        foreach (SchoolData school in schools)
-            Log.Information(
-                "School: {Name}, Address: {Address}, Division: {Division}, GradeSpan: {GradeSpan}, Lon: {Lon}, Lat: {Lat}",
-                school.Name,
-                school.Address,
-                school.Division,
-                school.GradeSpan,
-                school.LatLng.Lon,
-                school.LatLng.Lat
-            );
-
-        return JsonSerializer.Serialize(schools.DistinctBy(s => s.LatLng));
+        return JsonSerializer.Serialize(schools);
     }
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ParsePage(int page)

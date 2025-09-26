@@ -59,6 +59,17 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
             if (result == null)
                 return null;
 
+            Console.WriteLine(
+                $"[GetDivisionSchools] Completed {divisionName}. Found {result.Count} schools"
+            );
+
+            foreach (var school in result)
+            {
+                Console.WriteLine(
+                    $"{divisionName} ({code}) - {school.Name} ({school.GradeSpan}) {school.LatLng} "
+                );
+            }
+
             return result;
         }
         catch (Exception ex)
