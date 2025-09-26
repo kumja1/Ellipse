@@ -122,13 +122,14 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
             async (attempt) =>
             {
                 Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
-                GeoPoint2d[] destinations = [.. schools.Select(s => s.LatLng)];
-
                 await _semaphore.WaitAsync();
                 try
                 {
                     (double[] distances, double[] durations) =
-                        await geocodingService.GetMatrixCached(source, destinations);
+                        await geocodingService.GetMatrixCached(
+                            source,
+                            [.. schools.Select(s => s.LatLng)]
+                        );
 
                     for (int i = 0; i < schools.Count; i++)
                     {
@@ -136,11 +137,24 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
                         double distance = distances![i];
                         double duration = durations![i];
 
-                        results[school.Name] = new Route
+                        if (
+                            results.TryAdd(
+                                school.Name,
+                                new Route { Distance = distance / 1609, Duration = duration }
+                            )
+                        )
                         {
-                            Distance = distance / 1609,
-                            Duration = duration,
-                        };
+                            Log.Information(
+                                "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
+                                school.Name,
+                                distance,
+                                duration
+                            );
+                        }
+                        else
+                        {
+                            Log.Warning("Duplicate entry for school: {School}", school.Name);
+                        }
 
                         Log.Information(
                             "School: {School} => Distance: {Distance}, Duration: {Duration}",
