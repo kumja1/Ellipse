@@ -35,10 +35,11 @@ partial class MapPage() : ComponentBase
         List<SchoolData> schools = await SchoolDivisionService!
             .GetAllSchools()
             .ConfigureAwait(false);
-        BoundingBox box = new(schools.Select(s => s.LatLng));
 
+        BoundingBox box = new(schools.Select(s => s.LatLng));
         double closestMarkerDistance = await FindClosestMarker(box, schools);
-        foreach (Marker marker in _mapDisplay!.Map.MarkersList.Cast<Marker>())
+
+        foreach (Marker marker in _mapDisplay!.Map.MarkersList.Cast<Marker>()) // Do a second pass to color nearby markers
         {
             double distance = marker.Properties["TotalDistance"];
             bool isNear = Math.Abs(distance - closestMarkerDistance) <= 100;

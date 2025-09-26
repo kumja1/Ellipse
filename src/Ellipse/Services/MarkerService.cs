@@ -18,17 +18,17 @@ public class MarkerService(HttpClient httpClient)
         for (double y = box.MinLat; y <= box.MaxLat; y += StepSize)
         for (double x = box.MinLng; x <= box.MaxLng; x += StepSize)
         {
-            MarkerResponse? marker = await RequestMarker(x, y, schools).ConfigureAwait(false);
-            if (marker == null)
+            MarkerResponse? response = await GetMarker(x, y, schools).ConfigureAwait(false);
+            if (response == null)
                 continue;
 
-            yield return new Marker(MarkerType.MarkerPin, new Coordinate(x, y), marker.Address)
+            yield return new Marker(MarkerType.MarkerPin, new Coordinate(x, y), response.Address)
             {
                 Properties =
                 {
-                    ["Name"] = marker.Address,
-                    ["Routes"] = marker.Routes,
-                    ["TotalDistance"] = marker.TotalDistance,
+                    ["Name"] = response.Address,
+                    ["Routes"] = response.Routes,
+                    ["TotalDistance"] = response.TotalDistance,
                 },
                 TextScale = 0.7,
                 Popup = true,
@@ -36,7 +36,7 @@ public class MarkerService(HttpClient httpClient)
         }
     }
 
-    private async Task<MarkerResponse> RequestMarker(double x, double y, List<SchoolData> schools)
+    private async Task<MarkerResponse?> GetMarker(double x, double y, List<SchoolData> schools)
     {
         try
         {

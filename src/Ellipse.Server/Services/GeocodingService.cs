@@ -21,7 +21,11 @@ public class GeocodingService(
 {
     private const string CacheFolderName = "geocoding";
 
-    public async Task<string> GetAddressCached(double longitude, double latitude)
+    public async Task<string> GetAddressCached(
+        double longitude,
+        double latitude,
+        bool snapToRoad = true
+    )
     {
         string cacheKey = $"address_{longitude}_{latitude}";
         Log.Information(
@@ -48,9 +52,9 @@ public class GeocodingService(
             latitude
         );
 
-        string address = await GetAddressWithCensus(longitude, latitude);
+        string address = await GetAddressWithCensus(longitude, latitude, snapToRoad);
         if (string.IsNullOrEmpty(address))
-            address = await GetAddressWithOpenRoute(longitude, latitude);
+            address = await GetAddressWithOpenRoute(longitude, latitude, snapToRoad);
 
         Log.Information(
             "[GetAddressCached] Caching address for {Longitude}, {Latitude}: {Address}",
@@ -73,7 +77,11 @@ public class GeocodingService(
         return address;
     }
 
-    private async Task<string> GetAddressWithCensus(double longitude, double latitude)
+    private async Task<string> GetAddressWithCensus(
+        double longitude,
+        double latitude,
+        bool snapToRoad
+    )
     {
         try
         {
@@ -82,6 +90,21 @@ public class GeocodingService(
                 longitude,
                 latitude
             );
+
+            if (snapToRoad)
+            {
+                SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
+                if (snapped != null)
+                {
+                    longitude = snapped.Location[0];
+                    latitude = snapped.Location[1];
+                    Log.Information(
+                        "[GetAddress] Snapped coordinates to road: Longitude={Longitude}, Latitude={Latitude}",
+                        longitude,
+                        latitude
+                    );
+                }
+            }
 
             CensusReverseGeocodingRequest request = new()
             {
@@ -115,7 +138,11 @@ public class GeocodingService(
         }
     }
 
-    private async Task<string> GetAddressWithOpenRoute(double longitude, double latitude)
+    private async Task<string> GetAddressWithOpenRoute(
+        double longitude,
+        double latitude,
+        bool snapToRoad
+    )
     {
         Log.Information(
             "[GetLatLng] No address found for coordinates: {Longitude}, {Latitude}",
@@ -123,23 +150,26 @@ public class GeocodingService(
             latitude
         );
         Log.Information("[GetLatLng] Switching to Mapbox geocoder");
-
-        SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
-        if (snapped == null)
+        if (snapToRoad)
         {
-            Log.Information(
-                "[GetLatLng] No address found for coordinates: {Longitude}, {Latitude}",
-                longitude,
-                latitude
-            );
-            return string.Empty;
+            SnappedLocation? snapped = await SnapCoordinatesToRoad(longitude, latitude);
+            if (snapped != null)
+            {
+                longitude = snapped.Location[0];
+                latitude = snapped.Location[1];
+                Log.Information(
+                    "[GetLatLng] Snapped coordinates to road: Longitude={Longitude}, Latitude={Latitude}",
+                    longitude,
+                    latitude
+                );
+            }
         }
 
         OpenRouteGeocodingResponse? response = await openRouteClient.ReverseGeocode(
             new OpenRouteReverseGeocodingRequest
             {
-                Longitude = snapped.Location[0],
-                Latitude = snapped.Location[1],
+                Longitude = longitude,
+                Latitude = latitude,
                 Size = 10,
             }
         );
@@ -182,12 +212,12 @@ public class GeocodingService(
         string cacheKey = $"latlng_{address.ToLower().Replace(" ", "_")}";
         Log.Information("[GetLatLngCached] Searching cache for address: {Address}", address);
 
-        _ = GeoPoint2d.TryParse(await cache.Get(cacheKey, CacheFolderName), out GeoPoint2d latLng)
-            ? latLng
-            : latLng = await GetLatLngWithCensus(address);
-
-        if (latLng == GeoPoint2d.Zero)
-            latLng = await GetLatLngWithOpenRoute(address);
+        _ =
+            GeoPoint2d.TryParse(await cache.Get(cacheKey, CacheFolderName), out GeoPoint2d latLng)
+                ? latLng
+            : (latLng = await GetLatLngWithCensus(address)) == GeoPoint2d.Zero
+                ? latLng = await GetLatLngWithOpenRoute(address)
+            : GeoPoint2d.Zero;
 
         if (latLng == GeoPoint2d.Zero)
         {
@@ -235,7 +265,7 @@ public class GeocodingService(
             Log.Information("[GetLatLng] First geocoding result: {@FirstResult}", firstResult);
             GeoPoint2d resultPoint =
                 firstResult != null
-                    ? new GeoPoint2d(firstResult.Coordinates.X, firstResult.Coordinates.Y)
+                    ? new(firstResult.Coordinates.X, firstResult.Coordinates.Y)
                     : GeoPoint2d.Zero;
 
             Log.Information("[GetLatLng] Returning coordinates: {ResultPoint}", resultPoint);

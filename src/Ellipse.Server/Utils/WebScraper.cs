@@ -143,7 +143,6 @@ public sealed partial class WebScraper(
                             Log.Information("Requesting: {Url}", url);
 
                             IDocument doc = await context.OpenAsync(url).ConfigureAwait(false);
-
                             IElement? el = doc.QuerySelector(
                                 "[itemtype='http://schema.org/PostalAddress']"
                             );

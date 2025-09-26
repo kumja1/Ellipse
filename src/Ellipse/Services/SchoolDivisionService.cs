@@ -30,10 +30,11 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
     {
         Console.WriteLine("[GeSchools] Starting school data collection");
 
-        var results = await Task.WhenAll(
+        List<SchoolData>?[] results = await Task.WhenAll(
                 _divisionCodes.Select(kvp => GetDivisionSchools(kvp.Key, kvp.Value))
             )
             .ConfigureAwait(false);
+
         var schools = results.Where(x => x is not null).SelectMany(x => x!);
 
         Console.WriteLine("[GetSchools] Completed.");
@@ -52,12 +53,17 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
                     await httpClient.GetFromJsonAsync<List<SchoolData>>(
                         $"schools?divisionCode={code}"
                     ),
-                maxRetries: 5,
-                delayMs: 300
+                maxRetries: 30,
+                delayMs: 500
             );
 
             if (result == null)
+            {
+                Console.WriteLine(
+                    $"[GetDivisionSchools] Failed to get schools for division {divisionName} ({code})"
+                );
                 return null;
+            }
 
             Console.WriteLine(
                 $"[GetDivisionSchools] Completed {divisionName}. Found {result.Count} schools"
