@@ -45,7 +45,11 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
                 return null;
             }
 
-            await cache.Set(request.Point, StringHelper.Compress(JsonSerializer.Serialize(markerResponse)), CacheFolderName);
+            await cache.Set(
+                request.Point,
+                StringHelper.Compress(JsonSerializer.Serialize(markerResponse)),
+                CacheFolderName
+            );
             Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
             return markerResponse;

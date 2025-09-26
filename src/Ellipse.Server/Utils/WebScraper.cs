@@ -41,6 +41,18 @@ public sealed partial class WebScraper(
             );
         }
 
+        Log.Information("Scraped {Count} schools", schools.Count);
+        foreach (SchoolData school in schools)
+            Log.Information(
+                "School: {Name}, Address: {Address}, Division: {Division}, GradeSpan: {GradeSpan}, Lon: {Lon}, Lat: {Lat}",
+                school.Name,
+                school.Address,
+                school.Division,
+                school.GradeSpan,
+                school.LatLng.Lon,
+                school.LatLng.Lat
+            );
+
         return JsonSerializer.Serialize(schools);
     }
 
