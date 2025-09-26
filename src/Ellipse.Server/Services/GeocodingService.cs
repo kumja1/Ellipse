@@ -351,9 +351,9 @@ public class GeocodingService(
         }
 
         await cache.Set(
-            CacheFolderName,
             cacheKey,
-            $"{string.Join(',', distances!)};{string.Join(',', durations!)}"
+            $"{string.Join(',', distances!)};{string.Join(',', durations!)}",
+            CacheFolderName
         );
         return (distances, durations);
     }
