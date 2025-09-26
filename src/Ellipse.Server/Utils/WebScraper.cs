@@ -153,7 +153,8 @@ public sealed partial class WebScraper(
                         {
                             _semaphore.Release();
                         }
-                    }
+                    },
+                    maxRetries: 20
                 )
                 .ConfigureAwait(false);
 
