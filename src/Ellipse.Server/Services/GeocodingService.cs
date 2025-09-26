@@ -301,7 +301,7 @@ public class GeocodingService(
             hash.Add(dest);
 
         string cacheKey = $"matrix_{hash.ToHashCode()}";
-        string cachedMatrix = await cache.Get(CacheFolderName, cacheKey);
+        string cachedMatrix = await cache.Get(cacheKey, CacheFolderName,);
 
         if (!string.IsNullOrEmpty(cachedMatrix))
         {
