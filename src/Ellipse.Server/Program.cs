@@ -24,7 +24,6 @@ public static class Program
             app.UseRouting();
             app.UseCors("DynamicCorsPolicy");
             app.UseOutputCache();
-            app.UseRequestTimeouts();
             app.MapControllers();
             app.Run();
         }
