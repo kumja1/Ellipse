@@ -24,7 +24,9 @@ public static class CallbackHelper
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                Console.WriteLine(
+                    $"Error: {ex.Message} - Retrying... Attempt {retries + 1} of {maxRetries}. StackTrace: {ex.StackTrace}"
+                );
             }
 
             retries++;
