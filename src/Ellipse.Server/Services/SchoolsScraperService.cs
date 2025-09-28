@@ -1,9 +1,7 @@
 using System.Collections.Concurrent;
 using AngleSharp;
 using Ellipse.Server.Utils;
-using Ellipse.Server.Utils.Clients;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Postgres;
 
 namespace Ellipse.Server.Services;
 
@@ -18,6 +16,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
 
     public async Task<string> ScrapeDivision(int divisionCode, bool overwriteCache = false)
     {
+        ArgumentNullException.ThrowIfNull(cache, nameof(cache));
         string? cachedData = await cache.GetStringAsync($"division_{divisionCode}");
         if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)
             return StringHelper.Decompress(cachedData!);
@@ -49,6 +48,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
     public void Dispose()
     {
         _tasks.Clear();
-        geoService.Dispose();
+        // geoService.Dispose();
     }
 }
