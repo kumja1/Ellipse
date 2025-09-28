@@ -4,6 +4,7 @@ using Ellipse.Server.Utils.Clients;
 using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
 using Ellipse.Server.Utils.Logging;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 using Serilog;
@@ -21,6 +22,7 @@ public static class Program
             ConfigureServices(builder);
 
             WebApplication app = builder.Build();
+            _ = app.Services.GetRequiredService<IDistributedCache>();
             app.UseRouting();
             app.UseCors("DynamicCorsPolicy");
             app.UseOutputCache();

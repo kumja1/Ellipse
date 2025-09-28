@@ -16,7 +16,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
 
     public async Task<string> ScrapeDivision(int divisionCode, bool overwriteCache = false)
     {
-        ArgumentNullException.ThrowIfNull(cache, nameof(cache));
         string? cachedData = await cache.GetStringAsync($"division_{divisionCode}");
         if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)
             return StringHelper.Decompress(cachedData!);
