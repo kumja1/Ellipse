@@ -1,3 +1,4 @@
+using Ellipse.Server.Policies;
 using Ellipse.Server.Services;
 using Ellipse.Server.Utils.Clients;
 using Ellipse.Server.Utils.Clients.Mapping;
@@ -12,17 +13,17 @@ namespace Ellipse.Server;
 
 public static class Program
 {
-    public static async Task Main(string[] args)
+    public static void Main(string[] args)
     {
         try
         {
             WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-            await ConfigureServices(builder);
+            ConfigureServices(builder);
 
             WebApplication app = builder.Build();
-
             app.UseRouting();
-            app.UseCors("DynamicCors");
+            app.UseCors("DynamicCorsPolicy");
+            app.UseOutputCache();
             app.UseRequestTimeouts();
             app.MapControllers();
             app.Run();
@@ -34,7 +35,7 @@ public static class Program
         }
     }
 
-    public static async ValueTask ConfigureServices(WebApplicationBuilder builder)
+    public static void ConfigureServices(WebApplicationBuilder builder)
     {
         builder.Host.UseSerilog(
             (_, config) => config.Enrich.With<CallerEnricher>().WriteTo.Console()
@@ -44,15 +45,20 @@ public static class Program
         builder.Services.AddCors(options =>
         {
             options.AddPolicy(
-                "DynamicCors",
+                "DynamicCorsPolicy",
                 policy =>
                     policy.SetIsOriginAllowed(origin => true).AllowAnyHeader().AllowAnyMethod()
             );
         });
 
-        builder.Services.AddRequestTimeouts(options =>
-            options.AddPolicy("ResponseTimeout", TimeSpan.FromMinutes(5))
-        );
+        builder.Services.AddOutputCache(options =>
+        {
+            options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromMinutes(60)));
+            options.AddPolicy(
+                "PostCachingPolicy",
+                builder => builder.AddPolicy<PostCachingPolicy>().SetVaryByQuery("overrideCache")
+            );
+        });
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
@@ -61,35 +67,26 @@ public static class Program
             options.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromMinutes(10))
         );
 
-        string? anonKey = Environment.GetEnvironmentVariable("SUPABASE_ANON_KEY");
-        string? supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE_PROJECT_URL");
         string? openRouteApiKey = Environment.GetEnvironmentVariable("OPENROUTE_API_KEY");
+        string? postgrestUrl = Environment.GetEnvironmentVariable(
+            "PostgresCache__ConnectionString"
+        );
+        string? postgrestSchema = Environment.GetEnvironmentVariable("PostgresCache__SchemaName");
+        string? postgrestTable = Environment.GetEnvironmentVariable("PostgresCache__TableName");
 
-        ArgumentException.ThrowIfNullOrEmpty(anonKey);
-        ArgumentException.ThrowIfNullOrEmpty(supabaseUrl);
+        ArgumentException.ThrowIfNullOrEmpty(postgrestUrl);
+        ArgumentException.ThrowIfNullOrEmpty(postgrestSchema);
+        ArgumentException.ThrowIfNullOrEmpty(postgrestTable);
         ArgumentException.ThrowIfNullOrEmpty(openRouteApiKey);
 
-        Client client = new(
-            supabaseUrl,
-            anonKey,
-            new SupabaseOptions { AutoConnectRealtime = true, AutoRefreshToken = true }
-        );
-        SupabaseCache supabaseCache = new(client);
-
-        try
+        builder.Services.AddDistributedPostgresCache(options =>
         {
-            await client.InitializeAsync();
-            await supabaseCache.InitializeAsync(
-                Environment.GetEnvironmentVariable("SUPABASE_BUCKET_NAME")
-            );
-
-            builder.Services.AddSingleton(client).AddSingleton(supabaseCache);
-        }
-        catch (Exception e)
-        {
-            Log.Error(e, "An error occured while initializing Supabase client");
-            return;
-        }
+            options.ConnectionString = postgrestUrl;
+            options.SchemaName = postgrestSchema;
+            options.TableName = postgrestTable;
+            options.CreateIfNotExists = true;
+            options.DefaultSlidingExpiration = TimeSpan.FromDays(365);
+        });
 
         builder
             .Services.AddSingleton<PhotonGeocoderClient>()
@@ -100,7 +97,7 @@ public static class Program
                 sp.GetRequiredService<HttpClient>(),
                 openRouteApiKey
             ))
-            .AddSingleton<WebScraperService>()
+            .AddSingleton<SchoolsScraperService>()
             .AddHttpClient<OsrmHttpApiClient>(
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")

@@ -7,6 +7,8 @@ using Ellipse.Common.Models.Snapping.OpenRoute;
 using Ellipse.Server.Utils.Clients;
 using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Postgres;
 using Osrm.HttpApiClient;
 using Serilog;
 
@@ -16,7 +18,7 @@ public class GeocodingService(
     CensusGeocoderClient censusGeocoder,
     OpenRouteClient openRouteClient,
     OsrmHttpApiClient osrmClient,
-    SupabaseCache cache
+    PostgresCache cache
 ) : IDisposable
 {
     private const string CacheFolderName = "geocoding";
@@ -34,7 +36,7 @@ public class GeocodingService(
             latitude
         );
 
-        string? cachedAddress = await cache.Get(cacheKey, CacheFolderName);
+        string? cachedAddress = await cache.GetStringAsync(cacheKey);
         if (!string.IsNullOrEmpty(cachedAddress))
         {
             Log.Information(
@@ -73,7 +75,7 @@ public class GeocodingService(
             return string.Empty;
         }
 
-        await cache.Set(cacheKey, address, CacheFolderName);
+        await cache.SetStringAsync(cacheKey, address);
         return address;
     }
 
@@ -210,11 +212,11 @@ public class GeocodingService(
         }
 
         string cacheKey = $"latlng_{address.ToLower().Replace(" ", "_")}";
+        string? cachedLatLng = await cache.GetStringAsync(cacheKey);
         Log.Information("[GetLatLngCached] Searching cache for address: {Address}", address);
 
         _ =
-            GeoPoint2d.TryParse(await cache.Get(cacheKey, CacheFolderName), out GeoPoint2d latLng)
-                ? latLng
+            GeoPoint2d.TryParse(cachedLatLng, out GeoPoint2d latLng) ? latLng
             : (latLng = await GetLatLngWithCensus(address)) == GeoPoint2d.Zero
                 ? latLng = await GetLatLngWithOpenRoute(address)
             : GeoPoint2d.Zero;
@@ -233,7 +235,7 @@ public class GeocodingService(
             latLng
         );
 
-        await cache.Set(cacheKey, latLng.ToString(), CacheFolderName);
+        await cache.SetStringAsync(cacheKey, latLng.ToString());
         return latLng;
     }
 
@@ -331,7 +333,7 @@ public class GeocodingService(
             hash.Add(dest);
 
         string cacheKey = $"matrix_{hash.ToHashCode()}";
-        string cachedMatrix = await cache.Get(cacheKey, CacheFolderName);
+        string? cachedMatrix = await cache.GetStringAsync(cacheKey);
 
         if (!string.IsNullOrEmpty(cachedMatrix))
         {
@@ -380,11 +382,11 @@ public class GeocodingService(
             durations = openRouteResponse.Durations[0];
         }
 
-        await cache.Set(
+        await cache.SetStringAsync(
             cacheKey,
-            $"{string.Join(',', distances!)};{string.Join(',', durations!)}",
-            CacheFolderName
+            $"{string.Join(',', distances!)};{string.Join(',', durations!)}"
         );
+
         return (distances, durations);
     }
 

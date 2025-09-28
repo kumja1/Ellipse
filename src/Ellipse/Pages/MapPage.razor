@@ -54,12 +54,10 @@
                     <MudDivider />
 
                     <!-- Actions -->
-                    <MudStack Justify="Justify.FlexStart" Row Spacing="2">
-                        <MudButton Variant="Variant.Filled"
-                            Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg">
-                            Open in LandSearch
-                        </MudButton>
-                    </MudStack>
+                    <MudButton Variant="Variant.Filled"
+                        Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg">
+                        Open in LandSearch
+                    </MudButton>
                     <MudDivider />
 
                     <!-- Route Selection -->
@@ -67,7 +65,7 @@
                         Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
                         @if (marker.Routes != null)
                         {
-                            @foreach ((string routeName, (double Distance, string Duration) _) in marker.Routes)
+                            @foreach ((string routeName, (double Distance, double Duration) _) in marker.Routes)
                             {
                                 <MudSelectItem Value="routeName">
                                     @routeName
@@ -78,17 +76,13 @@
 
                     <!-- Route Details -->
                     <MudStack Spacing="2" Class="text-gray-600">
-                        <MudText Typo="Typo.body1" Class="font-medium">
+                        <MudText Typo="Typo.body1" Class="font-normal">
                             Distance:
-                            <span class="font-normal text-blue-600">
-                                @(Math.Round(marker.Routes[_selectedRouteName].Distance)) miles
-                            </span>
+                            @(Math.Round(marker.Routes[_selectedRouteName].Distance)) miles
                         </MudText>
-                        <MudText Typo="Typo.body1" Class="font-medium">
+                        <MudText Typo="Typo.body1" Class="font-normal">
                             Duration:
-                            <span class="font-normal text-blue-600">
-                                @(marker.Routes[_selectedRouteName].Duration)
-                            </span>
+                            @(marker.Routes[_selectedRouteName].Duration)
                         </MudText>
                     </MudStack>
                 </MudStack>

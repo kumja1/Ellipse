@@ -35,10 +35,12 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
             )
             .ConfigureAwait(false);
 
-        var schools = results.Where(x => x is not null).SelectMany(x => x!);
+        List<SchoolData> schools = [.. results.Where(x => x is not null).SelectMany(x => x!)];
+        Console.WriteLine(
+            $"[GetSchools] Completed, Current Count: {schools.Count}. Removing duplicates..."
+        );
 
-        Console.WriteLine("[GetSchools] Completed.");
-        return [.. schools];
+        return [.. schools.DistinctBy(s => s.LatLng)];
     }
 
     private async Task<List<SchoolData>?> GetDivisionSchools(string divisionName, int code)
@@ -46,7 +48,6 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
         try
         {
             Console.WriteLine($"[GetDivisionSchools] Starting {divisionName}");
-
             List<SchoolData>? result = await CallbackHelper.RetryIfInvalid(
                 r => r != null && r.Count != 0,
                 async _ =>
@@ -68,13 +69,6 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
             Console.WriteLine(
                 $"[GetDivisionSchools] Completed {divisionName}. Found {result.Count} schools"
             );
-
-            foreach (var school in result)
-            {
-                Console.WriteLine(
-                    $"{divisionName} ({code}) - {school.Name} ({school.GradeSpan}) {school.LatLng} "
-                );
-            }
 
             return result;
         }

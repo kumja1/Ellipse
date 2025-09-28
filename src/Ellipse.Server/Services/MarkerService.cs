@@ -5,24 +5,26 @@ using Ellipse.Common.Models.Markers;
 using Ellipse.Common.Utils;
 using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Postgres;
 using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
 using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeocodingService geocodingService, SupabaseCache cache) : IDisposable
+public class MarkerService(GeocodingService geocodingService, PostgresCache cache) : IDisposable
 {
     private const string CacheFolderName = "markers";
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
-    private readonly SemaphoreSlim _semaphore = new(20, 20);
+    private readonly SemaphoreSlim _semaphore = new(15, 20);
 
-    public async Task<MarkerResponse?> GetMarker(MarkerRequest request)
+    public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overrideCache)
     {
         Log.Information("Called for point: {Point}", request.Point);
 
-        string? cachedData = await cache.Get(request.Point, CacheFolderName);
-        if (!string.IsNullOrEmpty(cachedData) && !request.OverrideCache)
+        string? cachedData = await cache.GetStringAsync($"marker_{request.Point}");
+        if (!string.IsNullOrEmpty(cachedData) && !overrideCache)
         {
             Log.Information("Cache hit for point: {Point}", request.Point);
             MarkerResponse deserialized = JsonSerializer.Deserialize<MarkerResponse>(
@@ -36,7 +38,7 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
         try
         {
             MarkerResponse? markerResponse = await _tasks
-                .GetOrAdd(request.Point, _ => ProcessMarkerRequest(request))
+                .GetOrAdd(request.Point, _ => GetMarkerInternal(request))
                 .ConfigureAwait(false);
 
             if (markerResponse == null)
@@ -45,10 +47,9 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
                 return null;
             }
 
-            await cache.Set(
-                request.Point,
-                StringHelper.Compress(JsonSerializer.Serialize(markerResponse)),
-                CacheFolderName
+            await cache.SetStringAsync(
+                $"marker_{request.Point}",
+                StringHelper.Compress(JsonSerializer.Serialize(markerResponse))
             );
             Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
@@ -60,7 +61,7 @@ public class MarkerService(GeocodingService geocodingService, SupabaseCache cach
         }
     }
 
-    private async Task<MarkerResponse?> ProcessMarkerRequest(MarkerRequest request)
+    private async Task<MarkerResponse?> GetMarkerInternal(MarkerRequest request)
     {
         Log.Information("Processing MarkerRequest for point: {Point}", request.Point);
         if (request.Schools.Count == 0)

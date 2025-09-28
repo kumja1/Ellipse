@@ -2,10 +2,11 @@ using System.Collections.Concurrent;
 using AngleSharp;
 using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Ellipse.Server.Services;
 
-public sealed class WebScraperService(GeocodingService geoService, SupabaseCache cache)
+public sealed class SchoolsScraperService(GeocodingService geoService, IDistributedCache cache)
     : IDisposable
 {
     private readonly ConcurrentDictionary<int, Task<string>> _tasks = new();
@@ -16,26 +17,22 @@ public sealed class WebScraperService(GeocodingService geoService, SupabaseCache
 
     private const string CacheFolderName = "scraper";
 
-    public async Task<string> StartNew(int divisionCode, bool overrideCache)
+    public async Task<string> ScrapeDivision(int divisionCode, bool forceRefresh = false)
     {
-        string cachedData = await cache.Get($"division_{divisionCode}", CacheFolderName);
-        if (!string.IsNullOrEmpty(cachedData) && !overrideCache)
+        string? cachedData = await cache.GetStringAsync($"division_{divisionCode}");
+        if (!string.IsNullOrEmpty(cachedData) && !forceRefresh)
             return StringHelper.Decompress(cachedData!);
 
         try
         {
             string result = await _tasks
-                .GetOrAdd(divisionCode, StartScraper(divisionCode))
+                .GetOrAdd(divisionCode, _ => ScrapeDivisionInternal(divisionCode))
                 .ConfigureAwait(false);
 
             if (string.IsNullOrEmpty(result))
                 return string.Empty;
 
-            await cache.Set(
-                $"division_{divisionCode}",
-                StringHelper.Compress(result),
-                CacheFolderName
-            );
+            await cache.SetStringAsync($"division_{divisionCode}", StringHelper.Compress(result));
             return result;
         }
         finally
@@ -44,9 +41,9 @@ public sealed class WebScraperService(GeocodingService geoService, SupabaseCache
         }
     }
 
-    private async Task<string> StartScraper(int divisionCode)
+    private async Task<string> ScrapeDivisionInternal(int divisionCode)
     {
-        WebScraper scraper = new(divisionCode, geoService, _browsingContext);
+        SchoolDivisionScraper scraper = new(divisionCode, geoService, _browsingContext);
         return await scraper.Scrape().ConfigureAwait(false);
     }
 

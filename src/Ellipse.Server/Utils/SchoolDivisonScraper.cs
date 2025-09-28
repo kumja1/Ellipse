@@ -10,7 +10,7 @@ using Serilog;
 
 namespace Ellipse.Server.Utils;
 
-public sealed partial class WebScraper(
+public sealed partial class SchoolDivisionScraper(
     int divisionCode,
     GeocodingService geoService,
     IBrowsingContext context
@@ -85,7 +85,7 @@ public sealed partial class WebScraper(
         Log.Information("{School} Division: {Division}", name, division);
         Log.Information("{School} Grade Span: {GradeSpan}", name, gradeSpan);
 
-        string? address = await FetchAddressAsync(schoolName).ConfigureAwait(false);
+        string? address = await FetchAddress(schoolName).ConfigureAwait(false);
         if (address == null)
         {
             Log.Warning("Address not found for school: {School}", name);
@@ -120,52 +120,40 @@ public sealed partial class WebScraper(
         };
     }
 
-    private async Task<string?> FetchAddressAsync(string schoolName)
-    {
-        try
-        {
-            string? address = await CallbackHelper
-                .RetryIfInvalid(
-                    isValid: s => !string.IsNullOrEmpty(s),
-                    func: async attempt =>
+    private async Task<string?> FetchAddress(string schoolName) =>
+        await CallbackHelper
+            .RetryIfInvalid(
+                isValid: s => !string.IsNullOrEmpty(s),
+                func: async attempt =>
+                {
+                    try
                     {
-                        try
-                        {
-                            Log.Information(
-                                "Attempt {Attempt}: Fetching address for {Name}",
-                                attempt,
-                                schoolName
-                            );
+                        Log.Information(
+                            "Attempt {Attempt}: Fetching address for {Name}",
+                            attempt,
+                            schoolName
+                        );
 
-                            await _semaphore.WaitAsync().ConfigureAwait(false);
+                        await _semaphore.WaitAsync().ConfigureAwait(false);
 
-                            string url = $"{VirginiaSchoolsUrl}/{schoolName}";
-                            Log.Information("Requesting: {Url}", url);
+                        string url = $"{VirginiaSchoolsUrl}/{schoolName}";
+                        Log.Information("Requesting: {Url}", url);
 
-                            IDocument doc = await context.OpenAsync(url).ConfigureAwait(false);
-                            IElement? el = doc.QuerySelector(
-                                "[itemtype='http://schema.org/PostalAddress']"
-                            );
+                        IDocument doc = await context.OpenAsync(url).ConfigureAwait(false);
+                        IElement? el = doc.QuerySelector(
+                            "[itemtype='http://schema.org/PostalAddress']"
+                        );
 
-                            return WebUtility.HtmlDecode(el?.TextContent ?? "").Trim();
-                        }
-                        finally
-                        {
-                            _semaphore.Release();
-                        }
-                    },
-                    maxRetries: 20
-                )
-                .ConfigureAwait(false);
-
-            return address;
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Fatal error during address fetch");
-            return string.Empty;
-        }
-    }
+                        return WebUtility.HtmlDecode(el?.TextContent ?? "").Trim();
+                    }
+                    finally
+                    {
+                        _semaphore.Release();
+                    }
+                },
+                maxRetries: 20
+            )
+            .ConfigureAwait(false);
 
     private static int ParseTotalPages(IDocument document) =>
         document

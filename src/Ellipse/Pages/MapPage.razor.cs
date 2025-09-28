@@ -1,4 +1,5 @@
 #pragma warning disable BL0005 // Component parameter should not be set outside of its component.
+using System.Text.Json;
 using Ellipse.Common.Models;
 using Ellipse.Components.MapDisplay;
 using Ellipse.Components.Menu;
@@ -8,7 +9,7 @@ using OpenLayers.Blazor;
 
 namespace Ellipse.Pages;
 
-partial class MapPage() : ComponentBase
+partial class MapPage : ComponentBase
 {
     private Menu? _menu;
     private MapDisplay? _mapDisplay;
@@ -56,6 +57,10 @@ partial class MapPage() : ComponentBase
         Marker? closestMarker = null;
         await foreach (var marker in MarkerService!.GetMarkers(box, schools))
         {
+            Console.WriteLine(
+                "[FindClosestMarker] Marker Properties: "
+                    + JsonSerializer.Serialize(marker.Properties)
+            );
             if (marker == null)
                 continue;
 

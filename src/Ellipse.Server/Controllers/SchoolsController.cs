@@ -1,14 +1,14 @@
 using Ellipse.Server.Services;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace Ellipse.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[RequestTimeout("ResponseTimeout")]
-public class SchoolsController(WebScraperService scraperService)
-    : ControllerBase
+[OutputCache]
+public class SchoolsController(SchoolsScraperService scraperService) : ControllerBase
 {
     // GET api/schools
     [HttpGet]
@@ -20,7 +20,7 @@ public class SchoolsController(WebScraperService scraperService)
         if (divisionCode <= 0)
             return BadRequest("Error: Missing or invalid required field 'divisionCode'.");
 
-        string result = await scraperService.StartNew(divisionCode, overrideCache);
+        string result = await scraperService.ScrapeDivision(divisionCode, overrideCache);
         return Content(result, "application/json");
     }
 }

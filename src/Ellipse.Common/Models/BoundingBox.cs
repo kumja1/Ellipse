@@ -17,4 +17,12 @@ public record BoundingBox
         MinLng = latLngs.Min(latLng => latLng.Lon);
         MaxLng = latLngs.Max(latLng => latLng.Lon);
     }
+
+    // Gets all points within the bounding box at the specified step size
+    public IEnumerable<GeoPoint2d> GetPoints(double step)
+    {
+        for (double lat = Math.Floor(MinLat / step) * step; lat <= MaxLat; lat += step)
+        for (double lon = Math.Floor(MinLng / step) * step; lon <= MaxLng; lon += step)
+            yield return new GeoPoint2d(lat, lon);
+    }
 }
