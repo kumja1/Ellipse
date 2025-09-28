@@ -8,8 +8,16 @@ public readonly record struct GeoPoint2d(double Lon, double Lat)
 
     public static bool TryParse(string str, out GeoPoint2d result)
     {
-        result = Parse(str);
-        return result != Zero;
+        try
+        {
+            result = Parse(str);
+            return result != Zero;
+        }
+        catch
+        {
+            result = Zero;
+            return false;
+        }
     }
 
     public static GeoPoint2d Parse(string str)
