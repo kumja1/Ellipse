@@ -55,7 +55,7 @@ public static class Program
             options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromMinutes(60)));
             options.AddPolicy(
                 "PostCachingPolicy",
-                builder => builder.AddPolicy<PostCachingPolicy>().SetVaryByQuery("overrideCache")
+                builder => builder.AddPolicy<PostCachingPolicy>().SetVaryByQuery("overwriteCache")
             );
         });
 

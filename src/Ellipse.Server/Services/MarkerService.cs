@@ -13,18 +13,17 @@ using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeocodingService geocodingService, PostgresCache cache) : IDisposable
+public class MarkerService(GeocodingService geocodingService, IDistributedCache cache) : IDisposable
 {
-    private const string CacheFolderName = "markers";
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
     private readonly SemaphoreSlim _semaphore = new(15, 20);
 
-    public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overrideCache)
+    public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overwriteCache)
     {
         Log.Information("Called for point: {Point}", request.Point);
 
         string? cachedData = await cache.GetStringAsync($"marker_{request.Point}");
-        if (!string.IsNullOrEmpty(cachedData) && !overrideCache)
+        if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)
         {
             Log.Information("Cache hit for point: {Point}", request.Point);
             MarkerResponse deserialized = JsonSerializer.Deserialize<MarkerResponse>(

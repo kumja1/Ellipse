@@ -3,6 +3,7 @@ using AngleSharp;
 using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Postgres;
 
 namespace Ellipse.Server.Services;
 
@@ -15,12 +16,10 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         Configuration.Default.WithDefaultLoader().WithXPath()
     );
 
-    private const string CacheFolderName = "scraper";
-
-    public async Task<string> ScrapeDivision(int divisionCode, bool forceRefresh = false)
+    public async Task<string> ScrapeDivision(int divisionCode, bool overwriteCache = false)
     {
         string? cachedData = await cache.GetStringAsync($"division_{divisionCode}");
-        if (!string.IsNullOrEmpty(cachedData) && !forceRefresh)
+        if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)
             return StringHelper.Decompress(cachedData!);
 
         try

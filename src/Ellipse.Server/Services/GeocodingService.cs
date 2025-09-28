@@ -4,7 +4,6 @@ using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 using Ellipse.Common.Models.Geocoding.OpenRoute;
 using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Common.Models.Snapping.OpenRoute;
-using Ellipse.Server.Utils.Clients;
 using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
 using Microsoft.Extensions.Caching.Distributed;
@@ -18,11 +17,9 @@ public class GeocodingService(
     CensusGeocoderClient censusGeocoder,
     OpenRouteClient openRouteClient,
     OsrmHttpApiClient osrmClient,
-    PostgresCache cache
+    IDistributedCache cache
 ) : IDisposable
 {
-    private const string CacheFolderName = "geocoding";
-
     public async Task<string> GetAddressCached(
         double longitude,
         double latitude,

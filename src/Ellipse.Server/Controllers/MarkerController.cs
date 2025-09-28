@@ -15,10 +15,10 @@ public class MarkerController(MarkerService markerService) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> PostMarker(
         [FromBody] MarkerRequest request,
-        [FromQuery] bool overrideCache = false
+        [FromQuery] bool overwriteCache = false
     )
     {
-        MarkerResponse? response = await markerService.GetMarker(request, overrideCache);
+        MarkerResponse? response = await markerService.GetMarker(request, overwriteCache);
         if (response == null)
             return NotFound();
         return Ok(response);
