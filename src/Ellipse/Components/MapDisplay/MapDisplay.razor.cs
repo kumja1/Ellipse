@@ -12,9 +12,16 @@ public partial class MapDisplay
 
     public async ValueTask AddOrUpdateMarker(Marker marker)
     {
-        if (Map.MarkersList.Contains(marker))
-            await Map.UpdateShape(marker);
-        else
-            Map.MarkersList.Add(marker);
+        try
+        {
+            if (Map.MarkersList.Contains(marker))
+                await Map.UpdateShape(marker);
+            else if (marker != null)
+                Map.MarkersList.Add(marker);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
     }
 }

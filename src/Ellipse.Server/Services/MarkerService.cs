@@ -4,9 +4,7 @@ using Ellipse.Common.Models;
 using Ellipse.Common.Models.Markers;
 using Ellipse.Common.Utils;
 using Ellipse.Server.Utils;
-using Ellipse.Server.Utils.Clients;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Postgres;
 using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
 using Route = Ellipse.Common.Models.Directions.Route;
@@ -84,12 +82,12 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         }
 
         List<double> distances = [.. routes.Values.Select(r => r.Distance)];
-        List<double> durations = [.. routes.Values.Select(r => r.Duration)];
+        List<double> durations = [.. routes.Values.Select(r => r.Duration.TotalSeconds)];
 
         double avgDistance = Trimean(distances);
         double avgDuration = Trimean(durations);
 
-        routes["Average"] = new Route { Distance = avgDistance, Duration = avgDuration };
+        routes["Average"] = new Route { Distance = avgDistance, Duration = TimeSpan.FromSeconds(avgDuration) };
         Log.Information(
             "Calculated average route: Distance={Distance}, Duration={Duration}",
             avgDistance,
@@ -140,7 +138,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                         if (
                             !results.TryAdd(
                                 school.Name,
-                                new Route { Distance = distance / 1609, Duration = duration }
+                                new Route { Distance = distance / 1609, Duration = TimeSpan.FromSeconds(duration) }
                             )
                         )
                         {

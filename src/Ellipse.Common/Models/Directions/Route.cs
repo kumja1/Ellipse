@@ -1,3 +1,3 @@
 namespace Ellipse.Common.Models.Directions;
 
-public record struct Route(double Duration, double Distance);
+public record struct Route(TimeSpan Duration, double Distance);

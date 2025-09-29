@@ -25,10 +25,13 @@ partial class MapPage : ComponentBase
 
     private string _selectedRouteName = "Average";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await base.OnInitializedAsync();
-        await GetMarkers();
+        if (firstRender)
+        {
+            Console.WriteLine($"[OnAfterRenderAsync] First render, loading markers...");
+            await GetMarkers();
+        }
     }
 
     private async Task GetMarkers()
@@ -61,6 +64,7 @@ partial class MapPage : ComponentBase
                 "[FindClosestMarker] Marker Properties: "
                     + JsonSerializer.Serialize(marker.Properties)
             );
+
             if (marker == null)
                 continue;
 
@@ -79,7 +83,7 @@ partial class MapPage : ComponentBase
                 closestMarker = marker;
             }
 
-            _menu!.AddMarker(marker);
+            _menu?.AddMarker(marker);
             await _mapDisplay!.AddOrUpdateMarker(marker);
         }
 

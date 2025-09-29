@@ -15,7 +15,7 @@ public partial class Menu : ComponentBase
     [Parameter]
     public RenderFragment<(
         Marker Marker,
-        Dictionary<string, (double Distance, double Duration)> Routes
+        Dictionary<string, (double Distance, TimeSpan Duration)> Routes
     )> ItemView { get; set; }
 
     [Parameter]
@@ -32,9 +32,9 @@ public partial class Menu : ComponentBase
 
     public Marker? SelectedMarker { get; private set; }
 
-    public Dictionary<string, (double Distance, double Duration)> SelectedMarkerRoutes =>
+    public Dictionary<string, (double Distance, TimeSpan Duration)> SelectedMarkerRoutes =>
         SelectedMarker != null && SelectedMarker.Properties.TryGetValue("Routes", out var routes)
-            ? routes as Dictionary<string, (double Distance, double Duration)>
+            ? routes as Dictionary<string, (double Distance, TimeSpan Duration)>
             : [];
 
     private readonly List<Marker> _markers = [];
