@@ -324,12 +324,7 @@ public class GeocodingService(
             destinations.Length
         );
 
-        HashCode hash = new();
-        hash.Add(source);
-        foreach (var dest in destinations)
-            hash.Add(dest);
-
-        string cacheKey = $"matrix_{hash.ToHashCode()}";
+        string cacheKey = $"matrix_{source}";
         string? cachedMatrix = await cache.GetStringAsync(cacheKey);
 
         if (!string.IsNullOrEmpty(cachedMatrix))

@@ -18,7 +18,6 @@ public sealed class PostCachingPolicy : IOutputCachePolicy
 
         // Vary by any query by default
         context.CacheVaryByRules.QueryKeys = "*";
-
         return ValueTask.CompletedTask;
     }
 
@@ -64,10 +63,15 @@ public sealed class PostCachingPolicy : IOutputCachePolicy
         if (!HttpMethods.IsHead(request.Method) && !HttpMethods.IsPost(request.Method))
             return false;
 
-        // Verify existence of authorization headers
         if (
             !StringValues.IsNullOrEmpty(request.Headers.Authorization)
             || request.HttpContext.User?.Identity?.IsAuthenticated == true
+        )
+            return false;
+
+        if (
+            request.Query.TryGetValue("overwriteCache", out StringValues overwriteCacheValues)
+            && overwriteCacheValues.Contains("true", StringComparer.OrdinalIgnoreCase)
         )
             return false;
 

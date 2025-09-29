@@ -1,3 +1,4 @@
+using System.Buffers;
 using Ellipse.Server.Policies;
 using Ellipse.Server.Services;
 using Ellipse.Server.Utils.Clients;
@@ -22,7 +23,6 @@ public static class Program
             ConfigureServices(builder);
 
             WebApplication app = builder.Build();
-            _ = app.Services.GetRequiredService<IDistributedCache>();
             app.UseRouting();
             app.UseCors("DynamicCorsPolicy");
             app.UseOutputCache();
@@ -57,7 +57,22 @@ public static class Program
             options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromMinutes(60)));
             options.AddPolicy(
                 "PostCachingPolicy",
-                builder => builder.AddPolicy<PostCachingPolicy>().SetVaryByQuery("overwriteCache")
+                builder =>
+                    builder
+                        .AddPolicy<PostCachingPolicy>()
+                        .VaryByValue(
+                            async (context, token) =>
+                            {
+                                using StreamReader reader = new(context.Request.Body);
+                                if (reader.BaseStream.Length == 0)
+                                    return KeyValuePair.Create("body", string.Empty);
+
+                                return KeyValuePair.Create(
+                                    "body",
+                                    await reader.ReadToEndAsync(token)
+                                );
+                            }
+                        )
             );
         });
 

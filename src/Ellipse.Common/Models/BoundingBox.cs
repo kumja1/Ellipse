@@ -23,6 +23,6 @@ public record BoundingBox
     {
         for (double lat = Math.Floor(MinLat / step) * step; lat <= MaxLat; lat += step)
         for (double lon = Math.Floor(MinLng / step) * step; lon <= MaxLng; lon += step)
-            yield return new GeoPoint2d(lat, lon);
+            yield return new GeoPoint2d(lon, lat);
     }
 }

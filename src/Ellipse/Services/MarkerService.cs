@@ -38,6 +38,7 @@ public class MarkerService(HttpClient httpClient)
                     );
                     continue;
                 }
+
                 if (response.Routes == null)
                 {
                     Console.WriteLine(
@@ -46,11 +47,7 @@ public class MarkerService(HttpClient httpClient)
                     continue;
                 }
 
-                yield return new Marker(
-                    MarkerType.MarkerPin,
-                    new Coordinate(point.Lon, point.Lat),
-                    response.Address
-                )
+                yield return new Marker(MarkerType.MarkerPin, new Coordinate(point.Lon, point.Lat))
                 {
                     Properties =
                     {
@@ -58,7 +55,6 @@ public class MarkerService(HttpClient httpClient)
                         ["Routes"] = response.Routes,
                         ["TotalDistance"] = response.TotalDistance,
                     },
-                    TextScale = 0.5,
                 };
             }
         }
