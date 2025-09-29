@@ -23,8 +23,8 @@ public static class Program
             ConfigureServices(builder);
 
             WebApplication app = builder.Build();
-            app.UseRouting();
             app.UseCors("DynamicCorsPolicy");
+            app.UseRouting();
             app.UseOutputCache();
             app.MapControllers();
             app.Run();
