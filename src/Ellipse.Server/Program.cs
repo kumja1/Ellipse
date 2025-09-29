@@ -63,13 +63,17 @@ public static class Program
                         .VaryByValue(
                             async (context, token) =>
                             {
-                                using StreamReader reader = new(context.Request.Body);
-                                if (reader.BaseStream.Length == 0)
-                                    return KeyValuePair.Create("body", string.Empty);
+                                if (context.Request.ContentLength == 0)
+                                    return KeyValuePair.Create("bodyHash", "no-body");
 
+                                context.Request.EnableBuffering();
+                                using StreamReader reader = new(context.Request.Body);
+
+                                var body = await reader.ReadToEndAsync(token);
+                                context.Request.Body.Position = 0;
                                 return KeyValuePair.Create(
-                                    "body",
-                                    await reader.ReadToEndAsync(token)
+                                    "bodyHash",
+                                    HashCode.Combine(body).ToString()
                                 );
                             }
                         )
