@@ -60,7 +60,7 @@ public sealed class PostCachingPolicy : IOutputCachePolicy
         var request = context.HttpContext.Request;
 
         // Verify the method
-        if (!HttpMethods.IsHead(request.Method) && !HttpMethods.IsPost(request.Method))
+        if (!HttpMethods.IsPost(request.Method))
             return false;
 
         if (
