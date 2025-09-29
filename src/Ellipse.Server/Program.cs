@@ -67,7 +67,12 @@ public static class Program
                                     return KeyValuePair.Create("bodyHash", "no-body");
 
                                 context.Request.EnableBuffering();
-                                using StreamReader reader = new(context.Request.Body);
+                                StreamReader reader = new(
+                                    context.Request.Body,
+                                    leaveOpen: true,
+                                    bufferSize: 1024,
+                                    detectEncodingFromByteOrderMarks: true
+                                );
 
                                 var body = await reader.ReadToEndAsync(token);
                                 context.Request.Body.Position = 0;
