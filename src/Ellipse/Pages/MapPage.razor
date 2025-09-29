@@ -12,9 +12,9 @@
     </div>
 
     <div class="relative z-10">
-        <Menu @ref="_menu" Open="true" IsList="true">
-            <ListView Context="markers">
-                <MudList T="Marker">
+        <Menu @ref="_menu" Open="true" IsList="true" Class="absolute">
+            <ListView Context="markers" >
+                <MudList T="Marker" Class="relative">
                     @foreach (var item in markers)
                     {
                         <MudListItem>
@@ -65,7 +65,7 @@
                         Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
                         @if (marker.Routes != null)
                         {
-                            @foreach ((string routeName, (double Distance, double Duration) _) in marker.Routes)
+                            @foreach ((string routeName, (double Distance, TimeSpan Duration) _) in marker.Routes)
                             {
                                 <MudSelectItem Value="routeName">
                                     @routeName
