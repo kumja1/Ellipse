@@ -21,12 +21,22 @@
     </MudDrawerHeader>
 
     <!-- Drawer Content -->
-    @if (IsList)
+    @if (IsList && _markers.Count > 0)
     {
-        @ListView(_markers)
+          <MudList T="Marker" Class="relative">
+                    @foreach (var item in _markers)
+                    {
+                        <MudListItem>
+                        @ListItem((item, item.Properties["Routes"]))
+                        </MudListItem>
+                        }
+                    </MudList>
     }
-    else
+    else if (SelectedMarker != null)
     {
-        @ItemView((SelectedMarker, SelectedMarkerRoutes))
+        @SingleItem((SelectedMarker, SelectedMarkerRoutes))
+    }
+    else {
+        <MudProgressCircular Color="Color.Info" Rounded="true" Size="Size.Large" StrokeWidth="4" Intermediate="true" />
     }
 </MudDrawer>

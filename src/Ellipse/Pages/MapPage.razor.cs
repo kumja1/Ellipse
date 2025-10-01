@@ -5,6 +5,7 @@ using Ellipse.Components.MapDisplay;
 using Ellipse.Components.Menu;
 using Ellipse.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using OpenLayers.Blazor;
 
 namespace Ellipse.Pages;
@@ -21,7 +22,7 @@ partial class MapPage : ComponentBase
     private SchoolDivisionService? SchoolDivisionService { get; set; }
 
     [Inject]
-    private NavigationManager? NavigationManager { get; set; }
+    private ILogger<MapPage> Logger { get; set; } = default!;
 
     private string _selectedRouteName = "Average";
 
@@ -29,65 +30,82 @@ partial class MapPage : ComponentBase
     {
         if (firstRender)
         {
-            Console.WriteLine($"[OnAfterRenderAsync] First render, loading markers...");
+            Logger.LogInformation("First render, loading markers...");
             await GetMarkers();
         }
     }
 
     private async Task GetMarkers()
     {
-        List<SchoolData> schools = await SchoolDivisionService!
-            .GetAllSchools()
-            .ConfigureAwait(false);
+        List<SchoolData> schools = await SchoolDivisionService!.GetAllSchools();
 
         BoundingBox box = new(schools.Select(s => s.LatLng));
-        double closestMarkerDistance = await FindClosestMarker(box, schools);
+        double? closestMarkerDistance = await FindClosestMarker(box, schools);
 
-        foreach (Marker marker in _mapDisplay!.Map.MarkersList.Cast<Marker>()) // Do a second pass to color nearby markers
+        if (_mapDisplay?.Map?.MarkersList.Count == 0 || closestMarkerDistance is null)
+            return;
+
+        // Do a second pass to higlight alternative markers
+        foreach (var marker in _mapDisplay!.Map.MarkersList.Cast<Marker>())
         {
             double distance = marker.Properties["TotalDistance"];
-            bool isNear = Math.Abs(distance - closestMarkerDistance) <= 100;
+            bool isNear = Math.Abs(distance - closestMarkerDistance.Value) <= 100;
             if (!isNear)
                 continue;
 
             marker.PinColor = PinColor.Blue;
-            await _mapDisplay!.AddOrUpdateMarker(marker);
+            await _mapDisplay.AddOrUpdateMarker(marker);
         }
     }
 
-    private async Task<double> FindClosestMarker(BoundingBox box, List<SchoolData> schools)
+    private async Task<double?> FindClosestMarker(BoundingBox box, List<SchoolData> schools)
     {
         Marker? closestMarker = null;
-        await foreach (var marker in MarkerService!.GetMarkers(box, schools))
-        {
-            Console.WriteLine(
-                "[FindClosestMarker] Marker Properties: "
-                    + JsonSerializer.Serialize(marker.Properties)
-            );
+        double? closestDistance = null;
 
-            if (marker == null)
+        await foreach (var markers in MarkerService!.GetMarkers(box, schools))
+        {
+            if (markers == null)
                 continue;
 
-            closestMarker ??= marker;
-            double closestDistance = closestMarker.Properties["TotalDistance"];
-            double newDistance = marker.Properties["TotalDistance"];
-
-            if (newDistance >= closestDistance)
-                marker.PinColor = PinColor.Red;
-            else
+            for (int i = 0; i < markers.Count; i++)
             {
-                closestMarker.PinColor = PinColor.Red;
-                await _mapDisplay!.AddOrUpdateMarker(closestMarker); // Update previous closest marker
+                Marker marker = markers[i];
 
-                marker.PinColor = PinColor.Green;
-                closestMarker = marker;
+                closestMarker ??= marker;
+                closestDistance ??= closestMarker.Properties["TotalDistance"];
+                double newDistance = marker.Properties["TotalDistance"];
+
+                if (newDistance >= closestDistance)
+                {
+                    Logger.LogInformation(
+                        "Marker {MarkerText} is farther than closest marker {ClosestMarkerText}. Marker Distance: {NewDistance}, Closest Distance: {ClosestDistance}.",
+                        marker.Text, closestMarker.Text, newDistance, closestDistance);
+
+                    marker.PinColor = PinColor.Red;
+                }
+                else
+                {
+                    Logger.LogInformation(
+                        "Marker {MarkerText} is closer than previous closest marker {ClosestMarkerText}. Marker Distance: {NewDistance}, Previous Closest: {ClosestDistance}.",
+                        marker.Text, closestMarker.Text, newDistance, closestDistance);
+
+                    // Update previous closest marker
+                    closestMarker.PinColor = PinColor.Red;
+                    await _mapDisplay.AddOrUpdateMarker(closestMarker);
+
+                    marker.PinColor = PinColor.Green;
+                    closestMarker = marker;
+                    closestDistance = newDistance;
+                }
+
+                await _mapDisplay.AddOrUpdateMarker(marker);
             }
 
-            _menu?.AddMarker(marker);
-            await _mapDisplay!.AddOrUpdateMarker(marker);
+
         }
 
-        return closestMarker?.Properties["TotalDistance"];
+        return closestDistance;
     }
 
     public void SelectMarker(Marker marker) => _menu!.SelectMarker(marker);

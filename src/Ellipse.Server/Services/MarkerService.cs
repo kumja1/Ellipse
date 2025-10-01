@@ -14,7 +14,7 @@ namespace Ellipse.Server.Services;
 public class MarkerService(GeocodingService geocodingService, IDistributedCache cache) : IDisposable
 {
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
-    private readonly SemaphoreSlim _semaphore = new(15, 20);
+    private readonly SemaphoreSlim _semaphore = new(20, 20);
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overwriteCache)
     {
@@ -82,10 +82,8 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         }
 
         List<double> distances = [.. routes.Values.Select(r => r.Distance)];
-        List<double> durations = [.. routes.Values.Select(r => r.Duration.TotalSeconds)];
-
         double avgDistance = Trimean(distances);
-        double avgDuration = Trimean(durations);
+        double avgDuration = Trimean([.. routes.Values.Select(r => r.Duration.TotalSeconds)]);
 
         routes["Average"] = new Route { Distance = avgDistance, Duration = TimeSpan.FromSeconds(avgDuration) };
         Log.Information(
@@ -103,73 +101,73 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     )
     {
         Log.Information("Called for source: {Source} with {Count} schools", source, schools.Count);
-        Dictionary<string, Route> results = [];
-
-        await GetMatrixRoute(source, schools, results);
-        Log.Information("All tasks completed.");
-        return results.ToDictionary();
+        return await GetMatrixRoute(source, schools);
     }
 
-    private async Task<bool> GetMatrixRoute(
+    private async Task<Dictionary<string, Route>> GetMatrixRoute(
         GeoPoint2d source,
-        List<SchoolData> schools,
-        Dictionary<string, Route> results
-    ) =>
-        _ = await CallbackHelper.RetryIfInvalid(
-            null,
-            async (attempt) =>
-            {
-                Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
-                await _semaphore.WaitAsync();
-                try
-                {
-                    (double[] distances, double[] durations) =
-                        await geocodingService.GetMatrixCached(
-                            source,
-                            [.. schools.Select(s => s.LatLng)]
-                        );
+        List<SchoolData> schools
+    )
+    {
+        Dictionary<string, Route> results = new(schools.Count);
+        await CallbackHelper.RetryIfInvalid(
+             null,
+             async (attempt) =>
+             {
+                 Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
+                 await _semaphore.WaitAsync();
+                 try
+                 {
+                     (double[] distances, double[] durations) =
+                         await geocodingService.GetMatrixCached(
+                             source,
+                             [.. schools.Select(s => s.LatLng)]
+                         );
 
-                    for (int i = 0; i < schools.Count; i++)
-                    {
-                        SchoolData school = schools[i];
-                        double distance = distances![i];
-                        double duration = durations![i];
+                     for (int i = 0; i < schools.Count; i++)
+                     {
+                         SchoolData school = schools[i];
+                         double distance = distances![i];
+                         double duration = durations![i];
 
-                        if (
-                            !results.TryAdd(
-                                school.Name,
-                                new Route { Distance = distance / 1609, Duration = TimeSpan.FromSeconds(duration) }
-                            )
-                        )
-                        {
-                            Log.Information(
-                                "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
-                                school.Name,
-                                distance,
-                                duration
-                            );
-                            continue;
-                        }
+                         if (
+                             !results.TryAdd(
+                                 school.Name,
+                                 new Route { Distance = distance, Duration = TimeSpan.FromSeconds(duration) }
+                             )
+                         )
+                         {
+                             Log.Information(
+                                 "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
+                                 school.Name,
+                                 distance,
+                                 duration
+                             );
+                             continue;
+                         }
 
-                        Log.Information(
-                            "School: {School} => Distance: {Distance}, Duration: {Duration}",
-                            school.Name,
-                            distance,
-                            duration
-                        );
-                    }
+                         Log.Information(
+                             "School: {School} => Distance: {Distance}, Duration: {Duration}",
+                             school.Name,
+                             distance,
+                             duration
+                         );
+                     }
 
-                    return true;
-                }
-                finally
-                {
-                    _semaphore.Release();
-                }
-            },
-            maxRetries: 20,
-            delayMs: 500
-        );
+                     return true;
+                 }
+                 finally
+                 {
+                     _semaphore.Release();
+                 }
+             },
+             maxRetries: 20,
+             delayMs: 500
+         );
 
+        Log.Information("Matrix routes obtained.");
+        return results;
+    }
     private static double Trimean(List<double> data)
     {
         Log.Information("Calculating trimean for {Count} data points.", data.Count);

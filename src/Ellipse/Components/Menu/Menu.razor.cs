@@ -15,11 +15,12 @@ public partial class Menu : ComponentBase
     [Parameter]
     public RenderFragment<(
         Marker Marker,
-        Dictionary<string, (double Distance, TimeSpan Duration)> Routes
-    )> ItemView { get; set; }
+        Dictionary<string, (double Distance, TimeSpan Duration)>? Routes
+    )> SingleItem
+    { get; set; }
 
     [Parameter]
-    public RenderFragment<List<Marker>> ListView { get; set; }
+    public RenderFragment<(Marker Marker, Dictionary<string, (double Distance, TimeSpan Duration)> Routes)> ListItem { get; set; }
 
     [Parameter]
     public string Class { get; set; }
@@ -30,14 +31,12 @@ public partial class Menu : ComponentBase
             .AddClass(Class, !string.IsNullOrWhiteSpace(Class))
             .Build();
 
-    public Marker? SelectedMarker { get; private set; }
-
-    public Dictionary<string, (double Distance, TimeSpan Duration)> SelectedMarkerRoutes =>
-        SelectedMarker != null && SelectedMarker.Properties.TryGetValue("Routes", out var routes)
-            ? routes as Dictionary<string, (double Distance, TimeSpan Duration)>
-            : [];
-
     private readonly List<Marker> _markers = [];
+
+    public Marker? SelectedMarker;
+
+    public Dictionary<string, (double Distance, TimeSpan Duration)>? SelectedMarkerRoutes;
+
 
     public void ToggleMenuOpen() => Open = !Open;
 
@@ -48,6 +47,12 @@ public partial class Menu : ComponentBase
     public void SelectMarker(Marker marker)
     {
         SelectedMarker = marker;
+        foreach (var kvp in marker.Properties)
+        {
+            Console.WriteLine($"Marker Property {kvp.Key}: {kvp.Value}");
+        }
+        Console.WriteLine($"Marker Has Routes: {marker.Properties.ContainsKey("Routes")}");
+        SelectedMarkerRoutes = marker.Properties["Routes"];
         IsList = false;
         StateHasChanged();
     }

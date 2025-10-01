@@ -32,8 +32,7 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
 
         List<SchoolData>?[] results = await Task.WhenAll(
                 _divisionCodes.Select(kvp => GetDivisionSchools(kvp.Key, kvp.Value))
-            )
-            .ConfigureAwait(false);
+            );
 
         List<SchoolData> schools = [.. results.Where(x => x is not null).SelectMany(x => x!)];
         Console.WriteLine(

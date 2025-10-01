@@ -10,7 +10,7 @@ public class MarkerService(HttpClient httpClient)
 {
     private const double StepSize = 0.1; // ~11km
 
-    public async IAsyncEnumerable<Marker> GetMarkers(BoundingBox box, List<SchoolData> schools)
+    public async IAsyncEnumerable<List<Marker>> GetMarkers(BoundingBox box, List<SchoolData> schools)
     {
         if (schools.Count == 0)
             yield break;
@@ -20,43 +20,23 @@ public class MarkerService(HttpClient httpClient)
         );
 
         Console.WriteLine($"[GetMarkers] Total schools: {schools.Count}");
-        foreach (GeoPoint2d[] chunk in box.GetPoints(StepSize).Chunk(15))
+        foreach (GeoPoint2d[] chunk in box.GetPoints(StepSize).Chunk(20))
         {
             IEnumerable<Task<MarkerResponse?>> tasks = chunk.Select(point =>
                 GetMarker(point.Lon, point.Lat, schools)
             );
 
-            MarkerResponse?[] responses = await Task.WhenAll(tasks).ConfigureAwait(false);
-            for (int i = 0; i < chunk.Length; i++)
+            MarkerResponse?[] responses = await Task.WhenAll(tasks);
+            yield return responses.Where(response => response != null).Select((response, i) => new Marker(MarkerType.MarkerPin, new Coordinate(chunk[i].Lon, chunk[i].Lat), response.Address)
             {
-                GeoPoint2d point = chunk[i];
-                MarkerResponse? response = responses[i];
-                if (response == null)
-                {
-                    Console.WriteLine(
-                        $"[GetMarkers] No response for marker at ({point.Lon},{point.Lat})"
-                    );
-                    continue;
-                }
-
-                if (response.Routes == null)
-                {
-                    Console.WriteLine(
-                        $"[GetMarkers] Marker at ({point.Lon},{point.Lat}) has null Routes!"
-                    );
-                    continue;
-                }
-
-                yield return new Marker(MarkerType.MarkerPin, new Coordinate(point.Lon, point.Lat))
-                {
-                    Properties =
+                Properties =
                     {
                         ["Name"] = response.Address,
                         ["Routes"] = response.Routes,
                         ["TotalDistance"] = response.TotalDistance,
                     },
-                };
-            }
+                TextScale = 0,
+            }).ToList();
         }
         Console.WriteLine("[GetMarkers] Completed marker generation");
     }
@@ -70,12 +50,11 @@ public class MarkerService(HttpClient httpClient)
                 async _ =>
                     await httpClient
                         .PostAsJsonAsync("marker", new MarkerRequest(schools, new GeoPoint2d(x, y)))
-                        .ConfigureAwait(false)
+            
             );
 
             MarkerResponse? markerResponse = await response!
-                .Content.ReadFromJsonAsync<MarkerResponse>()
-                .ConfigureAwait(false);
+                .Content.ReadFromJsonAsync<MarkerResponse>();
 
             return markerResponse!;
         }

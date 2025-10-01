@@ -14,7 +14,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         Configuration.Default.WithDefaultLoader().WithXPath()
     );
 
-    public async Task<string> ScrapeDivision(int divisionCode, bool overwriteCache = false)
+    public async ValueTask<string> ScrapeDivision(int divisionCode, bool overwriteCache = false)
     {
         string? cachedData = await cache.GetStringAsync($"division_{divisionCode}");
         if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)

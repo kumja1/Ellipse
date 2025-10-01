@@ -13,39 +13,33 @@
 
     <div class="relative z-10">
         <Menu @ref="_menu" Open="true" IsList="true" Class="absolute">
-            <ListView Context="markers" >
-                <MudList T="Marker" Class="relative">
-                    @foreach (var item in markers)
-                    {
-                        <MudListItem>
+            <ListItem Context="marker" >
                             <MudCard>
                                 <MudCardHeader>
                                     <CardHeaderActions>
                                         <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
-                                            OnClick="@(() => SelectMarker(item))" />
+                                            OnClick="@(() => SelectMarker(marker.Marker))" />
                                     </CardHeaderActions>
                                     <CardHeaderContent>
                                         <MudText Typo="Typo.h6" Color="Color.Dark" Align="Align.Start">
-                                            @item.Text
+                                            @marker.Marker.Text
                                         </MudText>
                                     </CardHeaderContent>
                                 </MudCardHeader>
                                 <MudCardContent>
                                     <div class="text-grey-400">
                                         <MudText>
-                                            Distance: @item.Properties["Routes"]["Average"].Distance
+                                            Distance: @(Math.Round(marker.Routes["Average"].Distance / 1609, 1)) miles
                                         </MudText>
                                         <MudText>
-                                            Duration: @item.Properties["Routes"]["Average"].Duration
+                                            Duration: @marker.Routes["Average"].Duration.ToReadableString()
                                         </MudText>
                                     </div>
                                 </MudCardContent>
                             </MudCard>
-                        </MudListItem>
                     }
-                </MudList>
-            </ListView>
-            <ItemView Context="marker">
+            </ListItem>
+            <SingleItem Context="marker">
                 <MudStack Class="p-6 space-y-4">
                     <!-- Marker Details -->
                     <MudText Typo="Typo.h6" Class="font-semibold text-blue-700 text-xl">
@@ -86,7 +80,7 @@
                         </MudText>
                     </MudStack>
                 </MudStack>
-            </ItemView>
+            </SingleItem>
         </Menu>
 
         <MudFab Size="Size.Medium" StartIcon="@Icons.Material.Filled.Menu" OnClick="@(() => _menu?.ToggleMenuOpen())"

@@ -7,7 +7,6 @@ using Ellipse.Common.Models.Snapping.OpenRoute;
 using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Postgres;
 using Osrm.HttpApiClient;
 using Serilog;
 
@@ -476,7 +475,7 @@ public class GeocodingService(
             [
                 [longitude, latitude],
             ],
-            Radius = 350,
+            Radius = 450,
         };
 
         OpenRouteSnappingResponse? response = await openRouteClient.SnapToRoads(
