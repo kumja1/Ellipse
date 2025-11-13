@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
 
-namespace Ellipse.Components.MapDisplay;
+namespace Ellipse.Components.Shared.MapDisplay;
 
 public partial class MapDisplay
 {

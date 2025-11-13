@@ -1,8 +1,9 @@
 @page "/map"
-@using Ellipse.Components.Menu
-@using Ellipse.Components.MapDisplay
+@using Ellipse.Components.Shared.Menu
+@using Ellipse.Components.Shared.MapDisplay
+@rendermode InteractiveWebAssembly
 
-@namespace Ellipse.Pages
+@namespace Ellipse.Components.Pages
 
 <PageTitle>Map</PageTitle>
 
@@ -13,31 +14,31 @@
 
     <div class="relative z-10">
         <Menu @ref="_menu" Open="true" IsList="true" Class="absolute">
-            <ListItem Context="marker" >
-                            <MudCard>
-                                <MudCardHeader>
-                                    <CardHeaderActions>
-                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
-                                            OnClick="@(() => SelectMarker(marker.Marker))" />
-                                    </CardHeaderActions>
-                                    <CardHeaderContent>
-                                        <MudText Typo="Typo.h6" Color="Color.Dark" Align="Align.Start">
-                                            @marker.Marker.Text
-                                        </MudText>
-                                    </CardHeaderContent>
-                                </MudCardHeader>
-                                <MudCardContent>
-                                    <div class="text-grey-400">
-                                        <MudText>
-                                            Distance: @(Math.Round(marker.Routes["Average"].Distance / 1609, 1)) miles
-                                        </MudText>
-                                        <MudText>
-                                            Duration: @marker.Routes["Average"].Duration.ToReadableString()
-                                        </MudText>
-                                    </div>
-                                </MudCardContent>
-                            </MudCard>
-                    }
+            <ListItem Context="marker">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderActions>
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
+                                OnClick="@(() => SelectMarker(marker.Marker))" />
+                        </CardHeaderActions>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6" Color="Color.Dark" Align="Align.Start">
+                                @marker.Marker.Text
+                            </MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <div class="text-grey-400">
+                            <MudText>
+                                Distance: @(Math.Round(marker.Routes["Average"].Distance / 1609, 1)) miles
+                            </MudText>
+                            <MudText>
+                                Duration: @marker.Routes["Average"].Duration.ToReadableString()
+                            </MudText>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+                }
             </ListItem>
             <SingleItem Context="marker">
                 <MudStack Class="p-6 space-y-4">

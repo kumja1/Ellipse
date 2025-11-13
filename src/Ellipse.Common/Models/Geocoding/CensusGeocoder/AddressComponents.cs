@@ -5,38 +5,38 @@ namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 public class AddressComponents
 {
     [JsonPropertyName("zip")]
-    public string Zip { get; set; }
+    public required string Zip { get; set; }
 
     [JsonPropertyName("streetName")]
-    public string StreetName { get; set; }
+    public required string StreetName { get; set; }
 
     [JsonPropertyName("preType")]
-    public string PreType { get; set; }
+    public required string PreType { get; set; }
 
     [JsonPropertyName("city")]
-    public string City { get; set; }
+    public required string City { get; set; }
 
     [JsonPropertyName("preDirection")]
-    public string PreDirection { get; set; }
+    public required string PreDirection { get; set; }
 
     [JsonPropertyName("suffixDirection")]
-    public string SuffixDirection { get; set; }
+    public required string SuffixDirection { get; set; }
 
     [JsonPropertyName("fromAddress")]
-    public string FromAddress { get; set; }
+    public required string FromAddress { get; set; }
 
     [JsonPropertyName("state")]
-    public string State { get; set; }
+    public required string State { get; set; }
 
     [JsonPropertyName("suffixType")]
-    public string SuffixType { get; set; }
+    public required string SuffixType { get; set; }
 
     [JsonPropertyName("toAddress")]
-    public string ToAddress { get; set; }
+    public required string ToAddress { get; set; }
 
     [JsonPropertyName("suffixQualifier")]
-    public string SuffixQualifier { get; set; }
+    public required string SuffixQualifier { get; set; }
 
     [JsonPropertyName("preQualifier")]
-    public string PreQualifier { get; set; }
+    public required string PreQualifier { get; set; }
 }

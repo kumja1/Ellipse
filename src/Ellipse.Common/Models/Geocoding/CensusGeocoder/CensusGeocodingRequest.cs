@@ -15,13 +15,13 @@ public record CensusGeocodingRequest
     public SearchType SearchType { get; set; }
 
     [JsonPropertyName("benchmark")]
-    public string Benchmark { get; set; }
+    public required string Benchmark { get; set; }
 
     /// <summary>
     /// Only required if ReturnType equals Geographies.
     /// </summary>
     [JsonPropertyName("vintage")]
-    public string Vintage { get; set; }
+    public required string Vintage { get; set; }
 
     // Optional parameters
 
@@ -35,37 +35,37 @@ public record CensusGeocodingRequest
     /// Only used if Format is set to Jsonp.
     /// </summary>
     [JsonPropertyName("callback")]
-    public string Callback { get; set; }
+    public required string Callback { get; set; }
 
     /// <summary>
     /// Optional comma-delimited list of layer IDs/names.
     /// </summary>
     [JsonPropertyName("layers")]
-    public string Layers { get; set; }
+    public required string Layers { get; set; }
 
     // For the 'onelineaddress' search type.
     [JsonPropertyName("address")]
-    public string Address { get; set; }
+    public required string Address { get; set; }
 
     // For structured address (searchType = Address)
     [JsonPropertyName("street")]
-    public string Street { get; set; }
+    public required string Street { get; set; }
 
     [JsonPropertyName("city")]
-    public string City { get; set; }
+    public required string City { get; set; }
 
     [JsonPropertyName("state")]
-    public string State { get; set; }
+    public required string State { get; set; }
 
     [JsonPropertyName("zip")]
-    public string Zip { get; set; }
+    public required string Zip { get; set; }
 
     // For Puerto Rico structured addresses (searchType = AddressPR)
     [JsonPropertyName("urb")]
-    public string Urb { get; set; }
+    public required string Urb { get; set; }
 
     [JsonPropertyName("municipio")]
-    public string Municipio { get; set; }
+    public required string Municipio { get; set; }
 
     // For coordinate-based reverse requests (searchType = Coordinates)
     [JsonPropertyName("x")]

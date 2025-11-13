@@ -8,8 +8,8 @@ public class Input
     /// For onelineaddress searches, the address is nested inside this object.
     /// </summary>
     [JsonPropertyName("address")]
-    public AddressContainer Address { get; set; }
+    public required AddressContainer Address { get; set; }
 
     [JsonPropertyName("benchmark")]
-    public Benchmark Benchmark { get; set; }
+    public required Benchmark Benchmark { get; set; }
 }

@@ -5,7 +5,7 @@ using Serilog;
 
 namespace Ellipse.Server.Utils.Clients;
 
-public abstract class WebClient(HttpClient client, string baseUrl, string apiKey = "") : IDisposable
+public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : IDisposable
 {
     protected static void AppendParam(
         StringBuilder builder,

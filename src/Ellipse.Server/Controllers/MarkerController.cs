@@ -9,7 +9,7 @@ namespace Ellipse.Server.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [OutputCache(PolicyName = "PostCachingPolicy")]
-public class MarkerController(MarkerService markerService) : ControllerBase
+public sealed class MarkerController(MarkerService markerService) : ControllerBase
 {
     // POST api/marker
     [HttpPost]

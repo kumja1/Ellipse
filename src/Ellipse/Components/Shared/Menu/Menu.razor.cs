@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 using MudBlazor.Utilities;
 using OpenLayers.Blazor;
 
-namespace Ellipse.Components.Menu;
+namespace Ellipse.Client.Components.Shared.Menu;
 
 public partial class Menu : ComponentBase
 {

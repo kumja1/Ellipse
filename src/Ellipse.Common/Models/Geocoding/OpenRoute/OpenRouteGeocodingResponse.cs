@@ -5,11 +5,11 @@ namespace Ellipse.Common.Models.Geocoding.OpenRoute;
 public class OpenRouteGeocodingResponse
 {
     [JsonPropertyName("type")]
-    public string Type { get; set; }
+    public required string Type { get; set; }
 
     [JsonPropertyName("features")]
-    public List<Feature> Features { get; set; }
+    public required List<Feature> Features { get; set; }
 
     [JsonPropertyName("bbox")]
-    public List<double> BoundingBox { get; set; }
+    public required List<double> BoundingBox { get; set; }
 }

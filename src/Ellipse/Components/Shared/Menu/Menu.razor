@@ -1,7 +1,7 @@
 @using MudBlazor
 @using OpenLayers.Blazor
 
-@namespace Ellipse.Components.Menu
+@namespace Ellipse.Components.Shared.Menu
 
 <MudDrawer @bind-Open="Open" Anchor="Anchor.Left" Elevation="8" Class="@_class"
     Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
@@ -37,6 +37,6 @@
         @SingleItem((SelectedMarker, SelectedMarkerRoutes))
     }
     else {
-        <MudProgressCircular Color="Color.Info" Rounded="true" Size="Size.Large" StrokeWidth="4" Intermediate="true" />
+        <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Circle" Width="350px" Class="max-h-fit"></MudSkeleton>
     }
 </MudDrawer>

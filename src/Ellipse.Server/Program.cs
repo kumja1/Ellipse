@@ -49,8 +49,6 @@ public static class Program
         });
 
         builder.Services.AddOutputCache(options =>
-        {
-            options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromMinutes(60)));
             options.AddPolicy(
                 "PostCachingPolicy",
                 builder =>
@@ -78,8 +76,8 @@ public static class Program
                                 );
                             }
                         )
-            );
-        });
+            )
+        );
 
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddControllers();
