@@ -2,7 +2,7 @@ using Ellipse.Server.Policies;
 using Ellipse.Server.Services;
 using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
-using Ellipse.Server.Utils.Logging;
+using Ellipse.Common.Utils.Logging;
 using Microsoft.Extensions.Http;
 using Osrm.HttpApiClient;
 using Serilog;
