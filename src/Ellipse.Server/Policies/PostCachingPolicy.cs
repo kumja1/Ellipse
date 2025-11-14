@@ -34,7 +34,7 @@ public sealed class PostCachingPolicy : IOutputCachePolicy
         CancellationToken cancellationToken
     )
     {
-        var response = context.HttpContext.Response;
+        HttpResponse response = context.HttpContext.Response;
 
         // Verify existence of cookie headers
         if (!StringValues.IsNullOrEmpty(response.Headers.SetCookie))
@@ -57,7 +57,7 @@ public sealed class PostCachingPolicy : IOutputCachePolicy
     {
         // Check if the current request fulfills the requirements
         // to be cached
-        var request = context.HttpContext.Request;
+        HttpRequest request = context.HttpContext.Request;
 
         // Verify the method
         if (!HttpMethods.IsPost(request.Method))

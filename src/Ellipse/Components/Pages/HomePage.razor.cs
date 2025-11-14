@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
 
-namespace Ellipse.Pages;
+namespace Ellipse.Components.Pages;
 
 partial class HomePage : ComponentBase
 {

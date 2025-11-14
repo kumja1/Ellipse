@@ -1,8 +1,10 @@
+using Ellipse.Common.Utils.Logging;
 using Ellipse.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Http;
 using MudBlazor.Services;
+using Serilog;
 
 namespace Ellipse;
 
@@ -16,15 +18,19 @@ partial class Program
         await builder.Build().RunAsync();
     }
 
-    public static void Setup(WebAssemblyHostBuilder builder)
+    private static void Setup(WebAssemblyHostBuilder builder)
     {
         builder.RootComponents.Add<App>("#app");
         builder.RootComponents.Add<HeadOutlet>("head::after");
         ConfigureServices(builder);
     }
 
-    public static void ConfigureServices(WebAssemblyHostBuilder builder)
+    private static void ConfigureServices(WebAssemblyHostBuilder builder)
     {
+        Log.Logger  = new LoggerConfiguration().Enrich.With(new CallerEnricher())
+            .WriteTo.BrowserConsole()
+            .CreateLogger();
+
         builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
         {
             options.HttpClientActions.Add(client =>

@@ -1,4 +1,6 @@
 #pragma warning disable BL0005 // Component parameter should not be set outside of its component.
+using System.Diagnostics.CodeAnalysis;
+using System.Net.Http.Json;
 using Ellipse.Components.Shared.MapDisplay;
 using Ellipse.Components.Shared.Menu;
 using Ellipse.Services;
@@ -38,14 +40,14 @@ partial class MapPage : ComponentBase
         BoundingBox box = new(schools.Select(s => s.LatLng));
 
         TimeSpan? closestMarkerDuration = await FindClosestMarker(box, schools);
-        if (_mapDisplay?.Map?.MarkersList.Count == 0 || closestMarkerDuration is null)
+        if (_mapDisplay?.Map.MarkersList.Count == 0 || closestMarkerDuration is null)
         {
             Log.Information("No markers found. Returning.");
             return;
         }
 
         // Do a second pass to highlight alternative markers that are "near" the best duration
-        foreach (var marker in _mapDisplay!.Map.MarkersList.Cast<Marker>())
+        foreach (Marker marker in _mapDisplay?.Map.MarkersList.Cast<Marker>())
         {
             TimeSpan duration = marker.Properties["Routes"]["Average"].Duration;
             bool isNear = (duration - closestMarkerDuration.Value).TotalMinutes <= 30;
@@ -54,7 +56,8 @@ partial class MapPage : ComponentBase
 
             Log.Information("Marker {MarkerText} is near the best route.", marker.Text);
             marker.PinColor = PinColor.Blue;
-            await _mapDisplay.AddOrUpdateMarker(marker);
+            _menu.AddMarker(marker);
+            _mapDisplay.AddOrUpdateMarker(marker);
         }
     }
 
@@ -63,10 +66,10 @@ partial class MapPage : ComponentBase
         try
         {
             HttpResponseMessage? response = await CallbackHelper.RetryIfInvalid(
+                r => r is { IsSuccessStatusCode: true },
                 async _ =>
                     await Http
-                        .PostAsJsonAsync("api/marker", new MarkerRequest(schools, new GeoPoint2d(x, y))),
-                r => r is HttpResponseMessage { IsSuccessStatusCode: true }
+                        .PostAsJsonAsync("api/marker", new MarkerRequest(schools, new GeoPoint2d(x, y)))
             );
 
             if (response == null)
@@ -142,7 +145,8 @@ partial class MapPage : ComponentBase
                     closestDuration = newDuration;
                 }
 
-                await _mapDisplay.AddOrUpdateMarker(marker);
+                _menu?.AddMarker(marker);
+                _ = _mapDisplay?.AddOrUpdateMarker(marker);
             }
         }
 

@@ -72,7 +72,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             .ConfigureAwait(false);
 
         Log.Information("Address fetched: {Address}", address);
-        var routes = await GetMatrixRoutes(request.Point, request.Schools).ConfigureAwait(false);
+        Dictionary<string, Route> routes = await GetMatrixRoutes(request.Point, request.Schools).ConfigureAwait(false);
 
         Log.Information("Matrix routes obtained. Count: {Count}", routes.Count);
         if (routes.Count == 0)

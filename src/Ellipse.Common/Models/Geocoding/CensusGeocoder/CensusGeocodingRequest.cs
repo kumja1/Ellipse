@@ -9,19 +9,19 @@ namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 public record CensusGeocodingRequest
 {
     [JsonPropertyName("returntype")]
-    public ReturnType ReturnType { get; set; }
+    public ReturnType ReturnType { get; init; }
 
     [JsonPropertyName("searchtype")]
-    public SearchType SearchType { get; set; }
+    public SearchType SearchType { get; init; }
 
     [JsonPropertyName("benchmark")]
-    public required string Benchmark { get; set; }
+    public string Benchmark { get; init; }
 
     /// <summary>
     /// Only required if ReturnType equals Geographies.
     /// </summary>
     [JsonPropertyName("vintage")]
-    public required string Vintage { get; set; }
+    public required string Vintage { get; init; }
 
     // Optional parameters
 
@@ -29,48 +29,48 @@ public record CensusGeocodingRequest
     /// Controls the output format. Valid values: "json", "jsonp"
     /// </summary>
     [JsonPropertyName("format")]
-    public ResponseFormat Format { get; set; } = ResponseFormat.Json;
+    public ResponseFormat Format { get; init; } = ResponseFormat.Json;
 
     /// <summary>
-    /// Only used if Format is set to Jsonp.
+    /// Only used if Format is init to Jsonp.
     /// </summary>
     [JsonPropertyName("callback")]
-    public required string Callback { get; set; }
+    public  string Callback { get; init; }
 
     /// <summary>
     /// Optional comma-delimited list of layer IDs/names.
     /// </summary>
     [JsonPropertyName("layers")]
-    public required string Layers { get; set; }
+    public string Layers { get; init; }
 
     // For the 'onelineaddress' search type.
     [JsonPropertyName("address")]
-    public required string Address { get; set; }
+    public required string Address { get; init; }
 
     // For structured address (searchType = Address)
     [JsonPropertyName("street")]
-    public required string Street { get; set; }
+    public string Street { get; init; }
 
     [JsonPropertyName("city")]
-    public required string City { get; set; }
+    public string City { get; init; }
 
     [JsonPropertyName("state")]
-    public required string State { get; set; }
+    public string State { get; init; }
 
     [JsonPropertyName("zip")]
-    public required string Zip { get; set; }
+    public string Zip { get; init; }
 
     // For Puerto Rico structured addresses (searchType = AddressPR)
     [JsonPropertyName("urb")]
-    public required string Urb { get; set; }
+    public string Urb { get; init; }
 
     [JsonPropertyName("municipio")]
-    public required string Municipio { get; set; }
+    public string Municipio { get; init; }
 
     // For coordinate-based reverse requests (searchType = Coordinates)
     [JsonPropertyName("x")]
-    public double? X { get; set; }
+    public double? X { get; init; }
 
     [JsonPropertyName("y")]
-    public double? Y { get; set; }
+    public double? Y { get; init; }
 }

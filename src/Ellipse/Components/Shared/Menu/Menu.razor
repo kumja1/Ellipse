@@ -24,7 +24,7 @@
     @if (IsList && _markers.Count > 0)
     {
           <MudList T="Marker" Class="relative">
-                    @foreach (var item in _markers)
+                    @foreach (Marker item in _markers)
                     {
                         <MudListItem>
                         @ListItem((item, item.Properties["Routes"]))

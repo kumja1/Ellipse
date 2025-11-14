@@ -25,7 +25,7 @@ public sealed partial class SchoolDivisionScraper(
 
     public async Task<string> Scrape()
     {
-        var (schools, totalPages) = await ParsePage(1).ConfigureAwait(false);
+        (List<SchoolData> schools, var totalPages) = await ParsePage(1).ConfigureAwait(false);
         if (totalPages > 1)
         {
             await Task.WhenAll(
@@ -34,7 +34,7 @@ public sealed partial class SchoolDivisionScraper(
                     .Select(
                         async (page, _) =>
                         {
-                            var (pageSchools, _) = await ParsePage(page).ConfigureAwait(false);
+                            (List<SchoolData> pageSchools, var _) = await ParsePage(page).ConfigureAwait(false);
                             schools.AddRange(pageSchools);
                         }
                     )
@@ -64,7 +64,7 @@ public sealed partial class SchoolDivisionScraper(
             .ConfigureAwait(false);
 
         ArgumentNullException.ThrowIfNull(rows, nameof(rows));
-        var results = await Task.WhenAll(rows.Select(ParseRow)).ConfigureAwait(false);
+        SchoolData?[] results = await Task.WhenAll(rows.Select(ParseRow)).ConfigureAwait(false);
 
         List<SchoolData> schools = [.. results.Where(s => s != null).Cast<SchoolData>()];
         int totalPages = ParseTotalPages(document!);

@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 using MudBlazor.Utilities;
 using OpenLayers.Blazor;
 
-namespace Ellipse.Client.Components.Shared.Menu;
+namespace Ellipse.Components.Shared.Menu;
 
 public partial class Menu : ComponentBase
 {
@@ -33,9 +33,9 @@ public partial class Menu : ComponentBase
 
     private readonly List<Marker> _markers = [];
 
-    public Marker? SelectedMarker;
+    private Marker? SelectedMarker;
 
-    public Dictionary<string, (double Distance, TimeSpan Duration)>? SelectedMarkerRoutes;
+    private Dictionary<string, (double Distance, TimeSpan Duration)>? SelectedMarkerRoutes;
 
 
     public void ToggleMenuOpen() => Open = !Open;
@@ -47,7 +47,7 @@ public partial class Menu : ComponentBase
     public void SelectMarker(Marker marker)
     {
         SelectedMarker = marker;
-        foreach (var kvp in marker.Properties)
+        foreach (KeyValuePair<string, dynamic> kvp in marker.Properties)
         {
             Console.WriteLine($"Marker Property {kvp.Key}: {kvp.Value}");
         }

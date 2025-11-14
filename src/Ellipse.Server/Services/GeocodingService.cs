@@ -395,7 +395,7 @@ public class GeocodingService(
         if (destinations.All(dest => dest == GeoPoint2d.Zero))
             return null;
 
-        var request = OsrmServices
+        TableRequest<JsonFormat> request = OsrmServices
             .Table(
                 PredefinedProfiles.Car,
                 GeographicalCoordinates.Create(
