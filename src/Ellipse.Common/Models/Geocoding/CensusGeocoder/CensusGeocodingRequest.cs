@@ -21,7 +21,7 @@ public record CensusGeocodingRequest
     /// Only required if ReturnType equals Geographies.
     /// </summary>
     [JsonPropertyName("vintage")]
-    public required string Vintage { get; init; }
+    public string Vintage { get; init; }
 
     // Optional parameters
 
@@ -45,7 +45,7 @@ public record CensusGeocodingRequest
 
     // For the 'onelineaddress' search type.
     [JsonPropertyName("address")]
-    public required string Address { get; init; }
+    public string Address { get; init; }
 
     // For structured address (searchType = Address)
     [JsonPropertyName("street")]
