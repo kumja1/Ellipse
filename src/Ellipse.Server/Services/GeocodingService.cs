@@ -411,18 +411,18 @@ public class GeocodingService(
             .Build();
 
         Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
-        TableResponse? response = await osrmClient.GetTableAsync(request);
+        var response = await osrmClient.GetTableAsync(request);
         Log.Information("{Response}", response);
 
-        if (response == null || response?.Durations == null || response?.Distances == null)
+        if (!response.IsSuccess)
         {
             Log.Error("Invalid matrix response received.");
-            throw new InvalidOperationException("Invalid matrix response");
+            throw new InvalidDataException("Invalid matrix response");
         }
 
         Log.Information("Matrix response successfully received.");
-        Log.Information("Matrix Response: {Response}", response);
-        return response;
+        Log.Information("Matrix Response: {Response}", response.Result);
+        return response.Result;
     }
 
     public async Task<OpenRouteMatrixResponse?> GetMatrixWithOpenRoute(
