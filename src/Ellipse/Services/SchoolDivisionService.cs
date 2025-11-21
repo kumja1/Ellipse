@@ -51,7 +51,7 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
                 r => r != null && r.Count != 0,
                 async _ =>
                     await httpClient.GetFromJsonAsync<List<SchoolData>>(
-                        $"schools?divisionCode={code}"
+                        $"api/schools?divisionCode={code}"
                     ),
                 maxRetries: 30,
                 delayMs: 500

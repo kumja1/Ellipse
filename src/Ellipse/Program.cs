@@ -37,7 +37,7 @@ partial class Program
             {
                 client.Timeout = TimeSpan.FromMinutes(10);
                 client.BaseAddress = new Uri(
-                    "https://doubtful-beatrix-lum-studios-0cd001db.koyeb.app/api/"
+                    "https://doubtful-beatrix-lum-studios-0cd001db.koyeb.app/"
                 );
             });
         });

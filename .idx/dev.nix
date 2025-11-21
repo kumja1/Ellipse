@@ -6,7 +6,7 @@
 
   # Use https://search.nixos.org/packages to find packages
   packages = [
-    pkgs.dotnet-sdk_8
+    pkgs.dotnet-sdk_9
     # pkgs.go
     # pkgs.python11
     # pkgs.python311Packages.pip

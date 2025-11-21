@@ -5,77 +5,77 @@ namespace Ellipse.Common.Models.Geocoding.OpenRoute;
 public class Properties
 {
     [JsonPropertyName("label")]
-    public required string Label { get; set; }
+    public string Label { get; set; }
 
     [JsonPropertyName("confidence")]
     public double Confidence { get; set; }
 
     [JsonPropertyName("country")]
-    public required string Country { get; set; }
+    public  string Country { get; set; }
 
     [JsonPropertyName("city")]
-    public required string City { get; set; }
+    public string City { get; set; }
 
     [JsonPropertyName("postcode")]
-    public required string Postcode { get; set; }
+    public string Postcode { get; set; }
 
     [JsonPropertyName("street")]
-    public required string Street { get; set; }
+    public string Street { get; set; }
 
     [JsonPropertyName("housenumber")]
-    public required string HouseNumber { get; set; }
+    public string HouseNumber { get; set; }
 
     [JsonPropertyName("id")]
-    public required string Id { get; set; }
+    public string Id { get; set; }
 
     [JsonPropertyName("gid")]
-    public required string Gid { get; set; }
+    public string Gid { get; set; }
 
     [JsonPropertyName("layer")]
-    public required string Layer { get; set; }
+    public  string Layer { get; set; }
 
     [JsonPropertyName("source")]
-    public required string Source { get; set; }
+    public string Source { get; set; }
 
     [JsonPropertyName("source_id")]
-    public required string SourceId { get; set; }
+    public string SourceId { get; set; }
 
     [JsonPropertyName("name")]
-    public required string Name { get; set; }
+    public string Name { get; set; }
 
     [JsonPropertyName("distance")]
     public double Distance { get; set; }
 
     [JsonPropertyName("accuracy")]
-    public required string Accuracy { get; set; }
+    public string Accuracy { get; set; }
 
     [JsonPropertyName("country_gid")]
-    public required string CountryGid { get; set; }
+    public string CountryGid { get; set; }
 
     [JsonPropertyName("country_a")]
-    public required string CountryA { get; set; }
+    public string CountryA { get; set; }
 
     [JsonPropertyName("region")]
-    public required string Region { get; set; }
+    public string Region { get; set; }
 
     [JsonPropertyName("region_gid")]
-    public required string RegionGid { get; set; }
+    public string RegionGid { get; set; }
 
     [JsonPropertyName("region_a")]
-    public required string RegionA { get; set; }
+    public string RegionA { get; set; }
 
     [JsonPropertyName("county")]
-    public required string County { get; set; }
+    public string County { get; set; }
 
     [JsonPropertyName("county_gid")]
-    public required string CountyGid { get; set; }
+    public string CountyGid { get; set; }
 
     [JsonPropertyName("county_a")]
-    public required string CountyA { get; set; }
+    public string CountyA { get; set; }
 
     [JsonPropertyName("continent")]
-    public required string Continent { get; set; }
+    public string Continent { get; set; }
 
     [JsonPropertyName("continent_gid")]
-    public required string ContinentGid { get; set; }
+    public string ContinentGid { get; set; }
 }

@@ -17,15 +17,15 @@
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="AngleSharp" Version="1.2.0" />
+    <PackageReference Include="AngleSharp" Version="1.4.0" />
     <PackageReference Include="AngleSharp.XPath" Version="2.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Postgres" Version="1.0.0" />
-    <PackageReference Include="Osrm.HttpApiClient" Version="1.13.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Postgres" Version="1.1.0" />
+    <PackageReference Include="Osrm.HttpApiClient" Version="1.14.0" />
     <PackageReference Include="Pelias.NET" Version="2.0.0-20250115.15" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ellipse.Common\Ellipse.Common.csproj" />
