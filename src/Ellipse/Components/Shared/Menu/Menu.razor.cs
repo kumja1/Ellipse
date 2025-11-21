@@ -1,6 +1,8 @@
+using Ellipse.Common.Models.Directions;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.Utilities;
 using OpenLayers.Blazor;
+using Serilog;
 
 namespace Ellipse.Components.Shared.Menu;
 
@@ -15,12 +17,12 @@ public partial class Menu : ComponentBase
     [Parameter]
     public RenderFragment<(
         Marker Marker,
-        Dictionary<string, (double Distance, TimeSpan Duration)>? Routes
+        Dictionary<string, Route>? Routes
     )> SingleItem
     { get; set; }
 
     [Parameter]
-    public RenderFragment<(Marker Marker, Dictionary<string, (double Distance, TimeSpan Duration)> Routes)> ListItem { get; set; }
+    public RenderFragment<(Marker Marker, Dictionary<string, Route> Routes)> ListItem { get; set; }
 
     [Parameter]
     public string Class { get; set; }
@@ -35,24 +37,33 @@ public partial class Menu : ComponentBase
 
     private Marker? SelectedMarker;
 
-    private Dictionary<string, (double Distance, TimeSpan Duration)>? SelectedMarkerRoutes;
+    private Dictionary<string, Route>? SelectedMarkerRoutes;
 
 
-    public void ToggleMenuOpen() => Open = !Open;
+    public void ToggleMenuOpen()
+    {
+        Open = !Open;
+        Log.Information("Menu Open: {Open}", Open);
+    }
 
     public void ToggleMenuView() => IsList = !IsList;
 
-    public void AddMarker(Marker marker) => _markers.Add(marker);
+    public void AddMarker(Marker marker)
+    {
+        _markers.Add(marker);
+                Log.Information("New marker added to menu: {@Marker}", marker);
+    }
 
     public void SelectMarker(Marker marker)
     {
         SelectedMarker = marker;
         foreach (KeyValuePair<string, dynamic> kvp in marker.Properties)
-        {
-            Console.WriteLine($"Marker Property {kvp.Key}: {kvp.Value}");
-        }
-        Console.WriteLine($"Marker Has Routes: {marker.Properties.ContainsKey("Routes")}");
-        SelectedMarkerRoutes = marker.Properties["Routes"];
+            Log.Information("Marker Property {@Property}", kvp);
+
+        Log.Information("Selected Marker: {@Marker}", marker);
+        if (marker.Properties.TryGetValue("Routes", out var routes))
+            SelectedMarkerRoutes = routes;
+
         IsList = false;
         StateHasChanged();
     }

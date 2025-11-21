@@ -1,6 +1,6 @@
-using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
+using Serilog;
 
 namespace Ellipse.Components.Shared.MapDisplay;
 
@@ -8,9 +8,6 @@ public partial class MapDisplay
 {
     [Parameter]
     public Action<Marker> OnMarkerClick { get; set; }
-
-    [Inject]
-    private ILogger<MapDisplay> Logger { get; set; }
 
     public OpenStreetMap Map { get; set; }
 
@@ -28,7 +25,7 @@ public partial class MapDisplay
         }
         catch (Exception e)
         {
-            Logger.LogError(e, "Error updating marker");
+            Log.Error(e, "Error updating marker");
         }
     }
 }

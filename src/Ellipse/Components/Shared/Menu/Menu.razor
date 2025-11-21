@@ -21,22 +21,26 @@
     </MudDrawerHeader>
 
     <!-- Drawer Content -->
-    @if (IsList && _markers.Count > 0)
+    @if (IsList)
     {
-          <MudList T="Marker" Class="relative">
-                    @foreach (Marker item in _markers)
-                    {
-                        <MudListItem>
-                        @ListItem((item, item.Properties["Routes"]))
-                        </MudListItem>
-                        }
-                    </MudList>
+        if (_markers.Count > 0)
+        {
+            <MudList T="Marker" Class="relative">
+                @foreach (Marker item in _markers)
+                {
+                    <MudListItem>
+                        @ListItem((item, item.Properties.TryGetValue("Routes", out var routes) ? routes : []))
+                    </MudListItem>
+                }
+            </MudList>
+        }
+        else
+        {
+            <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle" Width="100px" />
+        }
     }
     else if (SelectedMarker != null)
     {
         @SingleItem((SelectedMarker, SelectedMarkerRoutes))
-    }
-    else {
-        <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Circle" Width="350px" Class="max-h-fit"></MudSkeleton>
     }
 </MudDrawer>

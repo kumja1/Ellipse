@@ -1,4 +1,5 @@
 @page "/map"
+@using Ellipse.Common.Models.Directions
 @using Ellipse.Components.Shared.Menu
 @using Ellipse.Components.Shared.MapDisplay
 
@@ -8,7 +9,7 @@
 
 <div class="w-screen h-screen overflow-hidden">
     <div class="absolute inset-0 z-0">
-        <MapDisplay @ref="_mapDisplay" OnMarkerClick="SelectMarker" />
+        <MapDisplay @ref="_mapDisplay" OnMarkerClick="OnMarkerClicked" />
     </div>
 
     <div class="relative z-10">
@@ -18,7 +19,7 @@
                     <MudCardHeader>
                         <CardHeaderActions>
                             <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
-                                OnClick="@(() => SelectMarker(marker.Marker))" />
+                                OnClick="@(() => OnMarkerClicked(marker.Marker))" />
                         </CardHeaderActions>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6" Color="Color.Dark" Align="Align.Start">
@@ -29,10 +30,12 @@
                     <MudCardContent>
                         <div class="text-grey-400">
                             <MudText>
-                                Distance: @(Math.Round(marker.Routes["Average"].Distance / 1609, 1)) miles
+                                Distance: @(Math.Round(GetRouteProperty(marker.Routes, "Average")?.Distance ?? 0 / 1609, 1))
+                                miles
                             </MudText>
                             <MudText>
-                                Duration: @marker.Routes["Average"].Duration.ToReadableString()
+                                Duration: @(GetRouteProperty(marker.Routes, "Average")?.Duration.ToReadableString() ??
+                                                                "No Average")
                             </MudText>
                         </div>
                     </MudCardContent>
@@ -59,7 +62,7 @@
                         Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
                         @if (marker.Routes != null)
                         {
-                            @foreach ((string routeName, (double Distance, TimeSpan Duration) _) in marker.Routes)
+                            @foreach ((string routeName, Route _) in marker.Routes)
                             {
                                 <MudSelectItem Value="routeName">
                                     @routeName
@@ -72,11 +75,11 @@
                     <MudStack Spacing="2" Class="text-gray-600">
                         <MudText Typo="Typo.body1" Class="font-normal">
                             Distance:
-                            @(Math.Round(marker.Routes[_selectedRouteName].Distance)) miles
+                            @(Math.Round(GetRouteProperty(marker.Routes, _selectedRouteName)?.Distance ?? 0)) miles
                         </MudText>
                         <MudText Typo="Typo.body1" Class="font-normal">
                             Duration:
-                            @(marker.Routes[_selectedRouteName].Duration)
+                            @(GetRouteProperty(marker.Routes, _selectedRouteName)?.Duration)
                         </MudText>
                     </MudStack>
                 </MudStack>

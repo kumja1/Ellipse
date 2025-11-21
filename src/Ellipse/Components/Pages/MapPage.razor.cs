@@ -10,6 +10,7 @@ using Ellipse.Common.Models.Markers;
 using Microsoft.AspNetCore.Components;
 using OpenLayers.Blazor;
 using Serilog;
+using Ellipse.Common.Models.Directions;
 
 namespace Ellipse.Components.Pages;
 
@@ -153,5 +154,7 @@ partial class MapPage : ComponentBase
         return closestDuration;
     }
 
-    public void SelectMarker(Marker marker) => _menu!.SelectMarker(marker);
+    private void OnMarkerClicked(Marker marker) => _menu?.SelectMarker(marker);
+
+    Route? GetRouteProperty(Dictionary<string, Route> routes, string propertyName) => routes.TryGetValue(propertyName, out Route value) ? value : default;
 }

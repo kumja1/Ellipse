@@ -45,7 +45,6 @@ partial class Program
         builder
             .Services.AddMudServices()
             .AddHttpClient()
-            .AddSingleton<SchoolDivisionService>()
-            .AddSingleton<MarkerService>();
+            .AddSingleton<SchoolDivisionService>();
     }
 }
