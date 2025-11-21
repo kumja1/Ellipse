@@ -8,5 +8,5 @@ namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 public class CensusGeocodingResponse
 {
     [JsonPropertyName("result")]
-    public required Result Result { get; set; }
+    public Result Result { get; set; }
 }

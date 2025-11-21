@@ -7,12 +7,12 @@ namespace Ellipse.Components.Shared.MapDisplay;
 public partial class MapDisplay
 {
     [Parameter]
-    public required Action<Marker> OnMarkerClick { get; set; }
+    public Action<Marker> OnMarkerClick { get; set; }
 
     [Inject]
     private ILogger<MapDisplay> Logger { get; set; }
 
-    public required OpenStreetMap Map { get; set; }
+    public OpenStreetMap Map { get; set; }
 
     public async ValueTask AddOrUpdateMarker(Marker marker)
     {

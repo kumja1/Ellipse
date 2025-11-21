@@ -18,7 +18,7 @@ public sealed class SchoolsController(SchoolsScraperService scraperService) : Co
     )
     {
         if (divisionCode <= 0)
-            return BadRequest("Error: Missing or invalid required field 'divisionCode'.");
+            return BadRequest("Error: Missing or invalid field 'divisionCode'.");
 
         string result = await scraperService.ScrapeDivision(divisionCode, overrideCache);
         return Content(result, "application/json");

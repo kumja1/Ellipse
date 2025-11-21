@@ -8,10 +8,10 @@ namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 public class Geography
 {
     [JsonPropertyName("GEOID")]
-    public required string GEOID { get; set; }
+    public string GEOID { get; set; }
 
     [JsonPropertyName("CENTLAT")]
-    public required string CENTLAT { get; set; }
+    public string CENTLAT { get; set; }
 
     /// <summary>
     /// Area of water, if provided.
@@ -20,37 +20,37 @@ public class Geography
     public int? AREAWATER { get; set; }
 
     [JsonPropertyName("STATE")]
-    public required string STATE { get; set; }
+    public string STATE { get; set; }
 
     [JsonPropertyName("BASENAME")]
-    public required string BASENAME { get; set; }
+    public string BASENAME { get; set; }
 
     [JsonPropertyName("OID")]
-    public required string OID { get; set; }
+    public string OID { get; set; }
 
     [JsonPropertyName("LSADC")]
-    public required string LSADC { get; set; }
+    public string LSADC { get; set; }
 
     [JsonPropertyName("FUNCSTAT")]
-    public required string FUNCSTAT { get; set; }
+    public string FUNCSTAT { get; set; }
 
     [JsonPropertyName("INTPTLAT")]
-    public required string INTPTLAT { get; set; }
+    public string INTPTLAT { get; set; }
 
     [JsonPropertyName("NAME")]
-    public required string NAME { get; set; }
+    public string NAME { get; set; }
 
     [JsonPropertyName("OBJECTID")]
     public int? OBJECTID { get; set; }
 
     [JsonPropertyName("TRACT")]
-    public required string TRACT { get; set; }
+    public string TRACT { get; set; }
 
     [JsonPropertyName("CENTLON")]
-    public required string CENTLON { get; set; }
+    public string CENTLON { get; set; }
 
     [JsonPropertyName("BLKGRP")]
-    public required string BLKGRP { get; set; }
+    public string BLKGRP { get; set; }
 
     /// <summary>
     /// Area of land, if provided.
@@ -59,11 +59,11 @@ public class Geography
     public int? AREALAND { get; set; }
 
     [JsonPropertyName("INTPTLON")]
-    public required string INTPTLON { get; set; }
+    public string INTPTLON { get; set; }
 
     [JsonPropertyName("MTFCC")]
-    public required string MTFCC { get; set; }
+    public string MTFCC { get; set; }
 
     [JsonPropertyName("COUNTY")]
-    public required string COUNTY { get; set; }
+    public string COUNTY { get; set; }
 }

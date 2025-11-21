@@ -5,5 +5,5 @@ namespace Ellipse.Common.Models.Geocoding.CensusGeocoder;
 public class AddressContainer
 {
     [JsonPropertyName("address")]
-    public required string Address { get; set; }
+    public string Address { get; set; }
 }

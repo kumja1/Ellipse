@@ -8,11 +8,11 @@ public class Benchmark
     public bool IsDefault { get; set; }
 
     [JsonPropertyName("benchmarkDescription")]
-    public required string BenchmarkDescription { get; set; }
+    public string BenchmarkDescription { get; set; }
 
     [JsonPropertyName("id")]
-    public required string Id { get; set; }
+    public string Id { get; set; }
 
     [JsonPropertyName("benchmarkName")]
-    public required string BenchmarkName { get; set; }
+    public string BenchmarkName { get; set; }
 }

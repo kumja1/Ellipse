@@ -18,7 +18,7 @@ public record CensusGeocodingRequest
     public string Benchmark { get; init; }
 
     /// <summary>
-    /// Only required if ReturnType equals Geographies.
+    /// Only if ReturnType equals Geographies.
     /// </summary>
     [JsonPropertyName("vintage")]
     public string Vintage { get; init; }
