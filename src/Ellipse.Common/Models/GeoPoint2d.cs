@@ -1,6 +1,6 @@
 namespace Ellipse.Common.Models;
 
-public readonly record struct GeoPoint2d(double Lon, double Lat)
+public readonly record struct GeoPoint2d(double Lon, double Lat) : IComparable<GeoPoint2d>
 {
     public override string ToString() => $"{Lon},{Lat}";
 
@@ -28,10 +28,15 @@ public readonly record struct GeoPoint2d(double Lon, double Lat)
             || !double.TryParse(parts[0], out double lon)
             || !double.TryParse(parts[1], out double lat)
         )
-        {
             return Zero;
-        }
+
 
         return new GeoPoint2d(lon, lat);
+    }
+
+    public int CompareTo(GeoPoint2d other)
+    {
+        int lonComparison = Lon.CompareTo(other.Lon);
+        return lonComparison != 0 ? lonComparison : Lat.CompareTo(other.Lat);
     }
 }

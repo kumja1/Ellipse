@@ -1,6 +1,6 @@
-namespace Ellipse.Common.Models;
+﻿namespace Ellipse.Common.Models;
 
-public record BoundingBox
+public readonly record struct BoundingBox
 {
     public double MinLat { get; }
     public double MaxLat { get; }
@@ -16,6 +16,14 @@ public record BoundingBox
         MaxLat = latLngs.Max(latLng => latLng.Lat);
         MinLng = latLngs.Min(latLng => latLng.Lon);
         MaxLng = latLngs.Max(latLng => latLng.Lon);
+    }
+
+    public BoundingBox(GeoPoint2d point, double radius)
+    {
+        MinLat = point.Lat - radius;
+        MaxLat = point.Lat + radius;
+        MinLng = point.Lon - radius;
+        MaxLng = point.Lon + radius;
     }
 
     // Gets all points within the bounding box at the specified step size

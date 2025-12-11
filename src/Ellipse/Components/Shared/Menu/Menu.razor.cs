@@ -1,3 +1,4 @@
+using Ellipse.Common.Models;
 using Ellipse.Common.Models.Directions;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.Utilities;
@@ -8,62 +9,49 @@ namespace Ellipse.Components.Shared.Menu;
 
 public partial class Menu : ComponentBase
 {
-    [Parameter]
-    public bool Open { get; set; }
+    [Parameter] public bool Open { get; set; }
 
-    [Parameter]
-    public bool IsList { get; set; }
+    [Parameter] public bool IsList { get; set; }
 
     [Parameter]
     public RenderFragment<(
         Marker Marker,
         Dictionary<string, Route>? Routes
-    )> SingleItem
-    { get; set; }
+        )> SingleItem { get; set; }
 
     [Parameter]
-    public RenderFragment<(Marker Marker, Dictionary<string, Route> Routes)> ListItem { get; set; }
+    public RenderFragment<(Coordinate MarkerLngLat, double MarkerAverageDistance, TimeSpan
+        MarkerAverageDuration)> ListItem { get; set; }
 
-    [Parameter]
-    public string Class { get; set; }
+    [Parameter] public string Class { get; set; }
 
     private string _class =>
         CssBuilder
-            .Default("shadow-2xl bg-white rounded-r-lg overflow-auto")
+            .Default("flex shadow-2xl bg-white rounded-r-lg overflow-auto")
             .AddClass(Class, !string.IsNullOrWhiteSpace(Class))
             .Build();
 
-    private readonly List<Marker> _markers = [];
+    public readonly Dictionary<Coordinate, Marker> Markers = [];
 
-    private Marker? SelectedMarker;
+    private Marker? _selectedMarker;
 
-    private Dictionary<string, Route>? SelectedMarkerRoutes;
-
-
-    public void ToggleMenuOpen()
+    public void ToggleOpen()
     {
         Open = !Open;
         Log.Information("Menu Open: {Open}", Open);
     }
 
-    public void ToggleMenuView() => IsList = !IsList;
+    public void ToggleView() => IsList = !IsList;
 
-    public void AddMarker(Marker marker)
+    public void SelectMarker(Coordinate point)
     {
-        _markers.Add(marker);
-                Log.Information("New marker added to menu: {@Marker}", marker);
-    }
+        if (!Markers.TryGetValue(point, out Marker? marker))
+        {
+            Log.Warning("SelectMarker: Marker not found at point: {Point}", point);
+            return;
+        }
 
-    public void SelectMarker(Marker marker)
-    {
-        SelectedMarker = marker;
-        foreach (KeyValuePair<string, dynamic> kvp in marker.Properties)
-            Log.Information("Marker Property {@Property}", kvp);
-
-        Log.Information("Selected Marker: {@Marker}", marker);
-        if (marker.Properties.TryGetValue("Routes", out var routes))
-            SelectedMarkerRoutes = routes;
-
+        _selectedMarker = marker;
         IsList = false;
         StateHasChanged();
     }

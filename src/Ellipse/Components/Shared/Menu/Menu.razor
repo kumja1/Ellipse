@@ -1,46 +1,44 @@
-@using MudBlazor
 @using OpenLayers.Blazor
-
 @namespace Ellipse.Components.Shared.Menu
 
-<MudDrawer @bind-Open="Open" Anchor="Anchor.Left" Elevation="8" Class="@_class"
-    Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
+<MudDrawer @bind-Open="Open" Anchor="Anchor.Left" Elevation="8" Variant="DrawerVariant.Persistent" Class="@_class"
+           Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
     <!-- Drawer Header -->
     <MudDrawerHeader
         Class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-t-lg shadow">
         <MudText Typo="Typo.h5" Class="font-bold tracking-wide">
             Location Details
         </MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.Close" @onclick="ToggleMenuOpen" Edge="Edge.End"
-            Class="text-white hover:text-gray-300 transition-colors duration-200" />
+        <MudIconButton Icon="@Icons.Material.Filled.Close" @onclick="ToggleOpen" Edge="Edge.End"
+                       Class="text-white hover:text-gray-300 transition-colors duration-200"/>
         @if (!IsList)
         {
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="ToggleMenuView" Edge="Edge.Start"
-                Class="text-white hover:text-gray-300 transition-colors duration-200" />
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="ToggleView" Edge="Edge.Start"
+                           Class="text-white hover:text-gray-300 transition-colors duration-200"/>
         }
     </MudDrawerHeader>
 
     <!-- Drawer Content -->
     @if (IsList)
     {
-        if (_markers.Count > 0)
+        if (Markers.Count > 0)
         {
             <MudList T="Marker" Class="relative">
-                @foreach (Marker item in _markers)
+                @foreach (KeyValuePair<Coordinate, Marker> kvp in Markers)
                 {
                     <MudListItem>
-                        @ListItem((item, item.Properties.TryGetValue("Routes", out var routes) ? routes : []))
+                        @ListItem((kvp.Key, kvp.Value.Properties["Routes"]["Average"].Distance, kvp.Value.Properties["Routes"]["Average"].Duration))
                     </MudListItem>
                 }
             </MudList>
         }
         else
         {
-            <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle" Width="100px" />
+            <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle" Class="grow"/>
         }
     }
-    else if (SelectedMarker != null)
+    else if (_selectedMarker != null)
     {
-        @SingleItem((SelectedMarker, SelectedMarkerRoutes))
+        @SingleItem((_selectedMarker, _selectedMarker.Properties["Routes"]))
     }
 </MudDrawer>

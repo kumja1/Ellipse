@@ -1,17 +1,44 @@
 @page "/map"
 @using Ellipse.Common.Models.Directions
 @using Ellipse.Components.Shared.Menu
-@using Ellipse.Components.Shared.MapDisplay
+@using OpenLayers.Blazor
 
 @namespace Ellipse.Components.Pages
 
 <PageTitle>Map</PageTitle>
 
-<div class="w-screen h-screen overflow-hidden">
-    <div class="absolute inset-0 z-0">
-        <MapDisplay @ref="_mapDisplay" OnMarkerClick="OnMarkerClicked" />
+<div>
+    <div class="h-dvh w-dvw">
+        <div class="absolute inset-0 z-0">
+            <OpenStreetMap @ref="_map" FullScreenControl="true" />
+        </div>
+        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
+            <MudPaper Class="pa-4 pointer-events-auto" Elevation="8" Style="background-color: white;">
+                @if (_closestPoint == null)
+                {
+                    <div class="flex items-center gap-2">
+                        <MudText>Loading</MudText>
+                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small"/>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-center gap-2">
+                        <MudText>Layer: @_currentLayerIndex</MudText>
+                        @if (_currentLayerIndex > 0)
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="RemoveLayer">
+                                Remove Layer
+                            </MudButton>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </div>
     </div>
-
     <div class="relative z-10">
         <Menu @ref="_menu" Open="true" IsList="true" Class="absolute">
             <ListItem Context="marker">
@@ -19,23 +46,22 @@
                     <MudCardHeader>
                         <CardHeaderActions>
                             <MudIconButton Icon="@Icons.Material.Filled.ArrowForward"
-                                OnClick="@(() => OnMarkerClicked(marker.Marker))" />
+                                           OnClick="@(() => OnMarkerClicked(new Dictionary<string, dynamic> { ["lngLat"] = marker.MarkerLngLat }))"/>
                         </CardHeaderActions>
                         <CardHeaderContent>
                             <MudText Typo="Typo.h6" Color="Color.Dark" Align="Align.Start">
-                                @marker.Marker.Text
+                                @marker.MarkerLngLat
                             </MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
                     <MudCardContent>
                         <div class="text-grey-400">
                             <MudText>
-                                Distance: @(Math.Round(GetRouteProperty(marker.Routes, "Average")?.Distance ?? 0 / 1609, 1))
+                                Distance: @Math.Round(marker.MarkerAverageDistance / 1609, 1)
                                 miles
                             </MudText>
                             <MudText>
-                                Duration: @(GetRouteProperty(marker.Routes, "Average")?.Duration.ToReadableString() ??
-                                                                "No Average")
+                                Duration: @marker.MarkerAverageDuration.ToReadableString()
                             </MudText>
                         </div>
                     </MudCardContent>
@@ -48,18 +74,18 @@
                     <MudText Typo="Typo.h6" Class="font-semibold text-blue-700 text-xl">
                         @((string?)marker.Marker.Text)
                     </MudText>
-                    <MudDivider />
+                    <MudDivider/>
 
                     <!-- Actions -->
                     <MudButton Variant="Variant.Filled"
-                        Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg">
+                               Class="bg-blue rounded-full px-6 py-2 shadow-md transition-transform hover:scale-105 hover:shadow-lg">
                         Open in LandSearch
                     </MudButton>
-                    <MudDivider />
+                    <MudDivider/>
 
                     <!-- Route Selection -->
                     <MudSelect Label="Select Mode" Dense Outlined @bind-Value="_selectedRouteName"
-                        Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
+                               Class="bg-gray-50 rounded-md text-gray-700 hover:bg-gray-100 focus:border-blue-500 transition-all">
                         @if (marker.Routes != null)
                         {
                             @foreach ((string routeName, Route _) in marker.Routes)
@@ -75,18 +101,20 @@
                     <MudStack Spacing="2" Class="text-gray-600">
                         <MudText Typo="Typo.body1" Class="font-normal">
                             Distance:
-                            @(Math.Round(GetRouteProperty(marker.Routes, _selectedRouteName)?.Distance ?? 0)) miles
+                            @(Math.Round(marker.Routes[_selectedRouteName].Distance)) miles
                         </MudText>
                         <MudText Typo="Typo.body1" Class="font-normal">
                             Duration:
-                            @(GetRouteProperty(marker.Routes, _selectedRouteName)?.Duration)
+                            @marker.Routes[_selectedRouteName].Duration.ToReadableString()
                         </MudText>
                     </MudStack>
                 </MudStack>
             </SingleItem>
         </Menu>
 
-        <MudFab Size="Size.Medium" StartIcon="@Icons.Material.Filled.Menu" OnClick="@(() => _menu?.ToggleMenuOpen())"
-            Class="fixed left-2 bottom-2 z-20 bg-blue-600 hover:bg-blue-700 text-white border border-white" />
+        <MudFab Size="Size.Medium" StartIcon="@Icons.Material.Filled.Menu" OnClick="@(() => _menu?.ToggleOpen())"
+                Class="fixed left-2 bottom-2 z-20 bg-blue-600 hover:bg-blue-700 text-white border border-white"/>
     </div>
+    
+    
 </div>
