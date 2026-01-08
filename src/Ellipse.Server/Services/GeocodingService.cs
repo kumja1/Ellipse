@@ -243,6 +243,7 @@ public class GeocodingService(
                 "[GetLatLng] Initiating forward geocoding for address: {Address}",
                 address
             );
+            
             CensusGeocodingRequest request = new()
             {
                 Address = address,
@@ -263,7 +264,7 @@ public class GeocodingService(
             Log.Information("[GetLatLng] First geocoding result: {@FirstResult}", firstResult);
             GeoPoint2d resultPoint =
                 firstResult != null
-                    ? new(firstResult.Coordinates.X, firstResult.Coordinates.Y)
+                    ? new GeoPoint2d(firstResult.Coordinates.X, firstResult.Coordinates.Y)
                     : GeoPoint2d.Zero;
 
             Log.Information("[GetLatLng] Returning coordinates: {ResultPoint}", resultPoint);
@@ -346,13 +347,13 @@ public class GeocodingService(
             return (cachedDistances, cachedDurations);
         }
 
-        TableResponse? response = await GetMatrixWithOSRM(source, destinations)
+        TableResponse? response = await GetMatrixWithOsrm(source, destinations)
             .ConfigureAwait(false);
 
         double[]? distances = response?.Distances[0].Select(x => (double)(x ?? 0)).ToArray();
         double[]? durations = response?.Durations[0].Select(x => (double)(x ?? 0)).ToArray();
 
-        if (response is not TableResponse { Distances: not null, Durations: not null })
+        if (response is not { Distances: not null, Durations: not null })
         {
             OpenRouteMatrixResponse? openRouteResponse = await GetMatrixWithOpenRoute(
                     source,
@@ -381,7 +382,7 @@ public class GeocodingService(
         return (distances, durations);
     }
 
-    public async Task<TableResponse?> GetMatrixWithOSRM(
+    private async Task<TableResponse?> GetMatrixWithOsrm(
         GeoPoint2d source,
         GeoPoint2d[] destinations
     )
@@ -425,7 +426,7 @@ public class GeocodingService(
         return response.Result;
     }
 
-    public async Task<OpenRouteMatrixResponse?> GetMatrixWithOpenRoute(
+    private async Task<OpenRouteMatrixResponse?> GetMatrixWithOpenRoute(
         GeoPoint2d source,
         GeoPoint2d[] destinations
     )
@@ -487,7 +488,8 @@ public class GeocodingService(
             return null;
 
         SnappedLocation? snapPoint = response
-            .Locations.OrderBy(snap => snap?.SnappedDistance)
+            .Locations.Where(snap=> snap.Name.Contains("VA", StringComparison.CurrentCultureIgnoreCase) || snap.Name.Contains("Virginia", StringComparison.CurrentCultureIgnoreCase))
+            .OrderBy(snap => snap?.SnappedDistance)
             .FirstOrDefault();
         return snapPoint;
     }

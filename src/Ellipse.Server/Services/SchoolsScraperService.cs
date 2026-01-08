@@ -23,7 +23,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         try
         {
             string result = await _tasks
-                .GetOrAdd(divisionCode, _ => ScrapeDivisionInternal(divisionCode))
+                .GetOrAdd(divisionCode, ScrapeDivisionInternal(divisionCode))
                 .ConfigureAwait(false);
 
             if (string.IsNullOrEmpty(result))

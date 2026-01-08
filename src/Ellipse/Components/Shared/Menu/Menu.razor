@@ -1,7 +1,8 @@
-@using OpenLayers.Blazor
+@using Community.Blazor.MapLibre.Models
 @namespace Ellipse.Components.Shared.Menu
 
-<MudDrawer @bind-Open="Open" Anchor="Anchor.Left" Elevation="8" Variant="DrawerVariant.Persistent" Class="@_class"
+<MudDrawer @bind-Open="_open" Anchor="Anchor.Left" Elevation="8" Variant="DrawerVariant.Persistent" Overlay="false"
+           Class="@_class"
            Style="transition: transform 0.4s ease, width 0.4s ease;" Width="350px">
     <!-- Drawer Header -->
     <MudDrawerHeader
@@ -13,7 +14,7 @@
                        Class="text-white hover:text-gray-300 transition-colors duration-200"/>
         @if (!IsList)
         {
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="ToggleView" Edge="Edge.Start"
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="() => ToggleView()" Edge="Edge.Start"
                            Class="text-white hover:text-gray-300 transition-colors duration-200"/>
         }
     </MudDrawerHeader>
@@ -21,24 +22,28 @@
     <!-- Drawer Content -->
     @if (IsList)
     {
-        if (Markers.Count > 0)
+        if (_markers.Count > 0)
         {
-            <MudList T="Marker" Class="relative">
-                @foreach (KeyValuePair<Coordinate, Marker> kvp in Markers)
-                {
-                    <MudListItem>
-                        @ListItem((kvp.Key, kvp.Value.Properties["Routes"]["Average"].Distance, kvp.Value.Properties["Routes"]["Average"].Duration))
-                    </MudListItem>
-                }
-            </MudList>
+            <Virtualize TItem="KeyValuePair<LngLat, Dictionary<string, dynamic>>" Context="kvp"
+                        Items="@_markers.ToList()">
+                <ItemContent>
+                    @ListItem((kvp.Value["Name"], kvp.Key, kvp.Value["Routes"]["Average"].Distance, kvp.Value["Routes"]["Average"].Duration))
+                </ItemContent>
+                <Placeholder>
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="100%"/>
+                </Placeholder>
+                <EmptyContent>
+                    <MudText>There are no markers</MudText>
+                </EmptyContent>
+            </Virtualize>
         }
         else
         {
-            <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle" Class="grow"/>
+            <MudSkeleton Animation="Animation.Wave" SkeletonType="SkeletonType.Rectangle" Height="200px"/>
         }
     }
-    else if (_selectedMarker != null)
+    else if (_selectedMarkerData != null)
     {
-        @SingleItem((_selectedMarker, _selectedMarker.Properties["Routes"]))
+        @SingleItem((_selectedMarkerData, _selectedMarkerData["Routes"]))
     }
 </MudDrawer>

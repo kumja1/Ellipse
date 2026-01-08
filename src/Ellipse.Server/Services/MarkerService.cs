@@ -30,12 +30,12 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             Log.Information("Returning cached MarkerResponse");
             return deserialized;
         }
-
+        
         Log.Information("Cache miss for point: {Point}", request.Point);
         try
         {
             MarkerResponse? markerResponse = await _tasks
-                .GetOrAdd(request.Point, _ => GetMarkerInternal(request))
+                .GetOrAdd(request.Point, GetMarkerInternal(request))
                 .ConfigureAwait(false);
 
             if (markerResponse == null)

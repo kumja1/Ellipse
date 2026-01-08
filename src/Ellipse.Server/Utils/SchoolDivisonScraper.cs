@@ -16,7 +16,7 @@ public sealed partial class SchoolDivisionScraper(
     IBrowsingContext context
 )
 {
-    private const string VirginiaSchoolsUrl = "https://schoolquality.virginia.gov/schools";
+    private const string VIRGINIA_SCHOOLS_URL = "https://schoolquality.virginia.gov/schools";
 
     [GeneratedRegex(@"[.\s/]+")]
     private static partial Regex SchoolNameRegex();
@@ -47,7 +47,7 @@ public sealed partial class SchoolDivisionScraper(
 
     private async Task<(List<SchoolData> Schools, int TotalPages)> ParsePage(int page)
     {
-        string url = $"{VirginiaSchoolsUrl}/page/{page}?division={divisionCode}";
+        string url = $"{VIRGINIA_SCHOOLS_URL}/page/{page}?division={divisionCode}";
         IDocument? document = null;
         List<IElement>? rows = await CallbackHelper
             .RetryIfInvalid(
@@ -63,7 +63,7 @@ public sealed partial class SchoolDivisionScraper(
             )
             .ConfigureAwait(false);
 
-        ArgumentNullException.ThrowIfNull(rows, nameof(rows));
+        ArgumentNullException.ThrowIfNull(rows);
         SchoolData?[] results = await Task.WhenAll(rows.Select(ParseRow)).ConfigureAwait(false);
 
         List<SchoolData> schools = [.. results.Where(s => s != null).Cast<SchoolData>()];
@@ -136,7 +136,7 @@ public sealed partial class SchoolDivisionScraper(
 
                         await _semaphore.WaitAsync().ConfigureAwait(false);
 
-                        string url = $"{VirginiaSchoolsUrl}/{schoolName}";
+                        string url = $"{VIRGINIA_SCHOOLS_URL}/{schoolName}";
                         Log.Information("Requesting: {Url}", url);
 
                         IDocument doc = await context.OpenAsync(url).ConfigureAwait(false);
