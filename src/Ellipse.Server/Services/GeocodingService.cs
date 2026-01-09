@@ -488,7 +488,9 @@ public class GeocodingService(
             return null;
 
         SnappedLocation? snapPoint = response
-            .Locations.Where(snap=> snap.Name.Contains("VA", StringComparison.CurrentCultureIgnoreCase) || snap.Name.Contains("Virginia", StringComparison.CurrentCultureIgnoreCase))
+            .Locations.Where(snap=> snap != null &&
+                                    (snap.Name.Contains("VA", StringComparison.CurrentCultureIgnoreCase) ||
+                                     snap.Name.Contains("Virginia", StringComparison.CurrentCultureIgnoreCase)))
             .OrderBy(snap => snap?.SnappedDistance)
             .FirstOrDefault();
         return snapPoint;

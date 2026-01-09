@@ -112,7 +112,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         Dictionary<string, Route> results = new(schools.Count);
         await CallbackHelper.RetryIfInvalid(
              null,
-             async (attempt) =>
+             async attempt =>
              {
                  Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
                  await _semaphore.WaitAsync();
@@ -127,8 +127,8 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                      for (int i = 0; i < schools.Count; i++)
                      {
                          SchoolData school = schools[i];
-                         double distance = distances![i];
-                         double duration = durations![i];
+                         double distance = distances[i];
+                         double duration = durations[i];
 
                          if (
                              !results.TryAdd(

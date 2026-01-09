@@ -18,7 +18,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
     {
         string? cachedData = await cache.GetStringAsync($"division_{divisionCode}");
         if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)
-            return StringHelper.Decompress(cachedData!);
+            return StringHelper.Decompress(cachedData);
 
         try
         {
