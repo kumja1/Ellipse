@@ -87,6 +87,7 @@ public static class Program
         );
 
         string? openRouteApiKey = Environment.GetEnvironmentVariable("OPENROUTE_API_KEY");
+        string? mapillaryApiKey = Environment.GetEnvironmentVariable("MAPILLARY_API_KEY");
         string? postgrestUrl = Environment.GetEnvironmentVariable(
             "PostgresCache__ConnectionString"
         );
@@ -97,6 +98,7 @@ public static class Program
         ArgumentException.ThrowIfNullOrEmpty(postgrestSchema);
         ArgumentException.ThrowIfNullOrEmpty(postgrestTable);
         ArgumentException.ThrowIfNullOrEmpty(openRouteApiKey);
+        ArgumentException.ThrowIfNullOrEmpty(mapillaryApiKey);
 
         builder.Services.AddDistributedPostgresCache(options =>
         {
@@ -115,6 +117,10 @@ public static class Program
             .AddSingleton(sp => new OpenRouteClient(
                 sp.GetRequiredService<HttpClient>(),
                 openRouteApiKey
+            ))
+            .AddSingleton(sp => new MapillaryClient(
+                sp.GetRequiredService<HttpClient>(),
+                mapillaryApiKey
             ))
             .AddSingleton<SchoolsScraperService>()
             .AddHttpClient<OsrmHttpApiClient>(

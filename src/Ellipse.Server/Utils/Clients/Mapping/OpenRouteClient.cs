@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using Ellipse.Common.Interfaces;
 using Ellipse.Common.Models;
@@ -36,7 +35,7 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     {
         AppendParam(builder, "api_key", apiKey);
         AppendParam(builder, "text", request.Query);
-        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture));
+        AppendParam(builder, "size", request.Size);
         return builder.ToString();
     }
 
@@ -46,9 +45,13 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
     )
     {
         AppendParam(builder, "api_key", apiKey);
-        AppendParam(builder, "point.lon", request.Longitude.ToString(CultureInfo.InvariantCulture));
-        AppendParam(builder, "point.lat", request.Latitude.ToString(CultureInfo.InvariantCulture));
-        AppendParam(builder, "size", request.Size.ToString(CultureInfo.InvariantCulture));
+        AppendParam(builder, "point.lon", request.Longitude);
+        AppendParam(builder, "point.lat", request.Latitude);
+        AppendParam(builder, "size", request.Size);
+        AppendParam(builder, "layers", request.Layers);
+        AppendParam(builder, "boundary.country", request.BoundaryCountry);
+        AppendParam(builder, "boundary.circle.radius", request.BoundaryCircleRadius);
+        
         return builder.ToString();
     }
 

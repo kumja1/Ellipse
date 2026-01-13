@@ -156,9 +156,11 @@ partial class MapPage : ComponentBase, IDisposable
                     {
                         Color = "red"
                     }, point);
-                    _menu.AddMarker(point,  new()
+                    _menu.AddMarker(point,  new Dictionary<string, dynamic>
                     {
                         ["Name"] = response.Address,
+                        ["Image256Url"] = response.Image256Url,
+                        ["Image1024Url"] = response.Image1024Url,
                         ["Id"] = markerId,
                         ["Routes"] = response.Routes,
                         ["TotalDistance"] = response.TotalDistance,

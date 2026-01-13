@@ -19,26 +19,26 @@ public partial class Menu : ComponentBase
 
     [Parameter]
     public RenderFragment<(string MarkerName, LngLat MarkerLngLat, double MarkerAverageDistance, TimeSpan
-        MarkerAverageDuration)> ListItem { get; set; }
+        MarkerAverageDuration, string? Image256Url)> ListItem { get; set; }
 
     [Parameter] public string Class { get; set; }
     private string _class =>
         CssBuilder
-            .Default("flex shadow-2xl bg-white rounded-r-lg overflow-auto")
+            .Default("fixed left-0 top-0 z-30 h-full flex items-start overflow-hidden")
             .AddClass(Class, !string.IsNullOrWhiteSpace(Class))
             .Build();
     private readonly Dictionary<LngLat, Dictionary<string, dynamic>> _markers = [];
     private Dictionary<string, dynamic>? _selectedMarkerData;
     private Virtualize<KeyValuePair<LngLat, Dictionary<string, dynamic>>> _virtualize;
 
-    private bool _open;
+    public bool Open;
 
 
     public void ToggleOpen()
     {
-        Log.Information("Before Toggle: {Open}", _open);
-        _open = !_open;
-        Log.Information("After Toggle: {Open}", _open);
+        Log.Information("Before Toggle: {Open}", Open);
+        Open = !Open;
+        Log.Information("After Toggle: {Open}", Open);
     }
 
     public void ToggleView(LngLat? point = null)

@@ -1,9 +1,12 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Ellipse.Common.Models;
+using Ellipse.Common.Models.Mapillary;
 using Ellipse.Common.Models.Markers;
+using Ellipse.Common.Models.Snapping.OpenRoute;
 using Ellipse.Common.Utils;
 using Ellipse.Server.Utils;
+using Ellipse.Server.Utils.Clients.Mapping;
 using Microsoft.Extensions.Caching.Distributed;
 using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
@@ -11,7 +14,8 @@ using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeocodingService geocodingService, IDistributedCache cache) : IDisposable
+public class MarkerService(GeocodingService geocodingService, MapillaryClient mapillaryClient, IDistributedCache cache)
+    : IDisposable
 {
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
     private readonly SemaphoreSlim _semaphore = new(20, 20);
@@ -30,7 +34,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             Log.Information("Returning cached MarkerResponse");
             return deserialized;
         }
-        
+
         Log.Information("Cache miss for point: {Point}", request.Point);
         try
         {
@@ -48,8 +52,8 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                 $"marker_{request.Point}",
                 StringHelper.Compress(JsonSerializer.Serialize(markerResponse))
             );
-            Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
 
+            Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
             return markerResponse;
         }
         finally
@@ -92,7 +96,21 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             avgDuration
         );
 
-        return routes.Count == 0 ? null : new MarkerResponse(address, distances.Sum(), routes);
+
+        MapillaryResponse<MapillaryImage> mapillaryResponse = await mapillaryClient.SearchImages(
+            new MapillarySearchRequest
+            {
+                MaxLat = request.Point.Lat + 0.005,
+                MaxLon = request.Point.Lon + 0.005,
+                MinLat = request.Point.Lat - 0.005,
+                MinLon = request.Point.Lon - 0.005,
+                Limit = 10
+            });
+
+        MapillaryImage image = mapillaryResponse.Data[0];
+        return routes.Count == 0
+            ? null
+            : new MarkerResponse(address, image.Thumb256Url, image.Thumb1024Url, distances.Sum(), routes);
     }
 
     private async Task<Dictionary<string, Route>> GetMatrixRoutes(
@@ -111,63 +129,64 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     {
         Dictionary<string, Route> results = new(schools.Count);
         await CallbackHelper.RetryIfInvalid(
-             null,
-             async attempt =>
-             {
-                 Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
-                 await _semaphore.WaitAsync();
-                 try
-                 {
-                     (double[] distances, double[] durations) =
-                         await geocodingService.GetMatrixCached(
-                             source,
-                             [.. schools.Select(s => s.LatLng)]
-                         );
+            null,
+            async attempt =>
+            {
+                Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
+                await _semaphore.WaitAsync();
+                try
+                {
+                    (double[] distances, double[] durations) =
+                        await geocodingService.GetMatrixCached(
+                            source,
+                            [.. schools.Select(s => s.LatLng)]
+                        );
 
-                     for (int i = 0; i < schools.Count; i++)
-                     {
-                         SchoolData school = schools[i];
-                         double distance = distances[i];
-                         double duration = durations[i];
+                    for (int i = 0; i < schools.Count; i++)
+                    {
+                        SchoolData school = schools[i];
+                        double distance = distances[i];
+                        double duration = durations[i];
 
-                         if (
-                             !results.TryAdd(
-                                 school.Name,
-                                 new Route { Distance = distance, Duration = TimeSpan.FromSeconds(duration) }
-                             )
-                         )
-                         {
-                             Log.Information(
-                                 "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
-                                 school.Name,
-                                 distance,
-                                 duration
-                             );
-                             continue;
-                         }
+                        if (
+                            !results.TryAdd(
+                                school.Name,
+                                new Route { Distance = distance, Duration = TimeSpan.FromSeconds(duration) }
+                            )
+                        )
+                        {
+                            Log.Information(
+                                "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
+                                school.Name,
+                                distance,
+                                duration
+                            );
+                            continue;
+                        }
 
-                         Log.Information(
-                             "School: {School} => Distance: {Distance}, Duration: {Duration}",
-                             school.Name,
-                             distance,
-                             duration
-                         );
-                     }
+                        Log.Information(
+                            "School: {School} => Distance: {Distance}, Duration: {Duration}",
+                            school.Name,
+                            distance,
+                            duration
+                        );
+                    }
 
-                     return true;
-                 }
-                 finally
-                 {
-                     _semaphore.Release();
-                 }
-             },
-             maxRetries: 20,
-             delayMs: 500
-         );
+                    return true;
+                }
+                finally
+                {
+                    _semaphore.Release();
+                }
+            },
+            maxRetries: 20,
+            delayMs: 500
+        );
 
         Log.Information("Matrix routes obtained.");
         return results;
     }
+
     private static double Trimean(List<double> data)
     {
         Log.Information("Calculating trimean for {Count} data points.", data.Count);

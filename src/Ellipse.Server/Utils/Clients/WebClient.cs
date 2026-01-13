@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using AngleSharp.Text;
@@ -7,26 +8,30 @@ namespace Ellipse.Server.Utils.Clients;
 
 public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : IDisposable
 {
-    protected static void AppendParam(
+    protected static void AppendParam<T>(
         StringBuilder builder,
         string key,
-        string value,
+        T value,
         bool appendAnd = true
     )
     {
-        if (string.IsNullOrEmpty(key))
+        if (string.IsNullOrEmpty(key) || Equals(value, default(T)))
             return;
 
         if (builder.Length == 0)
             builder.Append('?');
-
-        if (string.IsNullOrEmpty(value))
-            value = string.Empty;
-
+        
         if (appendAnd && builder.Length > 1)
             builder.Append('&');
 
-        builder.Append(key).Append('=').Append(Uri.EscapeDataString(value));
+        string paramValue = value switch
+        {
+            IEnumerable<string> enumerable => string.Join(',', enumerable),
+            _ when value is bool or string or int or long or double or float => string.Format(CultureInfo.InvariantCulture, "{0}", value),
+            _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
+        };
+
+        builder.Append(key).Append('=').Append(Uri.EscapeDataString(paramValue));
     }
 
     private static void AppendParam(StringBuilder builder, string value)
@@ -64,7 +69,7 @@ public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : 
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<T>()
-            ?? throw new JsonException("'response.Content' could not be parsed");
+               ?? throw new JsonException("'response.Content' could not be parsed");
     }
 
     protected async Task<TResponse> GetRequest<TResponse>(
