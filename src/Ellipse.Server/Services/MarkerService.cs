@@ -97,20 +97,20 @@ public class MarkerService(GeocodingService geocodingService, MapillaryClient ma
         );
 
 
-        MapillaryResponse<MapillaryImage> mapillaryResponse = await mapillaryClient.SearchImages(
-            new MapillarySearchRequest
-            {
-                MaxLat = request.Point.Lat + 0.005,
-                MaxLon = request.Point.Lon + 0.005,
-                MinLat = request.Point.Lat - 0.005,
-                MinLon = request.Point.Lon - 0.005,
-                Limit = 10
-            });
+        // MapillaryResponse<MapillaryImage> mapillaryResponse = await mapillaryClient.SearchImages(
+        //     new MapillarySearchRequest
+        //     {
+        //         MaxLat = request.Point.Lat + 0.005,
+        //         MaxLon = request.Point.Lon + 0.005,
+        //         MinLat = request.Point.Lat - 0.005,
+        //         MinLon = request.Point.Lon - 0.005,
+        //         Limit = 10
+        //     });
 
-        MapillaryImage image = mapillaryResponse.Data[0];
+        // MapillaryImage image = mapillaryResponse.Data[0];
         return routes.Count == 0
             ? null
-            : new MarkerResponse(address, image.Thumb256Url, image.Thumb1024Url, distances.Sum(), routes);
+            : new MarkerResponse(address, distances.Sum(), routes);
     }
 
     private async Task<Dictionary<string, Route>> GetMatrixRoutes(
