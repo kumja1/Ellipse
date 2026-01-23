@@ -5,6 +5,7 @@ public readonly record struct GeoPoint2d(double Lon, double Lat) : IComparable<G
     public override string ToString() => $"{Lon},{Lat}";
 
     public static GeoPoint2d Zero => new(0d, 0d);
+    
 
     public static bool TryParse(string str, out GeoPoint2d result)
     {

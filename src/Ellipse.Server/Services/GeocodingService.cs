@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
@@ -19,6 +21,8 @@ public class GeocodingService(
     IDistributedCache cache
 )
 {
+    private bool _overwriteCache;
+
     public async Task<string> GetAddressCached(
         double longitude,
         double latitude
@@ -31,16 +35,19 @@ public class GeocodingService(
             latitude
         );
 
-        string? cachedAddress = await cache.GetStringAsync(cacheKey);
-        if (!string.IsNullOrEmpty(cachedAddress))
+        if (!_overwriteCache)
         {
-            Log.Information(
-                "[GetAddressCached] Cache hit for {Longitude}, {Latitude} - Address: {CachedAddress}",
-                longitude,
-                latitude,
-                cachedAddress
-            );
-            return cachedAddress;
+            string? cachedAddress = await cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedAddress))
+            {
+                Log.Information(
+                    "[GetAddressCached] Cache hit for {Longitude}, {Latitude} - Address: {CachedAddress}",
+                    longitude,
+                    latitude,
+                    cachedAddress
+                );
+                return cachedAddress;
+            }
         }
 
         Log.Information(
@@ -170,15 +177,19 @@ public class GeocodingService(
         }
 
         string cacheKey = $"latlng_{address.ToLower().Replace(" ", "_")}";
-        string? cachedLatLng = await cache.GetStringAsync(cacheKey);
-        Log.Information("[GetLatLngCached] Searching cache for address: {Address}", address);
 
-        _ =
-            GeoPoint2d.TryParse(cachedLatLng, out GeoPoint2d latLng)
-                ? latLng
-                : (latLng = await GetLatLngWithCensus(address)) == GeoPoint2d.Zero
-                    ? latLng = await GetLatLngWithOpenRoute(address)
-                    : GeoPoint2d.Zero;
+        if (!_overwriteCache)
+        {
+            string? cachedLatLng = await cache.GetStringAsync(cacheKey);
+            Log.Information("[GetLatLngCached] Searching cache for address: {Address}", address);
+
+            if (!string.IsNullOrEmpty(cachedLatLng))
+                return GeoPoint2d.Parse(cachedLatLng);
+        }
+
+        GeoPoint2d latLng = await GetLatLngWithCensus(address) == GeoPoint2d.Zero
+            ? await GetLatLngWithOpenRoute(address)
+            : GeoPoint2d.Zero;
 
         if (latLng == GeoPoint2d.Zero)
         {
@@ -283,23 +294,29 @@ public class GeocodingService(
             destinations.Length
         );
 
-        string cacheKey = $"matrix_{string.Join("_", sources.Select(s => s.ToString()))}_{string.Join("_", destinations.Select(d => d.ToString()))}";
+        string cacheKey =
+            $"matrix_{string.Join("_", sources.Select(s => s.ToString()))}_{string.Join("_", destinations.Select(d => d.ToString()))}";
         if (cacheKey.Length > 256)
         {
-            using var sha256 = SHA256.Create();
+            using SHA256 sha256 = SHA256.Create();
             byte[] hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(cacheKey));
             cacheKey = $"matrix_hash_{Convert.ToHexString(hashBytes)}";
         }
-        string? cachedMatrix = await cache.GetStringAsync(cacheKey);
 
-        if (!string.IsNullOrEmpty(cachedMatrix))
+        if (_overwriteCache)
         {
-            Log.Information(
-                "[GetMatrixCached] Cache hit for {SourceCount} sources",
-                sources.Length
-            );
-            return System.Text.Json.JsonSerializer.Deserialize<(double[][], double[][])>(cachedMatrix)!;
+            string? cachedMatrix = await cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedMatrix))
+            {
+                Log.Information(
+                    "[GetMatrixCached] Cache hit for {SourceCount} sources",
+                    sources.Length
+                );
+
+                return JsonSerializer.Deserialize<(double[][], double[][])>(cachedMatrix);
+            }
         }
+        
 
         TableResponse? response = await GetMatrixWithOsrm(sources, destinations)
             .ConfigureAwait(false);
@@ -309,8 +326,10 @@ public class GeocodingService(
 
         if (response is not null)
         {
-            resultDistances = response.Distances.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? []).ToArray() ?? [];
-            resultDurations = response.Durations.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? []).ToArray() ?? [];
+            resultDistances = response.Distances.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? [])
+                .ToArray();
+            resultDurations = response.Durations.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? [])
+                .ToArray();
         }
         else
         {
@@ -326,13 +345,15 @@ public class GeocodingService(
                 return (Array.Empty<double[]>(), Array.Empty<double[]>());
             }
 
-            resultDistances = openRouteResponse.Distances?.Select(row => row?.Select(d => (double)d).ToArray() ?? []).ToArray() ?? [];
-            resultDurations = openRouteResponse.Durations?.Select(row => row?.Select(d => (double)d).ToArray() ?? []).ToArray() ?? [];
+            resultDistances = openRouteResponse.Distances?.Select(row => row?.Select(d => (double)d).ToArray() ?? [])
+                .ToArray() ?? [];
+            resultDurations = openRouteResponse.Durations?.Select(row => row?.Select(d => (double)d).ToArray() ?? [])
+                .ToArray() ?? [];
         }
 
         await cache.SetStringAsync(
             cacheKey,
-            System.Text.Json.JsonSerializer.Serialize((resultDistances, resultDurations))
+            JsonSerializer.Serialize((resultDistances, resultDurations))
         );
 
         return (resultDistances, resultDurations);
@@ -419,5 +440,10 @@ public class GeocodingService(
 
         Log.Information("Matrix response successfully received.");
         return response;
+    }
+
+    public void DisableCaching(bool overwriteCache)
+    {
+        _overwriteCache = overwriteCache;
     }
 }

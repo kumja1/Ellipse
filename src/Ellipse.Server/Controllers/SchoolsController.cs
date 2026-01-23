@@ -8,7 +8,6 @@ namespace Ellipse.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[OutputCache(Duration = 1200)]
 public sealed class SchoolsController(SchoolsScraperService scraperService) : ControllerBase
 {
     // GET api/schools

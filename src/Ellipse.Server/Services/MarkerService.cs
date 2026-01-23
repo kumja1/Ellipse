@@ -1,14 +1,11 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Ellipse.Common.Models;
-using Ellipse.Common.Models.Mapillary;
 using Ellipse.Common.Models.Markers;
-using Ellipse.Common.Models.Snapping.OpenRoute;
 using Ellipse.Common.Utils;
 using Ellipse.Server.Utils;
 using Microsoft.Extensions.Caching.Distributed;
 using Serilog;
-using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
 using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
@@ -101,8 +98,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             avgDistance,
             avgDuration
         );
-
-
+        
         // MapillaryResponse<MapillaryImage> mapillaryResponse = await mapillaryClient.SearchImages(
         //     new MapillarySearchRequest
         //     {
