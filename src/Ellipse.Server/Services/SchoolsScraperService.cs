@@ -69,7 +69,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
                 func: async _ =>
                 {
                     IDocument document = await _browsingContext.OpenAsync(url).ConfigureAwait(false);
-                    Log.Information("Document: {@Document}", document);
+                    Log.Information("Document: {Document}", document.TextContent);
                     divisionName = document.QuerySelector("tr.division_heading td.division")?.TextContent ??
                                    "";
 
