@@ -36,7 +36,7 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
 
         List<SchoolData> schools = [.. results.Where(x => x is not null).SelectMany(x => x!)];
 
-        Log.Information("Completed school fetch. Current Count: {Count}. Removing duplicates…", 
+        Log.Information("Completed school fetch. Current Count: {Count}. Removing duplicates…",
             schools.Count);
 
         return [.. schools.DistinctBy(s => s.LatLng)];
@@ -48,17 +48,16 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
         {
             Log.Information("Fetching schools for division {Division}", divisionName);
 
-            List<SchoolData>? result = await CallbackHelper.RetryIfInvalid(
-                r => r != null && r.Count != 0,
+            List<SchoolData> result = await Retry.RetryIfListEmpty(
                 async _ =>
-                    await httpClient.GetFromJsonAsync<List<SchoolData>>(
+                    (await httpClient.GetFromJsonAsync<List<SchoolData>>(
                         $"api/schools?divisionCode={code}"
-                    ),
+                    ))!,
                 maxRetries: 30,
                 delayMs: 500
             );
 
-            if (result == null)
+            if (result.Count == 0)
             {
                 Log.Warning("Failed to retrieve schools for {Division} ({Code})", divisionName, code);
                 return null;
@@ -71,7 +70,7 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Error(ex, 
+            Log.Error(ex,
                 "An error occurred while retrieving schools for division {Code}", code);
             return [];
         }

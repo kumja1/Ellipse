@@ -1,7 +1,24 @@
 namespace Ellipse.Common.Utils;
 
-public static class CallbackHelper
+public static class Retry
 {
+    public static async Task Default<TResult>(Func<int, Task<TResult>> func, int maxRetries = 5,
+        int delayMs = 100
+    )
+        => await RetryIfInvalid(null, func, default, maxRetries, delayMs);
+
+    public static async Task<List<TItem>> RetryIfListEmpty<TItem>(Func<int, Task<List<TItem>>> func,
+        int maxRetries = 5,
+        int delayMs = 100) =>
+        (await RetryIfInvalid(l => l is { Count: > 0 }, func, [], maxRetries, delayMs))!;
+
+
+    public static async Task<HttpResponseMessage?> RetryIfResponseFailed(Func<int, Task<HttpResponseMessage>> func,
+        int maxRetries = 5,
+        int delayMs = 100) =>
+        await RetryIfInvalid(message => message is { IsSuccessStatusCode: true }, func, null, maxRetries,
+            delayMs);
+
     public static async Task<TResult?> RetryIfInvalid<TResult>(
         Func<TResult?, bool>? isValid,
         Func<int, Task<TResult>> func,

@@ -41,8 +41,8 @@ partial class MapPage : ComponentBase, IDisposable
         MinZoom = 5,
         // DoubleClickZoom = false,
     };
-    
-    [Inject] public HttpClient Http { get; set; }
+
+    [Inject] public HttpClient HttpClient { get; set; }
 
     [Inject] public SchoolDivisionService? SchoolDivisionService { get; set; }
 
@@ -64,52 +64,10 @@ partial class MapPage : ComponentBase, IDisposable
         BoundingBox bbox = new(_schools.Select(s => s.LatLng));
         Log.Information("Initializing map with bounding box: {BoundingBox}", bbox);
         await GetMarkers(0.11, bbox
-            );
+        );
 #if DEBUG
         Log.Information("OnMapLoaded: Map initialization complete");
 #endif
-    }
-
-
-    private async Task<MarkerResponse?> GetMarker(double x, double y, List<SchoolData> schools)
-    {
-        try
-        {
-#if DEBUG
-            Log.Information("GetMarker: Requesting marker for coordinates ({X}, {Y}) with {SchoolCount} schools", x, y,
-                schools.Count);
-#endif
-            HttpResponseMessage? response = await CallbackHelper.RetryIfInvalid(
-                r => r is { IsSuccessStatusCode: true },
-                async _ =>
-                    await Http
-                        .PostAsJsonAsync("api/marker", new MarkerRequest(schools, new GeoPoint2d(x, y)))
-            );
-
-            if (response == null)
-            {
-#if DEBUG
-                Log.Information("GetMarker: Received null response for ({X}, {Y})", x, y);
-#endif
-                return null;
-            }
-
-            MarkerResponse? markerResponse = await response
-                .Content.ReadFromJsonAsync<MarkerResponse>();
-#if DEBUG
-            Log.Information("GetMarker: Successfully retrieved marker response for ({X}, {Y})", x, y);
-#endif
-
-            return markerResponse;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error calling server for marker at ({x},{y}): {ex.Message}");
-#if DEBUG
-            Log.Information(ex, "GetMarker: Exception occurred for coordinates ({X}, {Y})", x, y);
-#endif
-            return null;
-        }
     }
 
     private async Task GetMarkers(double step, BoundingBox box)
@@ -122,7 +80,7 @@ partial class MapPage : ComponentBase, IDisposable
 #endif
             _loading = true;
             StateHasChanged();
-            
+
             Guid? closestMarkerId = null;
             TimeSpan? closestDuration = null;
             DateTime lastUpdate = DateTime.Now;
@@ -131,14 +89,29 @@ partial class MapPage : ComponentBase, IDisposable
 #if DEBUG
                 Log.Information("GetMarkers: Processing chunk of {ChunkSize} points", row.Length);
 #endif
-                if (DateTime.Now - lastUpdate   >= TimeSpan.FromSeconds(10))
+                if (DateTime.Now - lastUpdate >= TimeSpan.FromSeconds(10))
                     break;
 
-                MarkerResponse?[] responses = await Task.WhenAll(row.Select(point =>
-                    GetMarker(point.Lon, point.Lat, _schools)
-                ));
+                HttpResponseMessage? httpResponse = await Retry.RetryIfResponseFailed(async _ =>
+                    await HttpClient
+                        .PostAsJsonAsync("api/marker/batch", row.Select(p => new MarkerRequest(_schools, p)))
+                );
 
-                for (int i = 0; i < responses.Length; i++)
+                if (httpResponse == null)
+                {
+                    Log.Warning("GetMarkers: Failed to retrieve markers");
+                    continue;
+                }
+
+                List<MarkerResponse?>? responses =
+                    await httpResponse.Content.ReadFromJsonAsync<List<MarkerResponse?>>();
+                if (responses == null)
+                {
+                    Log.Warning("GetMarkers: Failed to deserialize marker responses");
+                    continue;
+                }
+
+                for (int i = 0; i < responses.Count; i++)
                 {
                     MarkerResponse? response = responses[i];
                     if (response == null)
@@ -148,15 +121,15 @@ partial class MapPage : ComponentBase, IDisposable
                     }
 
                     LngLat point = new(row[i].Lon, row[i].Lat);
-#if DEBUG
-                    Log.Information("GetMarkers: Adding marker {MarkerAddress} at ({Lon}, {Lat})", response.Address,
+                    Log.Debug("GetMarkers: Adding marker {MarkerAddress} at ({Lon}, {Lat})", response.Address,
                         point.Longitude, point.Latitude);
-#endif
+
                     Guid markerId = await _map!.AddMarker(new MarkerOptions
                     {
                         Color = "red"
                     }, point);
-                    _menu.AddMarker(point,  new Dictionary<string, dynamic>
+
+                    _menu.AddMarker(point, new Dictionary<string, dynamic>
                     {
                         ["Name"] = response.Address,
                         // ["Image256Url"] = response.Image256Url,
@@ -185,8 +158,8 @@ partial class MapPage : ComponentBase, IDisposable
                         _map.UpdateMarker(new MarkerOptions { Color = "red" }, _closestPoint, closestMarkerId.Value),
                         _map.AddMarker(new MarkerOptions { Color = "green" }, point, markerId));
 
-                    _menu!.UpdateMarker(_closestPoint, "Color" , "red");
-                    _menu!.UpdateMarker(_closestPoint, "Color" , "green");
+                    _menu!.UpdateMarker(_closestPoint, "Color", "red");
+                    _menu!.UpdateMarker(_closestPoint, "Color", "green");
                     _closestPoint = point;
                     lastUpdate = DateTime.Now;
                     closestMarkerId = markerId;
@@ -244,29 +217,29 @@ partial class MapPage : ComponentBase, IDisposable
             _layers.Add(_currentLayerIndex);
             double newStep = _currentLayerIndex switch
             {
-                0 => 0.11,       // ~12 km - Division-wide search (your initial)
-                1 => 0.02,       // ~2 km - Zone-level search
-                2 => 0.005,      // ~500 m - District-level search
-                3 => 0.001,      // ~100 m - Site-level search (STOP HERE)
-                _ => 0.001       // Don't go smaller - not useful for buildings
+                0 => 0.11, // ~12 km - Division-wide search (your initial)
+                1 => 0.02, // ~2 km - Zone-level search
+                2 => 0.005, // ~500 m - District-level search
+                3 => 0.001, // ~100 m - Site-level search (STOP HERE)
+                _ => 0.001 // Don't go smaller - not useful for buildings
             };
-            
+
             double newRadius = _currentLayerIndex switch
             {
-                0 => 0,          // Full division (handled by school bounds)
-                1 => 10000,      // 10 km
-                2 => 3000,       // 3 km
-                3 => 1000,       // 1 km (final refinement)
+                0 => 0, // Full division (handled by school bounds)
+                1 => 10000, // 10 km
+                2 => 3000, // 3 km
+                3 => 1000, // 1 km (final refinement)
                 _ => 1000
             };
             await _map!.FitBounds(LngLatBounds.FromLngLat(_closestPoint!, newRadius));
 #if DEBUG
-            Log.Information("AddLayer: Layer {LayerIndex} added with step={Step}, radius={Radius}", 
+            Log.Information("AddLayer: Layer {LayerIndex} added with step={Step}, radius={Radius}",
                 _currentLayerIndex, newStep, newRadius);
 #endif
-            
+
             BoundingBox box = new(
-                new GeoPoint2d(_closestPoint.Longitude, _closestPoint.Latitude), 
+                new GeoPoint2d(_closestPoint.Longitude, _closestPoint.Latitude),
                 newRadius
             );
 
@@ -282,6 +255,7 @@ partial class MapPage : ComponentBase, IDisposable
                     (Guid)kvp.Value["Id"]
                 )));
         }
+
         await InvokeAsync(StateHasChanged);
     }
 
@@ -301,7 +275,6 @@ partial class MapPage : ComponentBase, IDisposable
         }
 #endif
         await InvokeAsync(StateHasChanged);
-
     }
 
     private async Task OnMarkerClicked(Dictionary<string, dynamic> eventData)

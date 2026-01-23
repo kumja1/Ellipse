@@ -6,7 +6,6 @@ using Ellipse.Common.Models.Markers;
 using Ellipse.Common.Models.Snapping.OpenRoute;
 using Ellipse.Common.Utils;
 using Ellipse.Server.Utils;
-using Ellipse.Server.Utils.Clients.Mapping;
 using Microsoft.Extensions.Caching.Distributed;
 using Serilog;
 using GeoPoint2d = Ellipse.Common.Models.GeoPoint2d;
@@ -14,11 +13,18 @@ using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
-public class MarkerService(GeocodingService geocodingService, MapillaryClient mapillaryClient, IDistributedCache cache)
+public class MarkerService(GeocodingService geocodingService, IDistributedCache cache)
     : IDisposable
 {
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
     private readonly SemaphoreSlim _semaphore = new(20, 20);
+
+    public async Task<List<MarkerResponse?>> GetMarkers(List<MarkerRequest> requests, bool overwriteCache)
+    {
+        Log.Information("Called for batch of {Count} points", requests.Count);
+        MarkerResponse?[] results = await Task.WhenAll(requests.Select(r => GetMarker(r, overwriteCache)));
+        return results.ToList();
+    }
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overwriteCache)
     {
@@ -128,19 +134,21 @@ public class MarkerService(GeocodingService geocodingService, MapillaryClient ma
     )
     {
         Dictionary<string, Route> results = new(schools.Count);
-        await CallbackHelper.RetryIfInvalid(
-            null,
+        await Retry.Default(
             async attempt =>
             {
                 Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
                 await _semaphore.WaitAsync();
                 try
                 {
-                    (double[] distances, double[] durations) =
+                    (double[][] distancesMatrix, double[][] durationsMatrix) =
                         await geocodingService.GetMatrixCached(
-                            source,
+                            [source],
                             [.. schools.Select(s => s.LatLng)]
                         );
+
+                    double[] distances = distancesMatrix[0];
+                    double[] durations = durationsMatrix[0];
 
                     for (int i = 0; i < schools.Count; i++)
                     {

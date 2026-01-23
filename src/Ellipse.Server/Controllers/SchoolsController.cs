@@ -2,6 +2,7 @@ using Ellipse.Server.Services;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
+using Serilog;
 
 namespace Ellipse.Server.Controllers;
 
@@ -21,6 +22,9 @@ public sealed class SchoolsController(SchoolsScraperService scraperService) : Co
             return BadRequest("Error: Missing or invalid field 'divisionCode'.");
 
         string result = await scraperService.ScrapeDivision(divisionCode, overrideCache);
+        if (string.IsNullOrEmpty(result))
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
         return Content(result, "application/json");
     }
 }

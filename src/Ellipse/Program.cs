@@ -8,7 +8,7 @@ using Serilog;
 
 namespace Ellipse;
 
-partial class Program
+internal static class Program
 {
     public static async Task Main(string[] args)
     {
@@ -37,7 +37,7 @@ partial class Program
             {
                 client.Timeout = TimeSpan.FromMinutes(10);
                 client.BaseAddress = new Uri(
-                    "https://doubtful-beatrix-lum-studios-0cd001db.koyeb.app/"
+                    "http://localhost:6001/"
                 );
             });
         });

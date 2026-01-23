@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
@@ -16,7 +17,7 @@ public class GeocodingService(
     OpenRouteClient openRouteClient,
     OsrmHttpApiClient osrmClient,
     IDistributedCache cache
-) : IDisposable
+)
 {
     public async Task<string> GetAddressCached(
         double longitude,
@@ -271,106 +272,100 @@ public class GeocodingService(
         }
     }
 
-    public async Task<(double[] Destinations, double[] Durations)> GetMatrixCached(
-        GeoPoint2d source,
+    public async Task<(double[][] Destinations, double[][] Durations)> GetMatrixCached(
+        GeoPoint2d[] sources,
         GeoPoint2d[] destinations
     )
     {
         Log.Information(
-            "[GetMatrixCached] Searching cache for source: {Source} with {Count} destinations",
-            source,
+            "[GetMatrixCached] Searching cache for {SourceCount} sources with {DestCount} destinations",
+            sources.Length,
             destinations.Length
         );
 
-        string cacheKey = $"matrix_{source}";
+        string cacheKey = $"matrix_{string.Join("_", sources.Select(s => s.ToString()))}_{string.Join("_", destinations.Select(d => d.ToString()))}";
+        if (cacheKey.Length > 256)
+        {
+            using var sha256 = SHA256.Create();
+            byte[] hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(cacheKey));
+            cacheKey = $"matrix_hash_{Convert.ToHexString(hashBytes)}";
+        }
         string? cachedMatrix = await cache.GetStringAsync(cacheKey);
 
         if (!string.IsNullOrEmpty(cachedMatrix))
         {
             Log.Information(
-                "[GetMatrixCached] Cache hit for source: {Source} with {Count} destinations",
-                source,
-                destinations.Length
+                "[GetMatrixCached] Cache hit for {SourceCount} sources",
+                sources.Length
             );
-            string[] parts = cachedMatrix.Split(';');
-            double[] cachedDistances = Array.ConvertAll(
-                parts[0].Split(','),
-                s => double.TryParse(s, out double d) ? d : 0
-            );
-            double[] cachedDurations = Array.ConvertAll(
-                parts[1].Split(','),
-                s => double.TryParse(s, out double d) ? d : 0
-            );
-
-            return (cachedDistances, cachedDurations);
+            return System.Text.Json.JsonSerializer.Deserialize<(double[][], double[][])>(cachedMatrix)!;
         }
 
-        TableResponse? response = await GetMatrixWithOsrm(source, destinations)
+        TableResponse? response = await GetMatrixWithOsrm(sources, destinations)
             .ConfigureAwait(false);
 
-        double[]? distances = response?.Distances[0].Select(x => (double)(x ?? 0)).ToArray();
-        double[]? durations = response?.Durations[0].Select(x => (double)(x ?? 0)).ToArray();
+        double[][] resultDistances;
+        double[][] resultDurations;
 
-        if (response is null)
+        if (response is not null)
+        {
+            resultDistances = response.Distances.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? []).ToArray() ?? [];
+            resultDurations = response.Durations.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? []).ToArray() ?? [];
+        }
+        else
         {
             OpenRouteMatrixResponse? openRouteResponse = await GetMatrixWithOpenRoute(
-                    source,
+                    sources,
                     destinations
                 )
                 .ConfigureAwait(false);
 
-            if (
-                openRouteResponse
-                is null
-            )
+            if (openRouteResponse is null)
             {
                 Log.Warning("Both OSRM and OpenRouteMatrix responses are null or invalid.");
-                return default;
+                return (Array.Empty<double[]>(), Array.Empty<double[]>());
             }
 
-            distances = openRouteResponse.Distances![0];
-            durations = openRouteResponse.Durations![0];
+            resultDistances = openRouteResponse.Distances?.Select(row => row?.Select(d => (double)d).ToArray() ?? []).ToArray() ?? [];
+            resultDurations = openRouteResponse.Durations?.Select(row => row?.Select(d => (double)d).ToArray() ?? []).ToArray() ?? [];
         }
 
         await cache.SetStringAsync(
             cacheKey,
-            $"{string.Join(',', distances!)};{string.Join(',', durations!)}"
+            System.Text.Json.JsonSerializer.Serialize((resultDistances, resultDurations))
         );
 
-        return (distances!, durations!);
+        return (resultDistances, resultDurations);
     }
 
     private async Task<TableResponse?> GetMatrixWithOsrm(
-        GeoPoint2d source,
+        GeoPoint2d[] sources,
         GeoPoint2d[] destinations
     )
     {
-        Log.Information(
-            "Called for source: {Source} with {Count} destinations.",
-            source,
-            destinations.Length
-        );
-
-        if (destinations.All(dest => dest == GeoPoint2d.Zero))
+        if (destinations.Any(dest => dest == GeoPoint2d.Zero))
+        {
+            Log.Information("No destinations provided. Returning null.");
             return null;
+        }
 
         TableRequest<JsonFormat> request = OsrmServices
             .Table(
                 PredefinedProfiles.Car,
                 GeographicalCoordinates.Create(
                     [
-                        Coordinate.Create(source.Lon, source.Lat),
+                        .. sources.Select(source => Coordinate.Create(source.Lon, source.Lat)),
                         .. destinations.Select(dest => Coordinate.Create(dest.Lon, dest.Lat)),
                     ]
                 )
             )
-            .Destinations([.. Enumerable.Range(1, destinations.Length)])
-            .Sources(0)
+            .Destinations([.. Enumerable.Range(sources.Length, destinations.Length)])
+            .Sources([.. Enumerable.Range(0, sources.Length)])
             .Annotations(TableAnnotations.DurationAndDistance)
             .Build();
 
         Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
-        var response = await osrmClient.GetTableAsync(request);
+        OsrmHttpApiResponse<TableResponse> response = await osrmClient.GetTableAsync(request);
         Log.Information("{Response}", response);
 
         if (!response.IsSuccess)
@@ -385,13 +380,13 @@ public class GeocodingService(
     }
 
     private async Task<OpenRouteMatrixResponse?> GetMatrixWithOpenRoute(
-        GeoPoint2d source,
+        GeoPoint2d[] sources,
         GeoPoint2d[] destinations
     )
     {
         Log.Information(
-            "Called for source: {Source} with {Count} destinations.",
-            source,
+            "Called for {SourceCount} sources with {DestCount} destinations.",
+            sources.Length,
             destinations.Length
         );
 
@@ -402,11 +397,11 @@ public class GeocodingService(
         {
             Locations =
             [
-                [source.Lon, source.Lat],
+                .. sources.Select(source => new[] { source.Lon, source.Lat }),
                 .. destinations.Select(dest => new[] { dest.Lon, dest.Lat }),
             ],
-            Sources = [0],
-            Destinations = [.. Enumerable.Range(1, destinations.Length)],
+            Sources = [.. Enumerable.Range(0, sources.Length)],
+            Destinations = [.. Enumerable.Range(sources.Length, destinations.Length)],
             Metrics = ["distance", "duration"],
             Units = "m",
             Profile = Profile.DrivingCar,
@@ -424,12 +419,5 @@ public class GeocodingService(
 
         Log.Information("Matrix response successfully received.");
         return response;
-    }
-    
-    public void Dispose()
-    {
-        GC.SuppressFinalize(this);
-        censusGeocoder.Dispose();
-        openRouteClient.Dispose();
     }
 }

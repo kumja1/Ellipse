@@ -23,4 +23,16 @@ public sealed class MarkerController(MarkerService markerService) : ControllerBa
             return NotFound();
         return Ok(response);
     }
+    
+    
+    // POST api/marker/batch
+    [HttpPost("batch")]
+    public async Task<IActionResult> PostMarkers(
+        [FromBody] List<MarkerRequest> requests,
+        [FromQuery] bool overwriteCache = false
+    )
+    {
+        List<MarkerResponse?> responses = await markerService.GetMarkers(requests, overwriteCache);
+        return Ok(responses);
+    }
 }
