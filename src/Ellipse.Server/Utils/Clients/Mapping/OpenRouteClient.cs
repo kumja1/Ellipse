@@ -31,15 +31,14 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         return await GetRequest<OpenRouteGeocodingResponse>(queryParams, "geocode/reverse");
     }
 
-    public string BuildGeocodeQueryParams(OpenRouteGeocodingRequest request, StringBuilder builder)
+    public void BuildGeocodeQueryParams(OpenRouteGeocodingRequest request, StringBuilder builder)
     {
         AppendParam(builder, "api_key", apiKey);
         AppendParam(builder, "text", request.Query);
         AppendParam(builder, "size", request.Size);
-        return builder.ToString();
     }
 
-    public string BuildReverseGeocodeQueryParams(
+    public void BuildReverseGeocodeQueryParams(
         OpenRouteReverseGeocodingRequest request,
         StringBuilder builder
     )
@@ -51,8 +50,6 @@ public sealed class OpenRouteClient(HttpClient client, string apiKey)
         AppendParam(builder, "layers", request.Layers);
         AppendParam(builder, "boundary.country", request.BoundaryCountry);
         AppendParam(builder, "boundary.circle.radius", request.BoundaryCircleRadius);
-        
-        return builder.ToString();
     }
 
     public Task<OpenRouteSnappingResponse> SnapToRoads(

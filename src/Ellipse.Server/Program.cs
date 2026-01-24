@@ -68,7 +68,7 @@ public static class Program
                                     detectEncodingFromByteOrderMarks: true
                                 );
 
-                                var body = await reader.ReadToEndAsync(token);
+                                string body = await reader.ReadToEndAsync(token);
                                 context.Request.Body.Position = 0;
                                 return KeyValuePair.Create(
                                     "bodyHash",

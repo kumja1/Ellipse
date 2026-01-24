@@ -10,7 +10,7 @@ public sealed class PostCachingPolicy : IOutputCachePolicy
         CancellationToken cancellationToken
     )
     {
-        var attemptOutputCaching = AttemptOutputCaching(context);
+        bool attemptOutputCaching = AttemptOutputCaching(context);
         context.EnableOutputCaching = true;
         context.AllowCacheLookup = attemptOutputCaching;
         context.AllowCacheStorage = attemptOutputCaching;

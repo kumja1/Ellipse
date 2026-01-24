@@ -16,26 +16,84 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
     private readonly SemaphoreSlim _semaphore = new(20, 20);
 
-    public async Task<List<MarkerResponse?>> GetMarkers(List<MarkerRequest> requests, bool overwriteCache)
+    public async Task<List<MarkerResponse>> GetMarkers(BatchMarkerRequest request, bool overwriteCache)
     {
-        Log.Information("Called for batch of {Count} points", requests.Count);
-        MarkerResponse?[] results = await Task.WhenAll(requests.Select(r => GetMarker(r, overwriteCache)));
-        return results.ToList();
+        string cacheKey = CacheHelper.CreateCacheKey(request.Points, request.Schools);
+        if (!overwriteCache)
+        {
+            string? cachedData = await cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                Log.Information("Cache hit for batch request: {RequestId}", cacheKey);
+                List<MarkerResponse> deserialized = JsonSerializer.Deserialize<List<MarkerResponse>>(
+                    CacheHelper.DecompressData(cachedData)
+                )!;
+
+                Log.Information("Returning cached MarkerResponse");
+                return deserialized;
+            }
+        }
+
+        List<MarkerResponse> results = await GetMarkersInternal(request).ConfigureAwait(false);
+        await cache.SetStringAsync(cacheKey, CacheHelper.CompressData(JsonSerializer.Serialize(results)));
+        return results;
+    }
+
+    private async Task<List<MarkerResponse>> GetMarkersInternal(BatchMarkerRequest request)
+    {
+        Dictionary<GeoPoint2d, MarkerResponse?> resultsMap = [];
+        string[] addresses = await Task.WhenAll(
+            request.Points.Select(p => geocodingService.GetAddressCached(p.Lon, p.Lat))
+        );
+
+        List<Dictionary<string, Route>> allRoutes =
+            await GetMatrixRoute(request.Points, request.Schools).ConfigureAwait(false);
+
+        for (int i = 0; i < request.Points.Length; i++)
+        {
+            GeoPoint2d point = request.Points[i];
+            Dictionary<string, Route> routes = allRoutes[i];
+
+            if (routes.Count == 0)
+            {
+                resultsMap[point] = null;
+                Log.Warning("No routes found for point: {Point}", point);
+                continue;
+            }
+
+            List<double> distances = [.. routes.Values.Select(r => r.Distance)];
+            double avgDistance = Trimean(distances);
+            double avgDuration = Trimean([.. routes.Values.Select(r => r.Duration.TotalSeconds)]);
+
+            routes["Average"] = new Route
+            {
+                Distance = avgDistance,
+                Duration = TimeSpan.FromSeconds(avgDuration)
+            };
+            resultsMap[point] = new MarkerResponse(addresses[i], distances.Sum(), routes);
+        }
+
+        return request.Points.Where(p => resultsMap[p] != null).Select(p => resultsMap[p]!).ToList();
     }
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overwriteCache)
     {
         Log.Information("Called for point: {Point}", request.Point);
 
-        string? cachedData = await cache.GetStringAsync($"marker_{request.Point}");
-        if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)
+
+        string cacheKey = CacheHelper.CreateCacheKey("marker", request.Point);
+        if (!overwriteCache)
         {
-            Log.Information("Cache hit for point: {Point}", request.Point);
-            MarkerResponse deserialized = JsonSerializer.Deserialize<MarkerResponse>(
-                StringHelper.Decompress(cachedData)
-            )!;
-            Log.Information("Returning cached MarkerResponse");
-            return deserialized;
+            string? cachedData = await cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                Log.Information("Cache hit for point: {Point}", request.Point);
+                MarkerResponse deserialized = JsonSerializer.Deserialize<MarkerResponse>(
+                    CacheHelper.DecompressData(cachedData)
+                )!;
+                Log.Information("Returning cached MarkerResponse");
+                return deserialized;
+            }
         }
 
         Log.Information("Cache miss for point: {Point}", request.Point);
@@ -52,8 +110,8 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             }
 
             await cache.SetStringAsync(
-                $"marker_{request.Point}",
-                StringHelper.Compress(JsonSerializer.Serialize(markerResponse))
+                cacheKey,
+                CacheHelper.CompressData(JsonSerializer.Serialize(markerResponse))
             );
 
             Log.Information("Cached new MarkerResponse for point: {Point}", request.Point);
@@ -68,7 +126,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     private async Task<MarkerResponse?> GetMarkerInternal(MarkerRequest request)
     {
         Log.Information("Processing MarkerRequest for point: {Point}", request.Point);
-        if (request.Schools.Count == 0)
+        if (request.Schools.Length == 0)
         {
             Log.Warning("No schools provided. Returning null.");
             return null;
@@ -79,7 +137,9 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             .ConfigureAwait(false);
 
         Log.Information("Address fetched: {Address}", address);
-        Dictionary<string, Route> routes = await GetMatrixRoutes(request.Point, request.Schools).ConfigureAwait(false);
+        List<Dictionary<string, Route>> allRoutes =
+            await GetMatrixRoute([request.Point], request.Schools).ConfigureAwait(false);
+        Dictionary<string, Route> routes = allRoutes[0];
 
         Log.Information("Matrix routes obtained. Count: {Count}", routes.Count);
         if (routes.Count == 0)
@@ -98,7 +158,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             avgDistance,
             avgDuration
         );
-        
+
         // MapillaryResponse<MapillaryImage> mapillaryResponse = await mapillaryClient.SearchImages(
         //     new MapillarySearchRequest
         //     {
@@ -115,21 +175,17 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             : new MarkerResponse(address, distances.Sum(), routes);
     }
 
-    private async Task<Dictionary<string, Route>> GetMatrixRoutes(
-        GeoPoint2d source,
-        List<SchoolData> schools
-    )
-    {
-        Log.Information("Called for source: {Source} with {Count} schools", source, schools.Count);
-        return await GetMatrixRoute(source, schools);
-    }
 
-    private async Task<Dictionary<string, Route>> GetMatrixRoute(
-        GeoPoint2d source,
-        List<SchoolData> schools
+    private async Task<List<Dictionary<string, Route>>> GetMatrixRoute(
+        GeoPoint2d[] sources,
+        SchoolData[] schools
     )
     {
-        Dictionary<string, Route> results = new(schools.Count);
+        List<Dictionary<string, Route>> results = Enumerable
+            .Range(0, sources.Length)
+            .Select(_ => new Dictionary<string, Route>(schools.Length))
+            .ToList();
+
         await Retry.Default(
             async attempt =>
             {
@@ -137,43 +193,48 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                 await _semaphore.WaitAsync();
                 try
                 {
-                    (double[][] distancesMatrix, double[][] durationsMatrix) =
+                    (double[][] distances, double[][] durations) =
                         await geocodingService.GetMatrixCached(
-                            [source],
+                            sources,
                             [.. schools.Select(s => s.LatLng)]
                         );
 
-                    double[] distances = distancesMatrix[0];
-                    double[] durations = durationsMatrix[0];
-
-                    for (int i = 0; i < schools.Count; i++)
+                    for (int i = 0; i < sources.Length; i++)
                     {
-                        SchoolData school = schools[i];
-                        double distance = distances[i];
-                        double duration = durations[i];
-
-                        if (
-                            !results.TryAdd(
-                                school.Name,
-                                new Route { Distance = distance, Duration = TimeSpan.FromSeconds(duration) }
-                            )
-                        )
+                        Dictionary<string, Route> currentDict = results[i];
+                        for (int j = 0; j < schools.Length; j++)
                         {
+                            SchoolData school = schools[j];
+                            double distance = distances[i][j];
+                            double duration = durations[i][j];
+
+                            if (
+                                !currentDict.TryAdd(
+                                    school.Name,
+                                    new Route
+                                    {
+                                        Distance = distance,
+                                        Duration = TimeSpan.FromSeconds(duration)
+                                    }
+                                )
+                            )
+                            {
+                                Log.Information(
+                                    "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
+                                    school.Name,
+                                    distance,
+                                    duration
+                                );
+                                continue;
+                            }
+
                             Log.Information(
-                                "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
+                                "School: {School} => Distance: {Distance}, Duration: {Duration}",
                                 school.Name,
                                 distance,
                                 duration
                             );
-                            continue;
                         }
-
-                        Log.Information(
-                            "School: {School} => Distance: {Distance}, Duration: {Duration}",
-                            school.Name,
-                            distance,
-                            duration
-                        );
                     }
 
                     return true;

@@ -21,6 +21,7 @@ public sealed class MarkerController(MarkerService markerService) : ControllerBa
         MarkerResponse? response = await markerService.GetMarker(request, overwriteCache);
         if (response == null)
             return NotFound();
+        
         return Ok(response);
     }
     
@@ -28,11 +29,14 @@ public sealed class MarkerController(MarkerService markerService) : ControllerBa
     // POST api/marker/batch
     [HttpPost("batch")]
     public async Task<IActionResult> PostMarkers(
-        [FromBody] List<MarkerRequest> requests,
+        [FromBody] BatchMarkerRequest request,
         [FromQuery] bool overwriteCache = false
     )
     {
-        List<MarkerResponse?> responses = await markerService.GetMarkers(requests, overwriteCache);
+        List<MarkerResponse> responses = await markerService.GetMarkers(request, overwriteCache);
+        if (responses.Count == 0)
+            return NotFound();
+        
         return Ok(responses);
     }
 }

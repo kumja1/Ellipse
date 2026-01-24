@@ -20,14 +20,15 @@ public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : 
 
         if (builder.Length == 0)
             builder.Append('?');
-        
+
         if (appendAnd && builder.Length > 1)
             builder.Append('&');
 
         string paramValue = value switch
         {
             IEnumerable<string> enumerable => string.Join(',', enumerable),
-            _ when value is bool or string or int or long or double or float => string.Format(CultureInfo.InvariantCulture, "{0}", value),
+            _ when value is bool or string or int or long or double or float => string.Format(
+                CultureInfo.InvariantCulture, "{0}", value),
             _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
         };
 
@@ -105,11 +106,13 @@ public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : 
 
     protected string BuildQueryParams<TRequest>(
         TRequest request,
-        Func<TRequest, StringBuilder, string> buildParams
+        Action<TRequest, StringBuilder> buildParams
     )
     {
         StringBuilder builder = StringBuilderPool.Obtain();
-        return buildParams(request, builder);
+        buildParams(request, builder);
+        
+        return builder.ToPool(); 
     }
 
     private string BuildUrl(string[] paths, string parameters = "")

@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
+using AngleSharp.Text;
 using Ellipse.Common.Interfaces;
 using Ellipse.Common.Models.Mapillary;
 
@@ -14,7 +15,7 @@ public sealed class MapillaryClient(HttpClient client, string apiKey)
         return await GetRequest<MapillaryResponse<MapillaryImage>>(queryParams, "images");
     }
 
-    private string BuildSearchQueryParams(MapillarySearchRequest request, StringBuilder builder)
+    private void BuildSearchQueryParams(MapillarySearchRequest request, StringBuilder builder)
     {
         if (request.MinLon.HasValue && request is { MinLat: not null, MaxLon: not null, MaxLat: not null })
             AppendParam(builder, "bbox", string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3}",
@@ -25,8 +26,6 @@ public sealed class MapillaryClient(HttpClient client, string apiKey)
 
         if (!string.IsNullOrEmpty(request.Fields))
             AppendParam(builder, "fields", request.Fields);
-
-
-        return builder.ToString();
+        
     }
 }

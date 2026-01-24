@@ -51,7 +51,7 @@ public sealed class CensusGeocoderClient(HttpClient client)
         );
     }
 
-    public string BuildGeocodeQueryParams(CensusGeocodingRequest request, StringBuilder builder)
+    public void BuildGeocodeQueryParams(CensusGeocodingRequest request, StringBuilder builder)
     {
         AppendParam(builder, "benchmark", request.Benchmark);
         AppendParam(builder, "vintage", request.Vintage);
@@ -79,16 +79,16 @@ public sealed class CensusGeocoderClient(HttpClient client)
                 AppendParam(builder, "state", request.State);
                 AppendParam(builder, "zip", request.Zip);
                 break;
+
+            case SearchType.Coordinates:
             default:
                 throw new ArgumentOutOfRangeException(
                     $"Search type {request.SearchType} is not valid for this request"
                 );
         }
-
-        return builder.ToString().TrimEnd('&');
     }
 
-    public string BuildReverseGeocodeQueryParams(
+    public void BuildReverseGeocodeQueryParams(
         CensusReverseGeocodingRequest request,
         StringBuilder builder
     )
@@ -115,6 +115,7 @@ public sealed class CensusGeocoderClient(HttpClient client)
             );
         }
 
-        return builder.ToString().TrimEnd('&');
+        if (builder[^1] == '&')
+            builder.Remove(builder.Length - 1, 1);
     }
 }

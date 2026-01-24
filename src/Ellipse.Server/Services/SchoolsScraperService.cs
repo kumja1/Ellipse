@@ -34,28 +34,34 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
 
         try
         {
-            string? cachedData = await cache.GetStringAsync($"division_{divisionCode}");
-            if (!string.IsNullOrEmpty(cachedData) && !overwriteCache)
+            geoService.EnableCacheOverwrite(overwriteCache);
+
+            string cacheKey = CacheHelper.CreateCacheKey(nameof(divisionCode), divisionCode);
+            if (!overwriteCache)
             {
-                Log.Information(
-                    "[ScrapeDivision] Cache hit for division {DivisionCode}",
-                    divisionCode);
-                string decompressed = StringHelper.Decompress(cachedData);
-                return decompressed;
+                string? cachedData = await cache.GetStringAsync(cacheKey);
+                if (!string.IsNullOrEmpty(cachedData))
+                {
+                    Log.Information(
+                        "[ScrapeDivision] Cache hit for division {DivisionCode}",
+                        divisionCode);
+                    string decompressed = CacheHelper.DecompressData(cachedData);
+                    return decompressed;
+                }
             }
 
             string result = await _tasks
                 .GetOrAdd(divisionCode, ScrapeDivisionInternal(divisionCode))
                 .ConfigureAwait(false);
-            geoService.DisableCaching(overwriteCache);
+
             if (string.IsNullOrEmpty(result))
             {
                 Log.Warning("[ScrapeDivision] Scrape returned empty result for division {DivisionCode}", divisionCode);
                 return string.Empty;
             }
 
-            string compressed = StringHelper.Compress(result);
-            await cache.SetStringAsync($"division_{divisionCode}", compressed);
+            string compressed = CacheHelper.CompressData(result);
+            await cache.SetStringAsync(cacheKey, compressed);
 
             stopwatch.Stop();
             Log.Information("[ScrapeDivision] Completed scrape for division {DivisionCode} in {ElapsedMs}ms",
@@ -120,7 +126,8 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
 
                     return document
                         .QuerySelectorAll(
-                            "table > tbody > tr:not(.tr_header_row, .division_heading, .office_heading, :has(table.public_school_division_division), :has(td.division))")
+                            "table > tbody > tr:not(.tr_header_row, .division_heading, .office_heading, :has(table.public_school_division_division:has(tr.public_school_division_division_tr)), :has(td.division))")
+                        .Where(r => r.QuerySelector("td.td_column_wrapstyle:has(> strong)") != null)
                         .ToList();
                 },
                 maxRetries: 10,
@@ -161,10 +168,11 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
 
     private async Task<SchoolData?> ParseRow(IElement row, string divisionName)
     {
-        IElement? infoCell = row.QuerySelector("td.td_column_wrapstyle");
+        IElement? infoCell = row.QuerySelector("td.td_column_wrapstyle:has(> strong)");
         if (infoCell == null)
         {
-            Log.Warning("[ParseRow] Info cell not found in row for division '{DivisionName}'", divisionName);
+            Log.Warning("[ParseRow] Info cell not found in row for division '{DivisionName}'. Row: {RowHtml}",
+                divisionName, row.Html());
             return null;
         }
 

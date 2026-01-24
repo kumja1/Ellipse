@@ -19,7 +19,7 @@ partial class MapPage : ComponentBase, IDisposable
     private Menu? _menu;
     private MapLibre? _map;
 
-    private List<SchoolData>? _schools;
+    private SchoolData[]? _schools;
     private string _selectedRouteName = "Average";
 
     private Listener _clickListener;
@@ -59,7 +59,7 @@ partial class MapPage : ComponentBase, IDisposable
 
         _schools = await SchoolDivisionService!.GetAllSchools();
 #if DEBUG
-        Log.Information("OnMapLoaded: Retrieved {SchoolCount} schools", _schools?.Count ?? 0);
+        Log.Information("OnMapLoaded: Retrieved {SchoolCount} schools", _schools?.Length ?? 0);
 #endif
         BoundingBox bbox = new(_schools.Select(s => s.LatLng));
         Log.Information("Initializing map with bounding box: {BoundingBox}", bbox);
@@ -84,7 +84,7 @@ partial class MapPage : ComponentBase, IDisposable
             Guid? closestMarkerId = null;
             TimeSpan? closestDuration = null;
             DateTime lastUpdate = DateTime.Now;
-            foreach (GeoPoint2d[] row in box.GetPoints(step).Chunk(39))
+            foreach (GeoPoint2d[] row in box.GetPoints(step).Chunk(16))
             {
 #if DEBUG
                 Log.Information("GetMarkers: Processing chunk of {ChunkSize} points", row.Length);
@@ -94,7 +94,7 @@ partial class MapPage : ComponentBase, IDisposable
 
                 HttpResponseMessage? httpResponse = await Retry.RetryIfResponseFailed(async _ =>
                     await HttpClient
-                        .PostAsJsonAsync("api/marker/batch", row.Select(p => new MarkerRequest(_schools, p)))
+                        .PostAsJsonAsync("api/marker/batch", new BatchMarkerRequest(row, _schools))
                 );
 
                 if (httpResponse == null)
@@ -113,10 +113,11 @@ partial class MapPage : ComponentBase, IDisposable
 
                 for (int i = 0; i < responses.Count; i++)
                 {
+                    GeoPoint2d p = row[i];
                     MarkerResponse? response = responses[i];
                     if (response == null)
                     {
-                        Log.Warning("MarkerResponse is null");
+                        Log.Warning("MarkerResponse for ({Point}) is null.", p);
                         continue;
                     }
 

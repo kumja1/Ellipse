@@ -5,7 +5,7 @@ using Serilog;
 
 namespace Ellipse.Services;
 
-public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
+public sealed class SchoolDivisionService(HttpClient httpClient)
 {
     private readonly Dictionary<string, int> _divisionCodes = new()
     {
@@ -26,18 +26,16 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
         ["Sussex County"] = 91,
     };
 
-    public async Task<List<SchoolData>> GetAllSchools()
+    public async Task<SchoolData[]> GetAllSchools()
     {
         Log.Information("Starting school data collection");
-
         List<SchoolData>?[] results = await Task.WhenAll(
             _divisionCodes.Select(kvp => GetDivisionSchools(kvp.Key, kvp.Value))
         );
 
-        List<SchoolData> schools = [.. results.Where(x => x is not null).SelectMany(x => x!)];
-
-        Log.Information("Completed school fetch. Current Count: {Count}. Removing duplicates…",
-            schools.Count);
+        SchoolData[] schools = [.. results.Where(x => x is not null).SelectMany(x => x!)];
+        Log.Information("Completed school fetch. Current Count: {Length}. Removing duplicates…",
+            schools.Length);
 
         return [.. schools.DistinctBy(s => s.LatLng)];
     }
@@ -75,6 +73,4 @@ public sealed class SchoolDivisionService(HttpClient httpClient) : IDisposable
             return [];
         }
     }
-
-    public void Dispose() => httpClient.Dispose();
 }

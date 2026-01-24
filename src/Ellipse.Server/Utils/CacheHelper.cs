@@ -1,16 +1,19 @@
+using System.Collections;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
+using AngleSharp.Text;
 
 namespace Ellipse.Server.Utils;
 
-internal static class StringHelper
+public static class CacheHelper
 {
     /// <summary>
     /// Compresses the string.
     /// </summary>
     /// <param name="text">The text.</param>
     /// <returns></returns>
-    public static string Compress(string text)
+    public static string CompressData(string text)
     {
         try
         {
@@ -46,7 +49,7 @@ internal static class StringHelper
     /// </summary>
     /// <param name="compressedText">The compressed text.</param>
     /// <returns></returns>
-    public static string Decompress(string compressedText)
+    public static string DecompressData(string compressedText)
     {
         try
         {
@@ -66,5 +69,19 @@ internal static class StringHelper
             Console.WriteLine($"[DecompressString] Failed to decompress string: {compressedText}");
             throw;
         }
+    }
+
+    public static string CreateCacheKey(params object[] values)
+    {
+       StringBuilder builder = StringBuilderPool.Obtain();
+       foreach (object value in values)
+       {
+           if (value is IEnumerable enumerable)
+               builder.AppendJoin("", enumerable);
+           else
+               builder.Append(value);
+       }
+       
+       return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
     }
 }

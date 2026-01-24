@@ -32,18 +32,16 @@ public sealed class PhotonGeocoderClient(HttpClient client)
             "reverse"
         );
 
-    public string BuildGeocodeQueryParams(PhotonGeocodingRequest request, StringBuilder builder)
+    public void BuildGeocodeQueryParams(PhotonGeocodingRequest request, StringBuilder builder)
     {
         AppendParam(builder, "q", request.Query);
         AppendParam(builder, "limit", request.Limit.ToString(CultureInfo.InvariantCulture));
         AppendParam(builder, "lang", request.Lang);
         if (request is { Layers.Length: > 0 })
             AppendParam(builder, "osm_tag", string.Join(',', request.Layers));
-
-        return builder.ToString().TrimEnd('&');
     }
 
-    public string BuildReverseGeocodeQueryParams(
+    public void BuildReverseGeocodeQueryParams(
         PhotonReverseGeocodingRequest request,
         StringBuilder builder
     )
@@ -55,6 +53,5 @@ public sealed class PhotonGeocoderClient(HttpClient client)
             request.Longitude.ToString(CultureInfo.InvariantCulture),
             false
         );
-        return builder.ToString();
     }
 }

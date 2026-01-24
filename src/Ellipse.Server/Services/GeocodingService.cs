@@ -6,6 +6,7 @@ using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 using Ellipse.Common.Models.Geocoding.OpenRoute;
 using Ellipse.Common.Models.Matrix.OpenRoute;
+using Ellipse.Server.Utils;
 using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
 using Microsoft.Extensions.Caching.Distributed;
@@ -294,14 +295,7 @@ public class GeocodingService(
             destinations.Length
         );
 
-        string cacheKey =
-            $"matrix_{string.Join("_", sources.Select(s => s.ToString()))}_{string.Join("_", destinations.Select(d => d.ToString()))}";
-        if (cacheKey.Length > 256)
-        {
-            using SHA256 sha256 = SHA256.Create();
-            byte[] hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(cacheKey));
-            cacheKey = $"matrix_hash_{Convert.ToHexString(hashBytes)}";
-        }
+        string cacheKey = CacheHelper.CreateCacheKey("matrix", sources, destinations);
 
         if (_overwriteCache)
         {
@@ -316,7 +310,6 @@ public class GeocodingService(
                 return JsonSerializer.Deserialize<(double[][], double[][])>(cachedMatrix);
             }
         }
-        
 
         TableResponse? response = await GetMatrixWithOsrm(sources, destinations)
             .ConfigureAwait(false);
@@ -342,18 +335,18 @@ public class GeocodingService(
             if (openRouteResponse is null)
             {
                 Log.Warning("Both OSRM and OpenRouteMatrix responses are null or invalid.");
-                return (Array.Empty<double[]>(), Array.Empty<double[]>());
+                return ([], []);
             }
 
-            resultDistances = openRouteResponse.Distances?.Select(row => row?.Select(d => (double)d).ToArray() ?? [])
+            resultDistances = openRouteResponse.Distances?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
                 .ToArray() ?? [];
-            resultDurations = openRouteResponse.Durations?.Select(row => row?.Select(d => (double)d).ToArray() ?? [])
+            resultDurations = openRouteResponse.Durations?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
                 .ToArray() ?? [];
         }
 
         await cache.SetStringAsync(
             cacheKey,
-            JsonSerializer.Serialize((resultDistances, resultDurations))
+            CacheHelper.CompressData(JsonSerializer.Serialize((resultDistances, resultDurations)))
         );
 
         return (resultDistances, resultDurations);
@@ -442,7 +435,7 @@ public class GeocodingService(
         return response;
     }
 
-    public void DisableCaching(bool overwriteCache)
+    public void EnableCacheOverwrite(bool overwriteCache)
     {
         _overwriteCache = overwriteCache;
     }
