@@ -189,7 +189,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         await Retry.Default(
             async attempt =>
             {
-                Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Count);
+                Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Length);
                 await _semaphore.WaitAsync();
                 try
                 {
