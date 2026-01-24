@@ -29,7 +29,7 @@ public class GeocodingService(
         double latitude
     )
     {
-        string cacheKey = $"address_{longitude}_{latitude}";
+        string cacheKey = CacheHelper.CreateCacheKey("address", longitude, latitude);
         Log.Information(
             "[GetAddressCached] Searching cache for coordinates: {Longitude}, {Latitude}",
             longitude,
@@ -177,8 +177,7 @@ public class GeocodingService(
             return GeoPoint2d.Zero;
         }
 
-        string cacheKey = $"latlng_{address.ToLower().Replace(" ", "_")}";
-
+        string cacheKey = CacheHelper.CreateCacheKey("latLng", address.ToLower().Replace(" ", "_"));
         if (!_overwriteCache)
         {
             string? cachedLatLng = await cache.GetStringAsync(cacheKey);
