@@ -16,7 +16,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
     private readonly SemaphoreSlim _semaphore = new(20, 20);
 
-    public async Task<List<MarkerResponse>> GetMarkers(BatchMarkerRequest request, bool overwriteCache)
+    public async Task<List<MarkerResponse?>> GetMarkers(BatchMarkerRequest request, bool overwriteCache)
     {
         string cacheKey = CacheHelper.CreateCacheKey(request.Points, request.Schools);
         if (!overwriteCache)
@@ -25,7 +25,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             if (!string.IsNullOrEmpty(cachedData))
             {
                 Log.Information("Cache hit for batch request: {RequestId}", cacheKey);
-                List<MarkerResponse> deserialized = JsonSerializer.Deserialize<List<MarkerResponse>>(
+                List<MarkerResponse?> deserialized = JsonSerializer.Deserialize<List<MarkerResponse?>>(
                     CacheHelper.DecompressData(cachedData)
                 )!;
 
@@ -34,14 +34,14 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             }
         }
 
-        List<MarkerResponse> results = await GetMarkersInternal(request).ConfigureAwait(false);
+        List<MarkerResponse?> results = await GetMarkersInternal(request).ConfigureAwait(false);
         if (results.Count != 0)
             await cache.SetStringAsync(cacheKey, CacheHelper.CompressData(JsonSerializer.Serialize(results)));
 
         return results;
     }
 
-    private async Task<List<MarkerResponse>> GetMarkersInternal(BatchMarkerRequest request)
+    private async Task<List<MarkerResponse?>> GetMarkersInternal(BatchMarkerRequest request)
     {
         Dictionary<GeoPoint2d, MarkerResponse?> resultsMap = [];
         string[] addresses = await Task.WhenAll(
@@ -75,7 +75,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             resultsMap[point] = new MarkerResponse(addresses[i], distances.Sum(), routes);
         }
 
-        return request.Points.Where(p => resultsMap[p] != null).Select(p => resultsMap[p]!).ToList();
+        return request.Points.Select(p => resultsMap[p]).ToList();
     }
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overwriteCache)
