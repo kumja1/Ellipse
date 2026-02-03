@@ -37,7 +37,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         List<MarkerResponse> results = await GetMarkersInternal(request).ConfigureAwait(false);
         if (results.Count != 0)
             await cache.SetStringAsync(cacheKey, CacheHelper.CompressData(JsonSerializer.Serialize(results)));
-        
+
         return results;
     }
 
@@ -102,7 +102,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         try
         {
             MarkerResponse? markerResponse = await _tasks
-                .GetOrAdd(request.Point, GetMarkerInternal(request))
+                .GetOrAdd(request.Point, _ => GetMarkerInternal(request))
                 .ConfigureAwait(false);
 
             if (markerResponse == null)

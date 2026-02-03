@@ -187,9 +187,10 @@ public class GeocodingService(
                 return GeoPoint2d.Parse(cachedLatLng);
         }
 
-        GeoPoint2d latLng = await GetLatLngWithCensus(address) == GeoPoint2d.Zero
+        GeoPoint2d censusGeoPoint2d = await GetLatLngWithCensus(address);
+        GeoPoint2d latLng = censusGeoPoint2d == GeoPoint2d.Zero
             ? await GetLatLngWithOpenRoute(address)
-            : GeoPoint2d.Zero;
+            : censusGeoPoint2d;
 
         if (latLng == GeoPoint2d.Zero)
         {
@@ -296,7 +297,7 @@ public class GeocodingService(
 
         string cacheKey = CacheHelper.CreateCacheKey("matrix", sources, destinations);
 
-        if (_overwriteCache)
+        if (!_overwriteCache)
         {
             string? cachedMatrix = await cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedMatrix))
@@ -306,7 +307,7 @@ public class GeocodingService(
                     sources.Length
                 );
 
-                return JsonSerializer.Deserialize<(double[][], double[][])>(cachedMatrix);
+                return JsonSerializer.Deserialize<(double[][], double[][])>(CacheHelper.DecompressData(cachedMatrix));
             }
         }
 

@@ -31,8 +31,7 @@
                 <ItemContent>
                     @ListItem((kvp.Value["Name"], kvp.Key,
                         kvp.Value["Routes"]["Average"].Distance,
-                        kvp.Value["Routes"]["Average"].Duration,
-                        kvp.Value["Image256Url"]))
+                        kvp.Value["Routes"]["Average"].Duration))
                 </ItemContent>
                 <Placeholder>
                     <MudSkeleton Animation="Animation.Wave"
@@ -51,5 +50,5 @@
             </MudPaper>
         </div>
     }
-  
+
 </div>

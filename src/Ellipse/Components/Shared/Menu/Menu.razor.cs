@@ -19,7 +19,7 @@ public partial class Menu : ComponentBase
 
     [Parameter]
     public RenderFragment<(string MarkerName, LngLat MarkerLngLat, double MarkerAverageDistance, TimeSpan
-        MarkerAverageDuration, string? Image256Url)> ListItem { get; set; }
+        MarkerAverageDuration)> ListItem { get; set; }
 
     [Parameter] public string Class { get; set; }
     private string _class =>

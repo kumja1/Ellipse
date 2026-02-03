@@ -43,12 +43,12 @@
         <ListItem Context="marker">
             <div class="p-4 border-b hover:bg-gray-50 cursor-pointer transition-colors" @key="marker.MarkerName">
                 <div class="flex gap-4">
-                    @if (!string.IsNullOrEmpty(marker.Image256Url))
-                    {
-                        <div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 shadow-sm">
-                            @* <img src="@marker.Image256Url" class="w-full h-full object-cover" alt="Location preview"/> *@
-                        </div>
-                    }
+                    @* @if (!string.IsNullOrEmpty(marker.Image256Url)) *@
+                    @* { *@
+                    @*     <div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 shadow-sm"> *@
+                    @*         $1$ <img src="@marker.Image256Url" class="w-full h-full object-cover" alt="Location preview"/> #1# *@
+                    @*     </div> *@
+                    @* } *@
                     <div class="flex-grow min-w-0">
                         <div class="flex justify-between items-start mb-1">
                             <MudText Typo="Typo.subtitle1" Class="font-bold text-gray-900 leading-tight truncate">
