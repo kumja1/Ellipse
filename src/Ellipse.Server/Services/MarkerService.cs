@@ -210,29 +210,29 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                             double distance = distances[i][j];
                             double duration = durations[i][j];
 
-                            if (
-                                !currentDict.TryAdd(
-                                    school.Name,
-                                    new Route
-                                    {
-                                        Distance = distance,
-                                        Duration = TimeSpan.FromSeconds(duration)
-                                    }
-                                )
-                            )
+                            string schoolKey = school.Name;
+                            if (currentDict.ContainsKey(schoolKey))
                             {
-                                Log.Information(
-                                    "Route already exist for school: {School} => Distance: {Distance}, Duration: {Duration}",
-                                    school.Name,
-                                    distance,
-                                    duration
-                                );
-                                continue;
+                                schoolKey = $"{school.Name} ({school.Address})";
                             }
+
+                            if (currentDict.ContainsKey(schoolKey))
+                            {
+                                schoolKey = $"{schoolKey} [#{j}]";
+                            }
+
+                            currentDict.Add(
+                                schoolKey,
+                                new Route
+                                {
+                                    Distance = distance,
+                                    Duration = TimeSpan.FromSeconds(duration)
+                                }
+                            );
 
                             Log.Information(
                                 "School: {School} => Distance: {Distance}, Duration: {Duration}",
-                                school.Name,
+                                schoolKey,
                                 distance,
                                 duration
                             );

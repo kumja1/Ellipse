@@ -273,8 +273,8 @@ partial class MapPage : ComponentBase, IDisposable
             _currentLayerIndex--;
 #if DEBUG
             Log.Information("RemoveLayer: Layer removed, new currentLayerIndex={LayerIndex}", _currentLayerIndex);
-        }
 #endif
+        }
         await InvokeAsync(StateHasChanged);
     }
 
