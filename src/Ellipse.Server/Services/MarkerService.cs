@@ -211,18 +211,15 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                             double duration = durations[i][j];
 
                             string schoolKey = school.Name;
-                            if (currentDict.ContainsKey(schoolKey))
-                            {
-                                schoolKey = $"{school.Name} ({school.Address})";
-                            }
 
-                            if (currentDict.ContainsKey(schoolKey))
+                            if (currentDict.ContainsKey(school.Name))
                             {
-                                schoolKey = $"{schoolKey} [#{j}]";
+                                Log.Warning("Duplicate school name: {School}. Current point: {Point}", school.Name, sources[i]);
+                                continue;
                             }
-
+                            
                             currentDict.Add(
-                                schoolKey,
+                                school.Name,
                                 new Route
                                 {
                                     Distance = distance,
