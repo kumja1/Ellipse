@@ -7,5 +7,5 @@ public sealed record MarkerResponse(
     // string Image256Url,
     // string Image1024Url,
     double TotalDistance,
-    Dictionary<string, Route> Routes
+    Dictionary<string, SchoolRoute> Routes
 );

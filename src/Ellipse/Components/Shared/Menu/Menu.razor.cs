@@ -14,7 +14,7 @@ public partial class Menu : ComponentBase
     [Parameter]
     public RenderFragment<(
         Dictionary<string, dynamic> Data,
-        Dictionary<string, Route>? Routes
+        Dictionary<string, SchoolRoute>? Routes
         )> SingleItem { get; set; }
 
     [Parameter]

@@ -160,7 +160,7 @@ partial class MapPage : ComponentBase, IDisposable
                         _map.AddMarker(new MarkerOptions { Color = "green" }, point, markerId));
 
                     _menu!.UpdateMarker(_closestPoint, "Color", "red");
-                    _menu!.UpdateMarker(_closestPoint, "Color", "green");
+                    _menu!.UpdateMarker(point, "Color", "green");
                     _closestPoint = point;
                     lastUpdate = DateTime.Now;
                     closestMarkerId = markerId;

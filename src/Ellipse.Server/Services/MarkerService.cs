@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Ellipse.Common.Models;
+using Ellipse.Common.Models.Directions;
 using Ellipse.Common.Models.Markers;
 using Ellipse.Common.Utils;
 using Ellipse.Server.Utils;
 using Microsoft.Extensions.Caching.Distributed;
 using Serilog;
-using Route = Ellipse.Common.Models.Directions.Route;
 
 namespace Ellipse.Server.Services;
 
@@ -48,13 +48,13 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             request.Points.Select(p => geocodingService.GetAddressCached(p.Lon, p.Lat))
         );
 
-        List<Dictionary<string, Route>> allRoutes =
+        List<Dictionary<string, SchoolRoute>> allRoutes =
             await GetMatrixRoute(request.Points, request.Schools).ConfigureAwait(false);
 
         for (int i = 0; i < request.Points.Length; i++)
         {
             GeoPoint2d point = request.Points[i];
-            Dictionary<string, Route> routes = allRoutes[i];
+            Dictionary<string, SchoolRoute> routes = allRoutes[i];
 
             if (routes.Count == 0)
             {
@@ -67,7 +67,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             double avgDistance = Trimean(distances);
             double avgDuration = Trimean([.. routes.Values.Select(r => r.Duration.TotalSeconds)]);
 
-            routes["Average"] = new Route
+            routes["Average"] = new SchoolRoute
             {
                 Distance = avgDistance,
                 Duration = TimeSpan.FromSeconds(avgDuration)
@@ -139,9 +139,9 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             .ConfigureAwait(false);
 
         Log.Information("Address fetched: {Address}", address);
-        List<Dictionary<string, Route>> allRoutes =
+        List<Dictionary<string, SchoolRoute>> allRoutes =
             await GetMatrixRoute([request.Point], request.Schools).ConfigureAwait(false);
-        Dictionary<string, Route> routes = allRoutes[0];
+        Dictionary<string, SchoolRoute> routes = allRoutes[0];
 
         Log.Information("Matrix routes obtained. Count: {Count}", routes.Count);
         if (routes.Count == 0)
@@ -154,7 +154,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         double avgDistance = Trimean(distances);
         double avgDuration = Trimean([.. routes.Values.Select(r => r.Duration.TotalSeconds)]);
 
-        routes["Average"] = new Route { Distance = avgDistance, Duration = TimeSpan.FromSeconds(avgDuration) };
+        routes["Average"] = new SchoolRoute { Distance = avgDistance, Duration = TimeSpan.FromSeconds(avgDuration) };
         Log.Information(
             "Calculated average route: Distance={Distance}, Duration={Duration}",
             avgDistance,
@@ -178,14 +178,14 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     }
 
 
-    private async Task<List<Dictionary<string, Route>>> GetMatrixRoute(
+    private async Task<List<Dictionary<string, SchoolRoute>>> GetMatrixRoute(
         GeoPoint2d[] sources,
         SchoolData[] schools
     )
     {
-        List<Dictionary<string, Route>> results = Enumerable
+        List<Dictionary<string, SchoolRoute>> results = Enumerable
             .Range(0, sources.Length)
-            .Select(_ => new Dictionary<string, Route>(schools.Length))
+            .Select(_ => new Dictionary<string, SchoolRoute>(schools.Length))
             .ToList();
 
         await Retry.Default(
@@ -203,25 +203,27 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
 
                     for (int i = 0; i < sources.Length; i++)
                     {
-                        Dictionary<string, Route> currentDict = results[i];
+                        Dictionary<string, SchoolRoute> currentDict = results[i];
                         for (int j = 0; j < schools.Length; j++)
                         {
                             SchoolData school = schools[j];
+                            string schoolKey = $"{school.Name} ({school.Division})";
                             double distance = distances[i][j];
                             double duration = durations[i][j];
 
-                            string schoolKey = school.Name;
 
-                            if (currentDict.ContainsKey(school.Name))
+                            if (currentDict.ContainsKey(schoolKey))
                             {
-                                Log.Warning("Duplicate school name: {School}. Current point: {Point}", school.Name, sources[i]);
+                                Log.Warning("Duplicate school key: {Key}. Current point: {Point}", schoolKey,
+                                    sources[i]);
                                 continue;
                             }
-                            
+
                             currentDict.Add(
-                                school.Name,
-                                new Route
+                                schoolKey,
+                                new SchoolRoute
                                 {
+                                    Name = school.Name,
                                     Distance = distance,
                                     Duration = TimeSpan.FromSeconds(duration)
                                 }
