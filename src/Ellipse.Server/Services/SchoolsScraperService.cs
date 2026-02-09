@@ -85,7 +85,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
     private async Task<string> ScrapeDivisionInternal(int divisionCode)
     {
         List<SchoolData> schools = await ParsePage(divisionCode).ConfigureAwait(false);
-
         Log.Information(
             "[ScrapeDivisionInternal] Scraped {Count} schools from division {DivisionCode}",
             schools.Count, divisionCode);
@@ -96,7 +95,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
     private async Task<List<SchoolData>> ParsePage(int divisionCode)
     {
         string url = $"{VIRGINIA_SCHOOLS_URL}?d={divisionCode}&w=true";
-
         string divisionName = "";
         List<IElement> rows = await Retry
             .RetryIfListEmpty<IElement>(
@@ -136,12 +134,9 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
             .ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(divisionName))
-        {
             Log.Warning("[ParsePage] Division name is empty for division code {DivisionCode}!", divisionCode);
-        }
 
         ArgumentNullException.ThrowIfNull(rows);
-
         SchoolData?[] results =
             await Task.WhenAll(rows.Select(row => ParseRow(row, divisionName))).ConfigureAwait(false);
 
