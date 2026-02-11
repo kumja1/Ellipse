@@ -264,9 +264,11 @@ public class GeocodingService(
                 new OpenRouteGeocodingRequest { Query = address, Size = 10 }
             );
 
-            Feature? location = geocodeResponse
-                .Features.OrderByDescending(f => f.Properties.Confidence)
-                .FirstOrDefault();
+            IEnumerable<Feature>? features = geocodeResponse
+                .Features.OrderByDescending(f => f.Properties.Confidence);
+
+            Log.Information("[GetLatLng] Response Features: {@Features}", features);
+            Feature location = features?.FirstOrDefault(f => f.Properties.RegionA == "VA");
 
             if (location != null)
                 return new GeoPoint2d(

@@ -89,7 +89,7 @@ partial class MapPage : ComponentBase, IDisposable
 #if DEBUG
                 Log.Information("GetMarkers: Processing chunk of {ChunkSize} points", row.Length);
 #endif
-                if (DateTime.Now - lastUpdate >= TimeSpan.FromSeconds(10))
+                if (DateTime.Now - lastUpdate >= TimeSpan.FromSeconds(25))
                     break;
 
                 HttpResponseMessage? httpResponse = await Retry.RetryIfResponseFailed(async _ =>
@@ -113,16 +113,15 @@ partial class MapPage : ComponentBase, IDisposable
 
                 for (int i = 0; i < responses.Count; i++)
                 {
-                    GeoPoint2d p = row[i];
+                    LngLat point = new(row[i].Lon, row[i].Lat);
                     MarkerResponse? response = responses[i];
                     if (response == null)
                     {
-                        Log.Warning("MarkerResponse for ({Point}) is null.", p);
+                        Log.Warning("MarkerResponse for ({Point}) is null.", point);
                         continue;
                     }
 
-                    LngLat point = new(row[i].Lon, row[i].Lat);
-                    Log.Debug("GetMarkers: Adding marker {MarkerAddress} at ({Lon}, {Lat})", response.Address,
+                    Log.Information("GetMarkers: Adding marker {MarkerAddress} at ({Lon}, {Lat})", response.Address,
                         point.Longitude, point.Latitude);
 
                     Guid markerId = await _map!.AddMarker(new MarkerOptions
@@ -275,6 +274,7 @@ partial class MapPage : ComponentBase, IDisposable
             Log.Information("RemoveLayer: Layer removed, new currentLayerIndex={LayerIndex}", _currentLayerIndex);
 #endif
         }
+
         await InvokeAsync(StateHasChanged);
     }
 
