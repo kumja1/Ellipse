@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using DotNetEnv;
 using Ellipse.Server.Policies;
 using Ellipse.Server.Services;
@@ -70,9 +72,10 @@ public static class Program
 
                                 string body = await reader.ReadToEndAsync(token);
                                 context.Request.Body.Position = 0;
+                                byte[] hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(body));
                                 return KeyValuePair.Create(
                                     "bodyHash",
-                                    HashCode.Combine(body).ToString()
+                                    Convert.ToHexString(hashBytes)
                                 );
                             }
                         )

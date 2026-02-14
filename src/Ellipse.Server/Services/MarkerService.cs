@@ -255,6 +255,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
 
     private static double Trimean(List<double> data)
     {
+        if (data.Count == 0) return 0;
         Log.Information("Calculating trimean for {Count} data points.", data.Count);
         List<double> sorted = [.. data.OrderBy(x => x)];
         double q1 = WeightedPercentile(sorted, 0.25);
@@ -264,6 +265,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
 
         static double WeightedPercentile(List<double> sorted, double percentile)
         {
+            if (sorted.Count == 0) return 0;
             double position = (sorted.Count - 1) * percentile;
             int left = (int)Math.Floor(position);
             int right = (int)Math.Ceiling(position);

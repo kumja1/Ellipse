@@ -89,7 +89,7 @@ partial class MapPage : ComponentBase, IDisposable
 #if DEBUG
                 Log.Information("GetMarkers: Processing chunk of {ChunkSize} points", row.Length);
 #endif
-                if (DateTime.Now - lastUpdate >= TimeSpan.FromSeconds(25))
+                if (DateTime.Now - lastUpdate >= TimeSpan.FromSeconds(120))
                     break;
 
                 HttpResponseMessage? httpResponse = await Retry.RetryIfResponseFailed(async _ =>
@@ -105,12 +105,15 @@ partial class MapPage : ComponentBase, IDisposable
 
                 List<MarkerResponse?>? responses =
                     await httpResponse.Content.ReadFromJsonAsync<List<MarkerResponse?>>();
+                
                 if (responses == null)
                 {
                     Log.Warning("GetMarkers: Failed to deserialize marker responses");
                     continue;
                 }
-
+                
+                Log.Information("GetMarkers: Received {ResponseCount} responses", responses.Count);
+                Log.Information("GetMarkers: Received {RowCount} rows", row.Length);
                 for (int i = 0; i < responses.Count; i++)
                 {
                     LngLat point = new(row[i].Lon, row[i].Lat);
@@ -142,28 +145,31 @@ partial class MapPage : ComponentBase, IDisposable
                     });
 
                     TimeSpan duration = response.Routes["Average"].Duration;
-                    _closestPoint ??= point;
-                    closestMarkerId ??= markerId;
-                    closestDuration ??= duration;
-
-                    if (!(duration < closestDuration))
-                        continue;
-
+                    bool isFirstMarker = _closestPoint == null;
+                    
+                    if (isFirstMarker || duration < closestDuration)
+                    {
 #if DEBUG
-                    Log.Information(
-                        "GetMarkers: New closest marker found - Duration: {Duration}, Previous: {PreviousDuration}",
-                        duration, closestDuration);
+                        Log.Information(
+                            "GetMarkers: New closest marker found - Duration: {Duration}, Previous: {PreviousDuration}",
+                            duration, closestDuration ?? duration);
 #endif
-                    await Task.WhenAll(
-                        _map.UpdateMarker(new MarkerOptions { Color = "red" }, _closestPoint, closestMarkerId.Value),
-                        _map.AddMarker(new MarkerOptions { Color = "green" }, point, markerId));
+                        if (!isFirstMarker)
+                        {
+                            await _map.UpdateMarker(new MarkerOptions { Color = "red" }, _closestPoint!,
+                                closestMarkerId!.Value);
+                            _menu!.UpdateMarker(_closestPoint!, "Color", "red");
+                        }
 
-                    _menu!.UpdateMarker(_closestPoint, "Color", "red");
-                    _menu!.UpdateMarker(point, "Color", "green");
-                    _closestPoint = point;
+                        await _map.UpdateMarker(new MarkerOptions { Color = "green" }, point, markerId);
+                        _menu!.UpdateMarker(point, "Color", "green");
+
+                        _closestPoint = point;
+                        closestMarkerId = markerId;
+                        closestDuration = duration;
+                    }
+
                     lastUpdate = DateTime.Now;
-                    closestMarkerId = markerId;
-                    closestDuration = duration;
                 }
             }
 

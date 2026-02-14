@@ -142,7 +142,7 @@ public class GeocodingService(
             {
                 Longitude = longitude,
                 Latitude = latitude,
-                BoundaryCircleRadius = .45,
+                BoundaryCircleRadius = 1,
                 BoundaryCountry = ["US"],
                 Size = 10,
             }
@@ -305,8 +305,9 @@ public class GeocodingService(
             if (!string.IsNullOrEmpty(cachedMatrix))
             {
                 Log.Information(
-                    "[GetMatrixCached] Cache hit for {SourceCount} sources",
-                    sources.Length
+                    "[GetMatrixCached] Cache hit for {SourceCount} sources. Key: {CacheKey}",
+                    sources.Length,
+                    cacheKey
                 );
 
                 return JsonSerializer.Deserialize<(double[][], double[][])>(CacheHelper.DecompressData(cachedMatrix));
