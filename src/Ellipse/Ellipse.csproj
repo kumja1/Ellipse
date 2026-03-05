@@ -1,22 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Community.Blazor.MapLibre" Version="1.4.0-pre2" />
     <PackageReference Include="Geo" Version="1.2.0" />
-    <PackageReference Include="Geolocation" Version="1.2.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.11" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.11" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.11" />
+    <PackageReference Include="OpenLayers.Blazor" Version="2.5.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.3" />
     <PackageReference Include="MudBlazor" Version="7.16.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="OpenLayers.Blazor" Version="2.4.1" />
     <PackageReference Include="Serilog.Sinks.BrowserConsole" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="ValueTaskSupplement" Version="1.1.0" />
@@ -26,5 +24,8 @@
   </ItemGroup>
   <ItemGroup>
     <_ContentIncludedByDefault Remove="Components\Shared\MapDisplay\MapDisplay.razor" />
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="Components\Layout\Menu.razor" />
   </ItemGroup>
 </Project>

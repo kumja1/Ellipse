@@ -29,7 +29,7 @@ public sealed class SchoolDivisionService(HttpClient httpClient)
     public async Task<SchoolData[]> GetAllSchools()
     {
         Log.Information("Starting school data collection");
-        List<SchoolData>?[] results = await Task.WhenAll(
+        SchoolData[]?[] results = await Task.WhenAll(
             _divisionCodes.Select(kvp => GetDivisionSchools(kvp.Key, kvp.Value))
         );
 
@@ -40,29 +40,29 @@ public sealed class SchoolDivisionService(HttpClient httpClient)
         return [.. schools.DistinctBy(s => s.LatLng)];
     }
 
-    private async Task<List<SchoolData>?> GetDivisionSchools(string divisionName, int code)
+    private async Task<SchoolData[]?> GetDivisionSchools(string divisionName, int code)
     {
         try
         {
             Log.Information("Fetching schools for division {Division}", divisionName);
 
-            List<SchoolData> result = await Retry.RetryIfListEmpty(
+            SchoolData[] result = await Retry.RetryIfCollectionEmpty(
                 async _ =>
-                    (await httpClient.GetFromJsonAsync<List<SchoolData>>(
+                    (await httpClient.GetFromJsonAsync<SchoolData[]>(
                         $"api/schools?divisionCode={code}"
                     ))!,
                 maxRetries: 30,
                 delayMs: 500
             );
 
-            if (result.Count == 0)
+            if (result.Length == 0)
             {
                 Log.Warning("Failed to retrieve schools for {Division} ({Code})", divisionName, code);
                 return null;
             }
 
             Log.Information("Completed fetching {Division}. Found {Count} schools",
-                divisionName, result.Count);
+                divisionName, result.Length);
 
             return result;
         }

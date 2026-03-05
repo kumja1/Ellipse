@@ -2,44 +2,40 @@
 
 public readonly record struct BoundingBox
 {
-    public double MinLat { get; }
-    public double MaxLat { get; }
-    public double MinLng { get; }
-    public double MaxLng { get; }
+    public readonly LngLat Min;
+    public readonly LngLat Max;
 
-    public double Area { get; init; }
- 
-    public BoundingBox(IEnumerable<GeoPoint2d> latLngs)
+    public BoundingBox(List<LngLat> latLngs)
     {
-        if (!latLngs.Any())
+        if (latLngs.Count == 0)
             throw new ArgumentException("LatLngs list cannot be empty", nameof(latLngs));
 
-        MinLat = latLngs.Min(latLng => latLng.Lat);
-        MaxLat = latLngs.Max(latLng => latLng.Lat);
-        MinLng = latLngs.Min(latLng => latLng.Lon);
-        MaxLng = latLngs.Max(latLng => latLng.Lon);
+        double minLon = latLngs.Min(p => p.Lng);
+        double maxLon = latLngs.Max(p => p.Lng);
+        double minLat = latLngs.Min(p => p.Lat);
+        double maxLat = latLngs.Max(p => p.Lat);
+
+        Min = new LngLat(minLon, minLat);
+        Max = new LngLat(maxLon, maxLat);
     }
 
-    public BoundingBox(GeoPoint2d point, double radius)
+    public BoundingBox(LngLat point, double radius)
     {
         double num1 = 360.0 * radius / 40075017.0;
         double num2 = num1 / Math.Cos(point.Lat * Math.PI / 180.0);
-        MinLat = point.Lat - num2;
-        MaxLat = point.Lat + num2;
-        MinLng = point.Lon - num2;
-        MaxLng = point.Lon + num2;
+
+        Min = new LngLat(point.Lng - num2, point.Lat - num1);
+        Max = new LngLat(point.Lng + num2, point.Lat + num1);
     }
 
-    // Gets all points within the bounding box at the specified step size
-    public IEnumerable<GeoPoint2d> GetPoints(double step)
+
+    public IEnumerable<LngLat> GetPoints(double step)
     {
         if (step <= 0)
-        {
             yield break;
-        }
 
-        for (double lat = MinLat; lat <= MaxLat; lat += step)
-        for (double lon = MinLng; lon <= MaxLng; lon += step)
-            yield return new GeoPoint2d(lon, lat);
+        for (double lat = Min.Lat; lat <= Max.Lat; lat += step)
+        for (double lng = Min.Lng; lng <= Max.Lng; lng += step)
+            yield return new LngLat(lng, lat);
     }
 }

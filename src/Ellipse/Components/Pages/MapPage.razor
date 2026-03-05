@@ -1,7 +1,7 @@
 @page "/map"
-@using Community.Blazor.MapLibre
+@using OpenLayers.Blazor
 @using Ellipse.Common.Models.Directions
-@using Ellipse.Components.Shared.Menu
+@using Ellipse.Components.Layout
 
 @namespace Ellipse.Components.Pages
 
@@ -10,7 +10,7 @@
 <div>
     <div class="h-screen">
         <div class="absolute inset-0 z-0">
-            <MapLibre @ref="_map" Height="100%" Options="_mapOptions" OnLoad="OnMapLoaded"/>
+            <OpenStreetMap @ref="_map" MinZoom="5" Center="new Coordinate(-78, 37)" OnDoubleClick="OnDoubleClicked"/>
         </div>
         <div class="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
             <MudPaper Class="pa-4 pointer-events-auto" Elevation="8" Style="background-color: white;">
@@ -39,7 +39,7 @@
             </MudPaper>
         </div>
     </div>
-    <Menu @ref="_menu" IsList="true" Class="z-30 h-full">
+    <Menu @ref="_menu" Class="z-30 h-full">
         <ListItem Context="marker">
             <div class="p-4 border-b hover:bg-gray-50 cursor-pointer transition-colors" @key="marker.MarkerName">
                 <div class="flex gap-4">
@@ -56,7 +56,7 @@
                             </MudText>
                             <div class="flex flex-col items-end flex-shrink-0">
                                 <MudText Typo="Typo.caption" Class="text-blue-600 font-semibold">
-                                    @Math.Round(marker.MarkerAverageDistance / 1609, 1) mi
+                                    @Math.Round((double)marker.MarkerAverageDistance / 1609, 1) mi
                                 </MudText>
                                 <MudText Typo="Typo.caption" Class="text-gray-500">
                                     @marker.MarkerAverageDuration.ToReadableString()
@@ -105,7 +105,7 @@
 
                 <div class="px-4 pb-4">
                     <MudText Typo="Typo.h5" Class="font-bold text-gray-900 mb-1">
-                        @((string?)marker.Data["Name"])
+                        @((string?)marker.Marker.Text)
                     </MudText>
 
                     <div class="flex items-center gap-2 mb-4">
@@ -150,7 +150,7 @@
                                          Class="text-gray-400 uppercase font-bold tracking-wider">Distance
                                 </MudText>
                                 <MudText Typo="Typo.h6" Class="text-gray-900">
-                                    @(Math.Round(marker.Routes[_selectedRouteName].Distance, 1)) <span
+                                    @(Math.Round((double)marker.Routes[_selectedRouteName].Distance, 1)) <span
                                         class="text-sm font-normal text-gray-500">miles</span>
                                 </MudText>
                             </div>

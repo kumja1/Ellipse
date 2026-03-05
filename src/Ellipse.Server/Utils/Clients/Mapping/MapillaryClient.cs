@@ -1,6 +1,5 @@
 ﻿using System.Globalization;
 using System.Text;
-using AngleSharp.Text;
 using Ellipse.Common.Interfaces;
 using Ellipse.Common.Models.Mapillary;
 

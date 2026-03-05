@@ -10,5 +10,5 @@ public readonly record struct SchoolData(
     [property: JsonPropertyName("GradeSpan")] string GradeSpan,
     [property: JsonPropertyName("SchoolType")] string SchoolType,
     [property: JsonPropertyName("Address")] string Address,
-    [property: JsonPropertyName("LatLng")] GeoPoint2d LatLng
+    [property: JsonPropertyName("LatLng")] LngLat LatLng
 );

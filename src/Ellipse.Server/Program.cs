@@ -7,7 +7,6 @@ using Ellipse.Server.Utils.Clients.Mapping;
 using Ellipse.Server.Utils.Clients.Mapping.Geocoding;
 using Ellipse.Common.Utils.Logging;
 using Microsoft.Extensions.Http;
-using Npgsql;
 using Osrm.HttpApiClient;
 using Serilog;
 

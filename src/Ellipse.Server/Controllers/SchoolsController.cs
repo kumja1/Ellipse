@@ -1,8 +1,5 @@
 using Ellipse.Server.Services;
-using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OutputCaching;
-using Serilog;
 
 namespace Ellipse.Server.Controllers;
 

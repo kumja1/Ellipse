@@ -8,7 +8,7 @@ public enum Profile
 
     FootWalking,
 
-    CyclingRegular,
+    CyclingRegular
 }
 
 public static class ProfileExtensions

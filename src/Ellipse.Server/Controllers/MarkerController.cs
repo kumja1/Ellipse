@@ -33,7 +33,7 @@ public sealed class MarkerController(MarkerService markerService) : ControllerBa
         [FromQuery] bool overwriteCache = false
     )
     {
-        List<MarkerResponse?> responses = await markerService.GetMarkers(request, overwriteCache);
+        MarkerResponse?[] responses = await markerService.GetMarkers(request, overwriteCache);
         return Ok(responses);
     }
 }

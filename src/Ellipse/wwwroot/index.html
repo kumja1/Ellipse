@@ -6,12 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Ellipse</title>
     <base href="/"/>
-    <link rel="icon" type="image/png" href="favicon.png"/>
+    <link rel="icon" type="image/png" href="assets/icons/favicon.png"/>
     <link href="css/app.css" rel="stylesheet"/>
     <link href="Ellipse.styles.css" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet"/>
     <link href="_content/MudBlazor/MudBlazor.min.css?v=1" rel="stylesheet"/>
-    <link href="_content/Community.Blazor.MapLibre/maplibre-5.12.0.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/openlayers/8.1.0/ol.min.css" rel="stylesheet" />
+    <link href="_content/OpenLayers.Blazor/OpenLayers.Blazor.css" rel="stylesheet" />
+    <!-- OL first, synchronously, in <head> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/openlayers/8.1.0/dist/ol.min.js"></script>
 </head>
 
 <body>
@@ -28,11 +31,10 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
-<script src="_content/Community.Blazor.MapLibre/maplibre-5.3.0.min.js"></script>
-<script src="_content/Community.Blazor.MapLibre/MapLibre.razor.js"></script>
 <script src="_content/MudBlazor/MudBlazor.min.js?v=1"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="_framework/blazor.webassembly.js"></script>
+<script src="_framework/aspnetcore-browser-refresh.js"></script>
 </body>
 
 </html>

@@ -5,8 +5,8 @@ namespace Ellipse.Common.Models.Matrix.OpenRoute;
 public class OpenRouteMatrixResponse
 {
     [JsonPropertyName("durations")]
-    public float[][]? Durations { get; set; }
+    public double[][]? Durations { get; set; }
 
     [JsonPropertyName("distances")]
-    public float[][]? Distances { get; set; }
+    public double[][]? Distances { get; set; }
 }

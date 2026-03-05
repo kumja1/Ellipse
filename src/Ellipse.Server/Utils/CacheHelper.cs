@@ -73,15 +73,17 @@ public static class CacheHelper
 
     public static string CreateCacheKey(params object[] values)
     {
-       StringBuilder builder = StringBuilderPool.Obtain();
-       foreach (object value in values)
-       {
-           if (value is IEnumerable enumerable)
-               builder.AppendJoin("", enumerable);
-           else
-               builder.Append(value);
-       }
-       
-       return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
+        StringBuilder builder = StringBuilderPool.Obtain();
+        foreach (object value in values)
+        {
+            if (value is IEnumerable enumerable)
+                builder.AppendJoin("|", enumerable.Cast<object>());
+            else
+                builder.Append(value);
+
+            builder.Append('|');
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToPool())));
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Text.Json;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Directions;
@@ -13,10 +14,10 @@ namespace Ellipse.Server.Services;
 public class MarkerService(GeocodingService geocodingService, IDistributedCache cache)
     : IDisposable
 {
-    private readonly ConcurrentDictionary<GeoPoint2d, Task<MarkerResponse?>> _tasks = [];
+    private readonly ConcurrentDictionary<LngLat, Task<MarkerResponse?>> _tasks = [];
     private readonly SemaphoreSlim _semaphore = new(20, 20);
 
-    public async Task<List<MarkerResponse?>> GetMarkers(BatchMarkerRequest request, bool overwriteCache)
+    public async Task<MarkerResponse[]> GetMarkers(BatchMarkerRequest request, bool overwriteCache)
     {
         string cacheKey = CacheHelper.CreateCacheKey(request.Points, request.Schools);
         if (!overwriteCache)
@@ -25,7 +26,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             if (!string.IsNullOrEmpty(cachedData))
             {
                 Log.Information("Cache hit for batch request: {RequestId}", cacheKey);
-                List<MarkerResponse?> deserialized = JsonSerializer.Deserialize<List<MarkerResponse?>>(
+                MarkerResponse[] deserialized = JsonSerializer.Deserialize<MarkerResponse[]>(
                     CacheHelper.DecompressData(cachedData)
                 )!;
 
@@ -34,26 +35,26 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             }
         }
 
-        List<MarkerResponse?> results = await GetMarkersInternal(request).ConfigureAwait(false);
-        if (results.Count != 0)
+        MarkerResponse[] results = await GetMarkersInternal(request).ConfigureAwait(false);
+        if (results.Length != 0)
             await cache.SetStringAsync(cacheKey, CacheHelper.CompressData(JsonSerializer.Serialize(results)));
 
         return results;
     }
 
-    private async Task<List<MarkerResponse?>> GetMarkersInternal(BatchMarkerRequest request)
+    private async Task<MarkerResponse[]> GetMarkersInternal(BatchMarkerRequest request)
     {
-        Dictionary<GeoPoint2d, MarkerResponse?> resultsMap = [];
+        Dictionary<LngLat, MarkerResponse?> resultsMap = new(request.Points.Length);
         string[] addresses = await Task.WhenAll(
-            request.Points.Select(p => geocodingService.GetAddressCached(p.Lon, p.Lat))
+            request.Points.Select(p => geocodingService.GetAddressCached(p.Lng, p.Lat))
         );
 
-        List<Dictionary<string, SchoolRoute>> allRoutes =
+        Dictionary<string, SchoolRoute>[] allRoutes =
             await GetMatrixRoute(request.Points, request.Schools).ConfigureAwait(false);
 
         for (int i = 0; i < request.Points.Length; i++)
         {
-            GeoPoint2d point = request.Points[i];
+            LngLat point = request.Points[i];
             Dictionary<string, SchoolRoute> routes = allRoutes[i];
 
             if (routes.Count == 0)
@@ -63,19 +64,51 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                 continue;
             }
 
-            List<double> distances = [.. routes.Values.Select(r => r.Distance)];
-            double avgDistance = Trimean(distances);
-            double avgDuration = Trimean([.. routes.Values.Select(r => r.Duration.TotalSeconds)]);
+            var districtMetrics = request.Schools
+                .Where(s => s.LatLng != LngLat.Zero)
+                .GroupBy(s => s.Division)
+                .Select(g =>
+                {
+                    double[] durations =
+                    [
+                        ..g.Select(s => routes[$"{s.Name} ({s.Division})"].Duration.TotalSeconds)
+                    ];
+
+                    double[] distances = [..g.Select(s => routes[$"{s.Name} ({s.Division})"].Distance)];
+                    return new
+                    {
+                        TrimeanDuration = Trimean(durations),
+                        TrimeanDistance = Trimean(distances)
+                    };
+                })
+                .Where(x => !double.IsNaN(x.TrimeanDuration) && !double.IsNaN(x.TrimeanDistance))
+                .ToArray();
+
+            if (districtMetrics.Length == 0)
+            {
+                resultsMap[point] = null;
+                Log.Warning("No valid schools with coordinates for point: {Point}", point);
+                continue;
+            }
+
+            double totalDistance = routes.Sum(kvp => kvp.Value.Distance);
+            double totalDuration = routes.Sum(kvp => kvp.Value.Duration.TotalSeconds);
+
+            double averageDuration = districtMetrics.Average(x => x.TrimeanDuration);
+            double averageDistance = districtMetrics.Average(x => x.TrimeanDistance);
 
             routes["Average"] = new SchoolRoute
             {
-                Distance = avgDistance,
-                Duration = TimeSpan.FromSeconds(avgDuration)
+                Distance = averageDistance,
+                Duration = TimeSpan.FromSeconds(averageDuration)
             };
-            resultsMap[point] = new MarkerResponse(addresses[i], distances.Sum(), routes);
+
+            resultsMap[point] =
+                new MarkerResponse(addresses[i], totalDistance, TimeSpan.FromSeconds(totalDuration),
+                    routes);
         }
 
-        return request.Points.Select(p => resultsMap[p]).ToList();
+        return request.Points.Select(p => resultsMap[p]).ToArray();
     }
 
     public async Task<MarkerResponse?> GetMarker(MarkerRequest request, bool overwriteCache)
@@ -135,14 +168,14 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         }
 
         string address = await geocodingService
-            .GetAddressCached(request.Point.Lon, request.Point.Lat)
+            .GetAddressCached(request.Point.Lng, request.Point.Lat)
             .ConfigureAwait(false);
 
         Log.Information("Address fetched: {Address}", address);
-        List<Dictionary<string, SchoolRoute>> allRoutes =
+        Dictionary<string, SchoolRoute>[] allRoutes =
             await GetMatrixRoute([request.Point], request.Schools).ConfigureAwait(false);
-        Dictionary<string, SchoolRoute> routes = allRoutes[0];
 
+        Dictionary<string, SchoolRoute> routes = allRoutes[0];
         Log.Information("Matrix routes obtained. Count: {Count}", routes.Count);
         if (routes.Count == 0)
         {
@@ -150,43 +183,57 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             return null;
         }
 
-        List<double> distances = [.. routes.Values.Select(r => r.Distance)];
-        double avgDistance = Trimean(distances);
-        double avgDuration = Trimean([.. routes.Values.Select(r => r.Duration.TotalSeconds)]);
+        var districtMetrics = request.Schools
+            .Where(s => s.LatLng != LngLat.Zero)
+            .GroupBy(s => s.Division)
+            .Select(g =>
+            {
+                double[] durations = [..g.Select(s => routes[$"{s.Name} ({s.Division})"].Duration.TotalSeconds)];
+                double[] distances = [..g.Select(s => routes[$"{s.Name} ({s.Division})"].Distance)];
+                return new
+                {
+                    TrimeanDuration = Trimean(durations),
+                    TrimeanDistance = Trimean(distances)
+                };
+            })
+            .Where(x => !double.IsNaN(x.TrimeanDuration) && !double.IsNaN(x.TrimeanDistance))
+            .ToList();
 
-        routes["Average"] = new SchoolRoute { Distance = avgDistance, Duration = TimeSpan.FromSeconds(avgDuration) };
+        if (districtMetrics.Count == 0)
+        {
+            Log.Warning("No valid schools with coordinates for point: {Point}", request.Point);
+            return null;
+        }
+
+        double totalDistance = routes.Sum(kvp => kvp.Value.Distance);
+        double totalDuration = routes.Sum(kvp => kvp.Value.Duration.TotalSeconds);
+
+        double averageDuration = districtMetrics.Average(x => x.TrimeanDuration);
+        double averageDistance = districtMetrics.Average(x => x.TrimeanDistance);
+
+        routes["Average"] = new SchoolRoute
+            { Distance = averageDistance, Duration = TimeSpan.FromSeconds(averageDuration) };
+
         Log.Information(
             "Calculated average route: Distance={Distance}, Duration={Duration}",
-            avgDistance,
-            avgDuration
+            averageDistance,
+            averageDuration
         );
 
-        // MapillaryResponse<MapillaryImage> mapillaryResponse = await mapillaryClient.SearchImages(
-        //     new MapillarySearchRequest
-        //     {
-        //         MaxLat = request.Point.Lat + 0.005,
-        //         MaxLon = request.Point.Lon + 0.005,
-        //         MinLat = request.Point.Lat - 0.005,
-        //         MinLon = request.Point.Lon - 0.005,
-        //         Limit = 10
-        //     });
-
-        // MapillaryImage image = mapillaryResponse.Data[0];
         return routes.Count == 0
             ? null
-            : new MarkerResponse(address, distances.Sum(), routes);
+            : new MarkerResponse(address, totalDistance, TimeSpan.FromSeconds(totalDuration),
+                routes);
     }
 
 
-    private async Task<List<Dictionary<string, SchoolRoute>>> GetMatrixRoute(
-        GeoPoint2d[] sources,
+    private async Task<Dictionary<string, SchoolRoute>[]> GetMatrixRoute(
+        LngLat[] sources,
         SchoolData[] schools
     )
     {
-        List<Dictionary<string, SchoolRoute>> results = Enumerable
-            .Range(0, sources.Length)
-            .Select(_ => new Dictionary<string, SchoolRoute>(schools.Length))
-            .ToList();
+        Dictionary<string, SchoolRoute>[] results = Enumerable.Range(0, sources.Length)
+            .Select(_ => new Dictionary<string, SchoolRoute>(schools.Length)).ToArray();
 
         await Retry.Default(
             async attempt =>
@@ -195,11 +242,17 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                 await _semaphore.WaitAsync();
                 try
                 {
-                    (double[][] distances, double[][] durations) =
+                    (float?[][] distances, float?[][] durations) =
                         await geocodingService.GetMatrixCached(
                             sources,
                             [.. schools.Select(s => s.LatLng)]
                         );
+
+                    if (distances.Length == 0 || durations.Length == 0)
+                    {
+                        Log.Warning("Received empty matrix from GeocodingService. Retrying...");
+                        return false;
+                    }
 
                     for (int i = 0; i < sources.Length; i++)
                     {
@@ -208,9 +261,15 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                         {
                             SchoolData school = schools[j];
                             string schoolKey = $"{school.Name} ({school.Division})";
-                            double distance = distances[i][j];
-                            double duration = durations[i][j];
 
+                            float? distance = distances[i][j];
+                            float? duration = durations[i][j];
+
+                            if (distance == null || duration == null)
+                            {
+                                Log.Warning("Distance or duration is null for school: {School}", schoolKey);
+                                continue;
+                            }
 
                             if (currentDict.ContainsKey(schoolKey))
                             {
@@ -224,11 +283,10 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                                 new SchoolRoute
                                 {
                                     Name = school.Name,
-                                    Distance = distance,
-                                    Duration = TimeSpan.FromSeconds(duration)
+                                    Distance = distance.Value,
+                                    Duration = TimeSpan.FromSeconds((double)duration)
                                 }
                             );
-
                             Log.Information(
                                 "School: {School} => Distance: {Distance}, Duration: {Duration}",
                                 schoolKey,
@@ -236,6 +294,8 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                                 duration
                             );
                         }
+
+                        results[i] = currentDict;
                     }
 
                     return true;
@@ -253,20 +313,21 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         return results;
     }
 
-    private static double Trimean(List<double> data)
+    private static double Trimean(double[] data)
     {
-        if (data.Count == 0) return 0;
-        Log.Information("Calculating trimean for {Count} data points.", data.Count);
-        List<double> sorted = [.. data.OrderBy(x => x)];
+        if (data.Length == 0)
+            return 0;
+
+        Span<double> sorted = [.. data.OrderBy(x => x)];
         double q1 = WeightedPercentile(sorted, 0.25);
         double median = WeightedPercentile(sorted, 0.5);
         double q3 = WeightedPercentile(sorted, 0.75);
         return (q1 + 2 * median + q3) / 4.0;
 
-        static double WeightedPercentile(List<double> sorted, double percentile)
+        static double WeightedPercentile(Span<double> sorted, double percentile)
         {
-            if (sorted.Count == 0) return 0;
-            double position = (sorted.Count - 1) * percentile;
+            if (sorted.Length == 0) return 0;
+            double position = (sorted.Length - 1) * percentile;
             int left = (int)Math.Floor(position);
             int right = (int)Math.Ceiling(position);
             return left == right
@@ -279,5 +340,6 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     {
         GC.SuppressFinalize(this);
         _tasks.Clear();
+        _semaphore.Dispose();
     }
 }

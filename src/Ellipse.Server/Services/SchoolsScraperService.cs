@@ -34,8 +34,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
 
         try
         {
-            geoService.EnableCacheOverwrite(overwriteCache);
-
             string cacheKey = CacheHelper.CreateCacheKey(nameof(divisionCode), divisionCode);
             if (!overwriteCache)
             {
@@ -51,7 +49,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
             }
 
             string result = await _tasks
-                .GetOrAdd(divisionCode, ScrapeDivisionInternal(divisionCode))
+                .GetOrAdd(divisionCode, _ => ScrapeDivisionInternal(divisionCode))
                 .ConfigureAwait(false);
 
             if (string.IsNullOrEmpty(result))
@@ -97,7 +95,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         string url = $"{VIRGINIA_SCHOOLS_URL}?d={divisionCode}&w=true";
         string divisionName = "";
         List<IElement> rows = await Retry
-            .RetryIfListEmpty<IElement>(
+            .RetryIfCollectionEmpty<IElement>(
                 func: async _ =>
                 {
                     Url? requestUrl = Url.Create(url);
@@ -172,7 +170,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         }
 
         string? name = infoCell.QuerySelector("strong")?.TextContent.Trim();
-        string phoneNumber = infoCell.TextContent.Trim();
 
         string[] addressSegments = infoCell.ChildNodes
             .OfType<IText>()
@@ -180,13 +177,25 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
             .Where(t => !string.IsNullOrWhiteSpace(t) && t != "Street address:")
             .ToArray();
 
-        string address = addressSegments.Length > 0
-            ? string.Join(", ", addressSegments.Take(addressSegments.Length - 1))
-            : "";
+        string address = "";
+        string phoneNumber = "";
 
-        Task<GeoPoint2d> task = Retry
+        if (addressSegments.Length > 0)
+        {
+            if (addressSegments.Length > 1)
+            {
+                address = string.Join(", ", addressSegments.Take(addressSegments.Length - 1));
+                phoneNumber = addressSegments.Last();
+            }
+            else
+            {
+                address = addressSegments[0];
+            }
+        }
+
+        Task<LngLat> task = Retry
             .RetryIfInvalid(
-                isValid: c => c != GeoPoint2d.Zero,
+                isValid: c => c != LngLat.Zero,
                 async _ => await geoService.GetLatLngCached(address),
                 maxRetries: 20,
                 delayMs: 500
@@ -196,8 +205,8 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         string gradeSpan = WebUtility.HtmlDecode(row.QuerySelector("td:nth-child(3)")?.TextContent ?? "").Trim();
         string schoolType = WebUtility.HtmlDecode(row.QuerySelector("td:nth-child(4)")?.TextContent ?? "").Trim();
 
-        GeoPoint2d latLng = await task;
-        if (latLng == GeoPoint2d.Zero)
+        LngLat latLng = await task;
+        if (latLng == LngLat.Zero)
             Log.Warning("[ParseRow] Failed to geocode address '{Address}' for school '{SchoolName}'",
                 address, name);
 
@@ -217,5 +226,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
     public void Dispose()
     {
         _tasks.Clear();
+        _browsingContext.Dispose();
     }
 }

@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text.Json;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
@@ -22,11 +20,10 @@ public class GeocodingService(
     IDistributedCache cache
 )
 {
-    private bool _overwriteCache;
-
     public async Task<string> GetAddressCached(
         double longitude,
-        double latitude
+        double latitude,
+        bool overwriteCache = false
     )
     {
         string cacheKey = CacheHelper.CreateCacheKey("address", longitude, latitude);
@@ -36,7 +33,7 @@ public class GeocodingService(
             latitude
         );
 
-        if (!_overwriteCache)
+        if (!overwriteCache)
         {
             string? cachedAddress = await cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedAddress))
@@ -167,38 +164,38 @@ public class GeocodingService(
         return string.Empty;
     }
 
-    public async Task<GeoPoint2d> GetLatLngCached(string address)
+    public async Task<LngLat> GetLatLngCached(string address, bool overwriteCache = false)
     {
         if (string.IsNullOrWhiteSpace(address))
         {
             Log.Information(
-                "[GetLatLngCached] Provided address is empty or null. Returning GeoPoint2d.Zero."
+                "[GetLatLngCached] Provided address is empty or null. Returning LngLat.Zero."
             );
-            return GeoPoint2d.Zero;
+            return LngLat.Zero;
         }
 
         string cacheKey = CacheHelper.CreateCacheKey("latLng", address.ToLower().Replace(" ", "_"));
-        if (!_overwriteCache)
+        if (!overwriteCache)
         {
             string? cachedLatLng = await cache.GetStringAsync(cacheKey);
             Log.Information("[GetLatLngCached] Searching cache for address: {Address}", address);
 
             if (!string.IsNullOrEmpty(cachedLatLng))
-                return GeoPoint2d.Parse(cachedLatLng);
+                return LngLat.Parse(cachedLatLng);
         }
 
-        GeoPoint2d censusGeoPoint2d = await GetLatLngWithCensus(address);
-        GeoPoint2d latLng = censusGeoPoint2d == GeoPoint2d.Zero
+        LngLat censusLngLat = await GetLatLngWithCensus(address);
+        LngLat latLng = censusLngLat == LngLat.Zero
             ? await GetLatLngWithOpenRoute(address)
-            : censusGeoPoint2d;
+            : censusLngLat;
 
-        if (latLng == GeoPoint2d.Zero)
+        if (latLng == LngLat.Zero)
         {
             Log.Information(
-                "[GetLatLngCached] No coordinates found for address: {Address}. Returning GeoPoint2d.Zero.",
+                "[GetLatLngCached] No coordinates found for address: {Address}. Returning LngLat.Zero.",
                 address
             );
-            return GeoPoint2d.Zero;
+            return LngLat.Zero;
         }
 
         Log.Information(
@@ -211,7 +208,7 @@ public class GeocodingService(
         return latLng;
     }
 
-    private async Task<GeoPoint2d> GetLatLngWithCensus(string address)
+    private async Task<LngLat> GetLatLngWithCensus(string address)
     {
         try
         {
@@ -234,14 +231,14 @@ public class GeocodingService(
             Log.Information("[GetLatLng] Received response: {@Response}", response);
 
             if (response.Result.AddressMatches.Count == 0)
-                return GeoPoint2d.Zero;
+                return LngLat.Zero;
 
             AddressMatch? firstResult = response.Result.AddressMatches.FirstOrDefault();
             Log.Information("[GetLatLng] First geocoding result: {@FirstResult}", firstResult);
-            GeoPoint2d resultPoint =
+            LngLat resultPoint =
                 firstResult != null
-                    ? new GeoPoint2d(firstResult.Coordinates.X, firstResult.Coordinates.Y)
-                    : GeoPoint2d.Zero;
+                    ? new LngLat(firstResult.Coordinates.X, firstResult.Coordinates.Y)
+                    : LngLat.Zero;
 
             Log.Information("[GetLatLng] Returning coordinates: {ResultPoint}", resultPoint);
             return resultPoint;
@@ -249,11 +246,11 @@ public class GeocodingService(
         catch (Exception ex)
         {
             Log.Error(ex, "[GetLatLng] Error getting coordinates for address: {Address}", address);
-            return GeoPoint2d.Zero;
+            return LngLat.Zero;
         }
     }
 
-    private async Task<GeoPoint2d> GetLatLngWithOpenRoute(string address)
+    private async Task<LngLat> GetLatLngWithOpenRoute(string address)
     {
         try
         {
@@ -271,24 +268,25 @@ public class GeocodingService(
             Feature location = features?.FirstOrDefault(f => f.Properties.RegionA == "VA");
 
             if (location != null)
-                return new GeoPoint2d(
+                return new LngLat(
                     location.Geometry.Coordinates[0],
                     location.Geometry.Coordinates[1]
                 );
 
             Log.Information("[GetLatLng] No coordinates found for address: {Address}", address);
-            return GeoPoint2d.Zero;
+            return LngLat.Zero;
         }
         catch (Exception ex)
         {
             Log.Error(ex, "[GetLatLng] Error getting coordinates for address: {Address}", address);
-            return GeoPoint2d.Zero;
+            return LngLat.Zero;
         }
     }
 
-    public async Task<(double[][] Destinations, double[][] Durations)> GetMatrixCached(
-        GeoPoint2d[] sources,
-        GeoPoint2d[] destinations
+    public async Task<(float?[][] Destinations, float?[][] Durations)> GetMatrixCached(
+        LngLat[] sources,
+        LngLat[] destinations,
+        bool overwriteCache = false
     )
     {
         Log.Information(
@@ -298,8 +296,7 @@ public class GeocodingService(
         );
 
         string cacheKey = CacheHelper.CreateCacheKey("matrix", sources, destinations);
-
-        if (!_overwriteCache)
+        if (!overwriteCache)
         {
             string? cachedMatrix = await cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedMatrix))
@@ -310,41 +307,56 @@ public class GeocodingService(
                     cacheKey
                 );
 
-                return JsonSerializer.Deserialize<(double[][], double[][])>(CacheHelper.DecompressData(cachedMatrix));
+                return JsonSerializer.Deserialize<(float?[][], float?[][])>(CacheHelper.DecompressData(cachedMatrix));
             }
         }
 
-        TableResponse? response = await GetMatrixWithOsrm(sources, destinations)
-            .ConfigureAwait(false);
+        float?[][] resultDistances = [];
+        float?[][] resultDurations = [];
 
-        double[][] resultDistances;
-        double[][] resultDurations;
-
-        if (response is not null)
+        try
         {
-            resultDistances = response.Distances.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? [])
-                .ToArray();
-            resultDurations = response.Durations.Select(row => row?.Select(d => (double)(d ?? 0)).ToArray() ?? [])
-                .ToArray();
-        }
-        else
-        {
-            OpenRouteMatrixResponse? openRouteResponse = await GetMatrixWithOpenRoute(
-                    sources,
-                    destinations
-                )
+            TableResponse? response = await GetMatrixWithOsrm(sources, destinations)
                 .ConfigureAwait(false);
 
-            if (openRouteResponse is null)
+            if (response is not null)
             {
-                Log.Warning("Both OSRM and OpenRouteMatrix responses are null or invalid.");
-                return ([], []);
+                resultDistances = response.Distances;
+                resultDurations = response.Durations;
             }
-
-            resultDistances = openRouteResponse.Distances?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
-                .ToArray() ?? [];
-            resultDurations = openRouteResponse.Durations?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
-                .ToArray() ?? [];
+            else
+            {
+                throw new Exception("OSRM response is null");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "OSRM Matrix failed.");
+            // Log.Warning(ex, "OSRM Matrix failed, falling back to OpenRoute");
+            // try
+            // {
+            //     OpenRouteMatrixResponse? openRouteResponse = await GetMatrixWithOpenRoute(
+            //             sources,
+            //             destinations
+            //         )
+            //         .ConfigureAwait(false);
+            //
+            //     if (openRouteResponse is null)
+            //     {
+            //         Log.Warning("Both OSRM and OpenRouteMatrix responses are null or invalid.");
+            //         return ([], []);
+            //     }
+            //
+            //     resultDistances = openRouteResponse.Distances?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
+            //         .ToArray() ?? [];
+            //     resultDurations = openRouteResponse.Durations?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
+            //         .ToArray() ?? [];
+            // }
+            // catch (Exception ex2)
+            // {
+            //     Log.Error(ex2, "Both OSRM and OpenRouteMatrix failed.");
+            //     return ([], []);
+            // }
         }
 
         await cache.SetStringAsync(
@@ -356,13 +368,13 @@ public class GeocodingService(
     }
 
     private async Task<TableResponse?> GetMatrixWithOsrm(
-        GeoPoint2d[] sources,
-        GeoPoint2d[] destinations
+        LngLat[] sources,
+        LngLat[] destinations
     )
     {
-        if (destinations.Any(dest => dest == GeoPoint2d.Zero))
+        if (destinations.All(dest => dest == LngLat.Zero))
         {
-            Log.Information("No destinations provided. Returning null.");
+            Log.Information("All destinations are Zero. Returning null.");
             return null;
         }
 
@@ -371,8 +383,8 @@ public class GeocodingService(
                 PredefinedProfiles.Car,
                 GeographicalCoordinates.Create(
                     [
-                        .. sources.Select(source => Coordinate.Create(source.Lon, source.Lat)),
-                        .. destinations.Select(dest => Coordinate.Create(dest.Lon, dest.Lat)),
+                        .. sources.Select(source => Coordinate.Create(source.Lng, source.Lat)),
+                        .. destinations.Select(dest => Coordinate.Create(dest.Lng, dest.Lat)),
                     ]
                 )
             )
@@ -383,8 +395,8 @@ public class GeocodingService(
 
         Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
         OsrmHttpApiResponse<TableResponse> response = await osrmClient.GetTableAsync(request);
+        
         Log.Information("{Response}", response);
-
         if (!response.IsSuccess)
         {
             Log.Error("Invalid matrix response received.");
@@ -397,8 +409,8 @@ public class GeocodingService(
     }
 
     private async Task<OpenRouteMatrixResponse?> GetMatrixWithOpenRoute(
-        GeoPoint2d[] sources,
-        GeoPoint2d[] destinations
+        LngLat[] sources,
+        LngLat[] destinations
     )
     {
         Log.Information(
@@ -407,15 +419,15 @@ public class GeocodingService(
             destinations.Length
         );
 
-        if (destinations.All(dest => dest == GeoPoint2d.Zero))
+        if (destinations.All(dest => dest == LngLat.Zero))
             return null;
 
         OpenRouteMatrixRequest request = new()
         {
             Locations =
             [
-                .. sources.Select(source => new[] { source.Lon, source.Lat }),
-                .. destinations.Select(dest => new[] { dest.Lon, dest.Lat }),
+                .. sources.Select(source => new[] { source.Lng, source.Lat }),
+                .. destinations.Select(dest => new[] { dest.Lng, dest.Lat }),
             ],
             Sources = [.. Enumerable.Range(0, sources.Length)],
             Destinations = [.. Enumerable.Range(sources.Length, destinations.Length)],
@@ -438,8 +450,4 @@ public class GeocodingService(
         return response;
     }
 
-    public void EnableCacheOverwrite(bool overwriteCache)
-    {
-        _overwriteCache = overwriteCache;
-    }
 }
