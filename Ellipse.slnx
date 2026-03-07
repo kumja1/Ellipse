@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ellipse.Common/Ellipse.Common.csproj" />
+    <Project Path="src/Ellipse.Client/Ellipse.Client.csproj" />
+    <Project Path="src/Ellipse/Ellipse.csproj" />
+  </Folder>
+  <Project Path="BlazorApp4/BlazorApp4.Client/BlazorApp4.Client.csproj" />
+  <Project Path="BlazorApp4/BlazorApp4/BlazorApp4.csproj" />
+</Solution>

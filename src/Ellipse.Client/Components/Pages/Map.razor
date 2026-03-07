@@ -1,0 +1,177 @@
+@page "/map"
+@using Ellipse.Client.Utils
+@using OpenLayers.Blazor
+@using Ellipse.Common.Models.Directions
+@using MudBlazor
+
+@namespace Ellipse.Client.Components.Pages
+
+<PageTitle>Map</PageTitle>
+
+<div>
+    <div class="h-screen">
+        <div class="absolute inset-0 z-0">
+            <OpenStreetMap @ref="_map" Class="w-full h-full" MaxZoom="18"
+                           MinZoom="5" Center="new Coordinate(-78, 37)" OnDoubleClick="OnDoubleClicked"/>
+            
+        </div>
+        <div class="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
+            <MudPaper Class="pa-4 pointer-events-auto" Elevation="8" Style="background-color: white;">
+                @if (_loading)
+                {
+                    <div class="flex items-center gap-2">
+                        <MudText>Loading</MudText>
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="text-blue-600"/>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-center gap-2">
+                        <MudText>Layer: @_currentLayerIndex</MudText>
+                        @if (_currentLayerIndex > 0)
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       OnClick="RemoveLayer">
+                                Remove Layer
+                            </MudButton>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </div>
+    </div>
+    <Menu @ref="_menu" Class="z-30 h-full">
+        <ListItem Context="marker">
+            <div class="p-4 border-b hover:bg-gray-50 cursor-pointer transition-colors" @key="marker.MarkerName">
+                <div class="flex gap-4">
+                    @* @if (!string.IsNullOrEmpty(marker.Image256Url)) *@
+                    @* { *@
+                    @*     <div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 shadow-sm"> *@
+                    @*         $1$ <img src="@marker.Image256Url" class="w-full h-full object-cover" alt="Location preview"/> #1# *@
+                    @*     </div> *@
+                    @* } *@
+                    <div class="flex-grow min-w-0">
+                        <div class="flex justify-between items-start mb-1">
+                            <MudText Typo="Typo.subtitle1" Class="font-bold text-gray-900 leading-tight truncate">
+                                @marker.MarkerName
+                            </MudText>
+                            <div class="flex flex-col items-end flex-shrink-0">
+                                <MudText Typo="Typo.caption" Class="text-blue-600 font-semibold">
+                                    @Math.Round((double)marker.MarkerAverageDistance / 1609, 1) mi
+                                </MudText>
+                                <MudText Typo="Typo.caption" Class="text-gray-500">
+                                    @marker.MarkerAverageDuration.ToReadableString()
+                                </MudText>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                     Class="px-2 py-0 h-6">Average
+                            </MudChip>
+                            <MudText Typo="Typo.caption" Class="text-gray-400 italic">calculated from all routes
+                            </MudText>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </ListItem>
+
+        <SingleItem Context="marker">
+            <MudStack Spacing="0">
+                <!-- Header with optional image -->
+                <div class="h-32 rounded-t-lg relative mb-4 overflow-hidden">
+                    @* @if (!string.IsNullOrEmpty(marker.Data["Image256Url"])) *@
+                    @* { *@
+                    @*     <!-- Header image --> *@
+                    @*     <img src="@(marker.Data["Image1024Url"])" *@
+                    @*          class="absolute inset-0 w-full h-full object-cover" *@
+                    @*          alt="Location preview"/> *@
+                    @* *@
+                    @*     <!-- Contrast overlay --> *@
+                    @*     <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent"></div> *@
+                    @* } *@
+                    @* else *@
+                    @* { *@
+                    <!-- Fallback gradient -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-700"></div>
+                    @* } *@
+
+                    <!-- Location icon -->
+                    <div class="absolute bottom-[-16px] left-4 bg-white p-1 rounded-full shadow-lg z-10">
+                        <MudIcon Icon="@Icons.Material.Filled.LocationOn"
+                                 Color="Color.Primary"
+                                 Size="Size.Large"/>
+                    </div>
+                </div>
+
+                <div class="px-4 pb-4">
+                    <MudText Typo="Typo.h5" Class="font-bold text-gray-900 mb-1">
+                        @((string?)marker.Marker.Text)
+                    </MudText>
+
+                    <div class="flex items-center gap-2 mb-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Directions" Size="Size.Small" Class="text-gray-400"/>
+                        <MudText Typo="Typo.body2" Class="text-gray-500">
+                            Available SchoolRoutes: @(marker.Routes?.Count ?? 0)
+                        </MudText>
+                    </div>
+
+                    <MudDivider Class="my-4"/>
+
+                    <div class="flex gap-2 mb-6">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.OpenInNew"
+                                   Class="rounded-lg py-2 shadow-none hover:shadow-md transition-all">
+                            LandSearch
+                        </MudButton>
+                    </div>
+
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <MudSelect T="string" Label="Travel Mode" Dense @bind-Value="_selectedRouteName"
+                                   AnchorOrigin="Origin.BottomCenter"
+                                   Variant="Variant.Outlined"
+                                   Class="bg-white mb-4">
+                            @if (marker.Routes != null)
+                            {
+                                @foreach ((string routeName, SchoolRoute _) in marker.Routes)
+                                {
+                                    <MudSelectItem Value="routeName">
+                                        @routeName
+                                    </MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+
+                        <!-- Selected SchoolRoute Details -->
+                        <div class="flex justify-between items-center px-2">
+                            <div class="flex flex-col">
+                                <MudText Typo="Typo.caption"
+                                         Class="text-gray-400 uppercase font-bold tracking-wider">Distance
+                                </MudText>
+                                <MudText Typo="Typo.h6" Class="text-gray-900">
+                                    @(Math.Round((double)marker.Routes[_selectedRouteName].Distance, 1)) <span
+                                        class="text-sm font-normal text-gray-500">miles</span>
+                                </MudText>
+                            </div>
+                            <div class="h-8 w-[1px] bg-gray-200"></div>
+                            <div class="flex flex-col items-end">
+                                <MudText Typo="Typo.caption"
+                                         Class="text-gray-400 uppercase font-bold tracking-wider">Duration
+                                </MudText>
+                                <MudText Typo="Typo.h6" Class="text-gray-900">
+                                    @marker.Routes[_selectedRouteName].Duration.ToReadableString()
+                                </MudText>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </MudStack>
+        </SingleItem>
+    </Menu>
+    <MudFab Size="Size.Medium" StartIcon="@Icons.Material.Filled.Menu" OnClick="@(() => _menu?.ToggleOpen())"
+            Class="fixed left-2 bottom-2 z-40 bg-blue-600 hover:bg-blue-700 text-white border border-white"/>
+</div>

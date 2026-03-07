@@ -13,11 +13,11 @@ public static class Retry
     public static async Task<TItem[]> RetryIfCollectionEmpty<TItem>(Func<int, Task<TItem[]>> func,
         int maxRetries = 5,
         int delayMs = 100) =>
-        await RetryIfInvalid(a => a.Length == 0, func, [], maxRetries, delayMs);
+        await RetryIfInvalid(a => a.Length > 0, func, [], maxRetries, delayMs);
 
     public static async Task<List<TItem>> RetryIfCollectionEmpty<TItem>(Func<int, Task<List<TItem>>> func,
         int maxRetries = 5,
-        int delayMs = 100) => await RetryIfInvalid(l => l.Count == 0, func, [], maxRetries, delayMs);
+        int delayMs = 100) => await RetryIfInvalid(l => l.Count > 0, func, [], maxRetries, delayMs);
 
     public static async Task<HttpResponseMessage?> RetryIfResponseFailed(Func<int, Task<HttpResponseMessage>> func,
         int maxRetries = 5,

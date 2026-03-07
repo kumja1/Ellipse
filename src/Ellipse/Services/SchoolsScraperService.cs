@@ -1,0 +1,228 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Net;
+using System.Text.Json;
+using AngleSharp;
+using AngleSharp.Dom;
+using Ellipse.Common.Models;
+using Ellipse.Common.Utils;
+using Ellipse.Utils;
+using Microsoft.Extensions.Caching.Distributed;
+using Serilog;
+
+namespace Ellipse.Services;
+
+public sealed class SchoolsScraperService(GeocodingService geoService, IDistributedCache cache)
+    : IDisposable
+{
+    private readonly ConcurrentDictionary<int, Task<string>> _tasks = new();
+
+    private const string VIRGINIA_SCHOOLS_URL = "https://www.va-doeapp.com/PublicSchoolsByDivisions.aspx";
+    
+    private readonly IBrowsingContext _browsingContext = BrowsingContext.New(
+        Configuration.Default.WithDefaultLoader().WithXPath()
+    );
+
+    public async ValueTask<string> ScrapeDivision(int divisionCode, bool overwriteCache = false)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        Log.Information(
+            "[ScrapeDivision] Starting scrape for division {DivisionCode}, OverwriteCache: {OverwriteCache}",
+            divisionCode, overwriteCache);
+
+        try
+        {
+            string cacheKey = CacheHelper.CreateCacheKey(nameof(divisionCode), divisionCode);
+            if (!overwriteCache)
+            {
+                string? cachedData = await cache.GetStringAsync(cacheKey);
+                if (!string.IsNullOrEmpty(cachedData))
+                {
+                    Log.Information(
+                        "[ScrapeDivision] Cache hit for division {DivisionCode}",
+                        divisionCode);
+                    string decompressed = CacheHelper.DecompressData(cachedData);
+                    return decompressed;
+                }
+            }
+
+            string result = await _tasks
+                .GetOrAdd(divisionCode, _ => ScrapeDivisionInternal(divisionCode))
+                .ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(result))
+            {
+                Log.Warning("[ScrapeDivision] Scrape returned empty result for division {DivisionCode}", divisionCode);
+                return string.Empty;
+            }
+
+            string compressed = CacheHelper.CompressData(result);
+            await cache.SetStringAsync(cacheKey, compressed);
+
+            stopwatch.Stop();
+            Log.Information("[ScrapeDivision] Completed scrape for division {DivisionCode} in {ElapsedMs}ms",
+                divisionCode, stopwatch.ElapsedMilliseconds);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            Log.Error(ex, "[ScrapeDivision] Error scraping division {DivisionCode} after {ElapsedMs}ms",
+                divisionCode, stopwatch.ElapsedMilliseconds);
+            return string.Empty;
+        }
+        finally
+        {
+            _tasks.TryRemove(divisionCode, out _);
+        }
+    }
+
+    private async Task<string> ScrapeDivisionInternal(int divisionCode)
+    {
+        SchoolData[] schools = await ParsePage(divisionCode).ConfigureAwait(false);
+        Log.Information(
+            "[ScrapeDivisionInternal] Scraped {Count} schools from division {DivisionCode}",
+            schools.Length, divisionCode);
+
+        return JsonSerializer.Serialize(schools);
+    }
+
+    private async Task<SchoolData[]> ParsePage(int divisionCode)
+    {
+        string url = $"{VIRGINIA_SCHOOLS_URL}?d={divisionCode}&w=true";
+        string divisionName = "";
+        IElement[] rows = await Retry
+            .RetryIfCollectionEmpty<IElement>(
+                func: async _ =>
+                {
+                    Url? requestUrl = Url.Create(url);
+                    if (requestUrl is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"[ParsePage] Failed to create a valid URL from '{url}' for division {divisionCode}."
+                        );
+                    }
+
+                    IDocument document = await _browsingContext.OpenAsync(requestUrl).ConfigureAwait(false);
+                    if (document is null or
+                        {
+                            Body: null
+                        })
+                    {
+                        throw new InvalidOperationException(
+                            $"[ParsePage] AngleSharp returned null document for URL '{url}' (division {divisionCode})."
+                        );
+                    }
+
+                    divisionName = document.QuerySelector("tr.division_heading td.division")?.TextContent ??
+                                   "";
+
+                    return document
+                        .QuerySelectorAll(
+                            "table > tbody > tr:not(.tr_header_row, .division_heading, .office_heading, :has(table.public_school_division_division:has(tr.public_school_division_division_tr)), :has(td.division))")
+                        .Where(r => r.QuerySelector("td.td_column_wrapstyle:has(> strong)") != null)
+                        .ToArray();
+                },
+                maxRetries: 10,
+                delayMs: 300
+            )
+            .ConfigureAwait(false);
+
+        if (string.IsNullOrEmpty(divisionName))
+            Log.Warning("[ParsePage] Division name is empty for division code {DivisionCode}!", divisionCode);
+
+        ArgumentNullException.ThrowIfNull(rows);
+        SchoolData?[] results =
+            await Task.WhenAll(rows.Select(row => ParseRow(row, divisionName))).ConfigureAwait(false);
+
+        int nullCount = results.Count(r => r == null);
+        if (nullCount > 0)
+        {
+            Log.Warning("[ParsePage] {NullCount} out of {Total} rows failed to parse for division {DivisionCode}",
+                nullCount, results.Length, divisionCode);
+        }
+
+        SchoolData[] validSchools = results.Where(s =>
+        {
+            if (s != null) return true;
+
+            Log.Warning("[ParsePage] Failed to parse school in division {DivisionCode}", divisionCode);
+            return false;
+        }).Cast<SchoolData>().DistinctBy(s => s.LngLat).ToArray();
+
+        Log.Information("[ParsePage] Completed parsing division {DivisionCode} with {ValidCount} valid schools",
+            divisionCode, validSchools.Length);
+
+        return validSchools;
+    }
+
+    private async Task<SchoolData?> ParseRow(IElement row, string divisionName)
+    {
+        IElement? infoCell = row.QuerySelector("td.td_column_wrapstyle:has(> strong)");
+        if (infoCell == null)
+        {
+            Log.Warning("[ParseRow] Info cell not found in row for division '{DivisionName}'. Row: {RowHtml}",
+                divisionName, row.Html());
+            return null;
+        }
+
+        string? name = infoCell.QuerySelector("strong")?.TextContent.Trim();
+        string[] addressSegments = infoCell.ChildNodes
+            .OfType<IText>()
+            .Select(t => t.TextContent.Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t) && t != "Street address:")
+            .ToArray();
+
+        string address = "";
+        string phoneNumber = "";
+
+        if (addressSegments.Length > 0)
+        {
+            if (addressSegments.Length > 1)
+            {
+                address = string.Join(", ", addressSegments.Take(addressSegments.Length - 1));
+                phoneNumber = addressSegments.Last();
+            }
+            else
+            {
+                address = addressSegments[0];
+            }
+        }
+
+        Task<LngLat> task = Retry
+            .RetryIfInvalid(
+                isValid: c => c != LngLat.Zero,
+                async _ => await geoService.GetLatLngCached(address),
+                maxRetries: 20,
+                delayMs: 500
+            );
+
+        string principal = WebUtility.HtmlDecode(row.QuerySelector("td:nth-child(2)")?.TextContent ?? "").Trim();
+        string gradeSpan = WebUtility.HtmlDecode(row.QuerySelector("td:nth-child(3)")?.TextContent ?? "").Trim();
+        string schoolType = WebUtility.HtmlDecode(row.QuerySelector("td:nth-child(4)")?.TextContent ?? "").Trim();
+
+        LngLat latLng = await task;
+        if (latLng == LngLat.Zero)
+            Log.Warning("[ParseRow] Failed to geocode address '{Address}' for school '{SchoolName}'",
+                address, name);
+
+        return new SchoolData
+        {
+            Name = name,
+            PhoneNumber = phoneNumber,
+            PrincipalName = principal,
+            Address = address,
+            Division = divisionName,
+            GradeSpan = gradeSpan,
+            SchoolType = schoolType,
+            LngLat = latLng,
+        };
+    }
+
+    public void Dispose()
+    {
+        _tasks.Clear();
+        _browsingContext.Dispose();
+    }
+}
