@@ -1,6 +1,7 @@
 bin/
 obj/
+node_modules/
+.idea/
 
 .env
-
 appsettings.Development.json
