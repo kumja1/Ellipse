@@ -37,6 +37,11 @@ public sealed class SchoolDivisionService(HttpClient httpClient)
         Log.Information("Completed school fetch. Current Count: {Length}. Removing duplicates…",
             schools.Length);
 
+        foreach (var school in schools)
+        {
+            Console.WriteLine(school);
+        }
+
         return [.. schools.DistinctBy(s => s.LngLat)];
     }
 
@@ -54,6 +59,8 @@ public sealed class SchoolDivisionService(HttpClient httpClient)
                 maxRetries: 30,
                 delayMs: 500
             );
+            
+            
 
             if (result.Length == 0)
             {

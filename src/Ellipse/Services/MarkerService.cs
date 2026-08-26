@@ -241,13 +241,13 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                 await _semaphore.WaitAsync();
                 try
                 {
-                    (float?[][] distances, float?[][] durations) =
+                    (float?[][]? distances, float?[][]? durations) =
                         await geocodingService.GetMatrixCached(
                             sources,
                             [.. schools.Select(s => s.LngLat)]
                         );
 
-                    if (distances.Length == 0 || durations.Length == 0)
+                    if (distances?.Length == 0 || durations?.Length == 0)
                     {
                         Log.Warning("Received empty matrix from GeocodingService. Retrying...");
                         return false;

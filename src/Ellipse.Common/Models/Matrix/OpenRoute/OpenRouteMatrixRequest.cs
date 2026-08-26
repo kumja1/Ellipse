@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Ellipse.Common.Models.Matrix.OpenRoute;
 
 // Request Model
-public class OpenRouteMatrixRequest
+public record OpenRouteMatrixRequest
 {
     [JsonPropertyName("locations")]
     public double[][] Locations { get; set; } = [];
@@ -20,7 +20,7 @@ public class OpenRouteMatrixRequest
     [JsonPropertyName("units")]
     public string? Units { get; set; }
 
-    [JsonPropertyName("profile")]
+    [JsonIgnore]
     public Profile Profile { get; set; } = Profile.DrivingCar;
 
     [JsonPropertyName("resolve_locations")]
@@ -28,7 +28,4 @@ public class OpenRouteMatrixRequest
 
     [JsonPropertyName("optimized")]
     public bool? Optimized { get; set; }
-
-    [JsonPropertyName("dry_run")]
-    public bool? DryRun { get; set; }
 }

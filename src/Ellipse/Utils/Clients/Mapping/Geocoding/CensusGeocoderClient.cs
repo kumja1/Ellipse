@@ -7,7 +7,7 @@ using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 namespace Ellipse.Utils.Clients.Mapping.Geocoding;
 
 public sealed class CensusGeocoderClient(HttpClient client)
-    : WebClient(client, "https://geocoding.geo.census.gov/geocoder/"),
+    : WebClient(client, "https://geocoding.geo.census.gov/geocoder"),
         IGeocoderClient<
             CensusGeocodingRequest,
             CensusReverseGeocodingRequest,

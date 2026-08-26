@@ -1,0 +1,5 @@
+﻿@import "tailwindcss";
+@source "**/*.razor";
+@source "**/*.html";
+@source "../../../Ellipse.Client/**/*.razor";
+@source "../../../Ellipse.Client/**/*.html";

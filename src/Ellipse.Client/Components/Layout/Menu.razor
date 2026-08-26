@@ -11,7 +11,7 @@
                Style="transition: transform 0.4s ease, width 0.4s ease;"
                Width="400px"
                Height="100%"
-               Class="border-r overflow-y-auto">
+               Class="fixed left-0 top-0 z-30 h-full flex items-start border-r overflow-y-auto">
 
         <MudDrawerHeader
             Class="flex flex-col px-4 py-3 border-b gap-4">
@@ -58,9 +58,9 @@
 
         @if (!_isList && _selectedMarker != null)
         {
-            <div class="fixed left-[400px] top-4 z-30 ml-4 transition-all duration-300 pointer-events-none">
+            <div class="fixed left-100 top-4 z-30 ml-4 transition-all duration-300 pointer-events-none">
                 <MudPaper Elevation="6"
-                          Class="p-0 w-[360px] rounded-lg overflow-hidden pointer-events-auto">
+                          Class="p-0 w-90 rounded-lg overflow-hidden pointer-events-auto">
                     @SingleItem((_selectedMarker, _selectedMarker.Properties["Routes"]))
                 </MudPaper>
             </div>

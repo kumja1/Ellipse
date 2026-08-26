@@ -42,7 +42,7 @@ public partial class Menu : ComponentBase
 
     private string _containerClass =>
         CssBuilder
-            .Default("fixed left-0 top-0 z-30 h-full flex items-start overflow-hidden")
+            .Default("")
             .AddClass(Class, !string.IsNullOrWhiteSpace(Class))
             .Build();
 

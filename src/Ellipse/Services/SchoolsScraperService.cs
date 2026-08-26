@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
@@ -18,7 +19,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
     private readonly ConcurrentDictionary<int, Task<string>> _tasks = new();
 
     private const string VIRGINIA_SCHOOLS_URL = "https://www.va-doeapp.com/PublicSchoolsByDivisions.aspx";
-    
+
     private readonly IBrowsingContext _browsingContext = BrowsingContext.New(
         Configuration.Default.WithDefaultLoader().WithXPath()
     );
@@ -168,7 +169,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         }
 
         string? name = infoCell.QuerySelector("strong")?.TextContent.Trim();
-        string[] addressSegments = infoCell.ChildNodes
+        Span<string> addressSegments = infoCell.ChildNodes
             .OfType<IText>()
             .Select(t => t.TextContent.Trim())
             .Where(t => !string.IsNullOrWhiteSpace(t) && t != "Street address:")
@@ -179,22 +180,24 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
 
         if (addressSegments.Length > 0)
         {
-            if (addressSegments.Length > 1)
-            {
-                address = string.Join(", ", addressSegments.Take(addressSegments.Length - 1));
-                phoneNumber = addressSegments.Last();
-            }
-            else
+            if (addressSegments.Length == 1)
             {
                 address = addressSegments[0];
             }
+            else
+            {
+                address = string.Join(", ", addressSegments[..^1]);
+                phoneNumber = addressSegments[^1];
+            }
         }
+        
+        cache.
 
         Task<LngLat> task = Retry
             .RetryIfInvalid(
                 isValid: c => c != LngLat.Zero,
                 async _ => await geoService.GetLatLngCached(address),
-                maxRetries: 20,
+                maxRetries: 30,
                 delayMs: 500
             );
 

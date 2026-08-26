@@ -1,4 +1,7 @@
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
+using AngleSharp.Text;
 using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
@@ -7,9 +10,12 @@ using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Utils;
 using Ellipse.Utils.Clients.Mapping;
 using Ellipse.Utils.Clients.Mapping.Geocoding;
+using Geo.Geometries;
+using Geo.IO.Google;
 using Microsoft.Extensions.Caching.Distributed;
 using Osrm.HttpApiClient;
 using Serilog;
+using Coordinates = Osrm.HttpApiClient.Coordinates;
 
 namespace Ellipse.Services;
 
@@ -314,99 +320,95 @@ public class GeocodingService(
         float?[][] resultDistances = [];
         float?[][] resultDurations = [];
 
+        // try
+        // {
+        //     OpenRouteMatrixResponse? openRouteResponse = await GetMatrixWithOpenRoute(
+        //             sources,
+        //             destinations
+        //         )
+        //         .ConfigureAwait(false);
+        //
+        //     if (openRouteResponse is not { Distances: not null, Durations: not null })
+        //     {
+        //         Log.Warning("Both OSRM and OpenRouteMatrix responses are null or invalid.");
+        //         return ([], []);
+        //     }
+        //
+        //     resultDistances = openRouteResponse.Distances!;
+        //     resultDurations = openRouteResponse.Durations!;
+        // }
+        // catch (Exception ex)
+        // {
+        //     Log.Error(ex, "Both OSRM and OpenRouteMatrix failed.");
+        // }
+
         try
         {
-            TableResponse? response = await GetMatrixWithOsrm(sources, destinations)
+            OpenRouteMatrixResponse? response = await GetMatrixWithOpenRoute(sources, destinations)
                 .ConfigureAwait(false);
 
-            if (response is not null)
+            if (response is { IsValid: true })
             {
                 resultDistances = response.Distances;
                 resultDurations = response.Durations;
+                await cache.SetStringAsync(
+                    cacheKey,
+                    CacheHelper.CompressData(JsonSerializer.Serialize((resultDistances, resultDurations)))
+                );
             }
             else
             {
-                throw new Exception("OSRM response is null");
+                throw new Exception("Recieved invalid OSRM response");
             }
         }
         catch (Exception ex)
         {
             Log.Error(ex, "OSRM Matrix failed.");
-            // Log.Warning(ex, "OSRM Matrix failed, falling back to OpenRoute");
-            // try
-            // {
-            //     OpenRouteMatrixResponse? openRouteResponse = await GetMatrixWithOpenRoute(
-            //             sources,
-            //             destinations
-            //         )
-            //         .ConfigureAwait(false);
-            //
-            //     if (openRouteResponse is null)
-            //     {
-            //         Log.Warning("Both OSRM and OpenRouteMatrix responses are null or invalid.");
-            //         return ([], []);
-            //     }
-            //
-            //     resultDistances = openRouteResponse.Distances?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
-            //         .ToArray() ?? [];
-            //     resultDurations = openRouteResponse.Durations?.Select(row => row.Select(d => (double)d).ToArray() ?? [])
-            //         .ToArray() ?? [];
-            // }
-            // catch (Exception ex2)
-            // {
-            //     Log.Error(ex2, "Both OSRM and OpenRouteMatrix failed.");
-            //     return ([], []);
-            // }
         }
 
-        await cache.SetStringAsync(
-            cacheKey,
-            CacheHelper.CompressData(JsonSerializer.Serialize((resultDistances, resultDurations)))
-        );
 
         return (resultDistances, resultDurations);
     }
 
-    private async Task<TableResponse?> GetMatrixWithOsrm(
-        LngLat[] sources,
-        LngLat[] destinations
-    )
-    {
-        if (destinations.All(dest => dest == LngLat.Zero))
-        {
-            Log.Information("All destinations are Zero. Returning null.");
-            return null;
-        }
-
-        TableRequest<JsonFormat> request = OsrmServices
-            .Table(
-                PredefinedProfiles.Car,
-                GeographicalCoordinates.Create(
-                    [
-                        .. sources.Select(source => Coordinate.Create(source.Lng, source.Lat)),
-                        .. destinations.Select(dest => Coordinate.Create(dest.Lng, dest.Lat)),
-                    ]
-                )
-            )
-            .Destinations([.. Enumerable.Range(sources.Length, destinations.Length)])
-            .Sources([.. Enumerable.Range(0, sources.Length)])
-            .Annotations(TableAnnotations.DurationAndDistance)
-            .Build();
-
-        Log.Information("Request prepared. Calling MapboxClient.GetMatrixAsync...");
-        OsrmHttpApiResponse<TableResponse> response = await osrmClient.GetTableAsync(request);
-        
-        Log.Information("{Response}", response);
-        if (!response.IsSuccess)
-        {
-            Log.Error("Invalid matrix response received.");
-            throw new InvalidDataException("Invalid matrix response");
-        }
-
-        Log.Information("Matrix response successfully received.");
-        Log.Information("Matrix Response: {Response}", response.Result);
-        return response.Result;
-    }
+    // private async Task<TableResponse?> GetMatrixWithOsrm(
+    //     LngLat[] sources,
+    //     LngLat[] destinations
+    // )
+    // {
+    //     if (destinations.All(dest => dest == LngLat.Zero))
+    //     {
+    //         Log.Information("All destinations are Zero. Returning null.");
+    //         return null;
+    //     }
+    //
+    //     TableRequest<JsonFormat> request = OsrmServices
+    //         .Table(
+    //             PredefinedProfiles.Car,
+    //             GeographicalCoordinates.Create([
+    //                 .. sources.Select(lngLat => Coordinate.Create(lngLat.Lng, lngLat.Lat)),
+    //                 .. destinations.Select(lngLat => Coordinate.Create(lngLat.Lng, lngLat.Lat))
+    //             ])
+    //         )
+    //         .Destinations([.. Enumerable.Range(sources.Length, destinations.Length)])
+    //         .Sources([.. Enumerable.Range(0, sources.Length)])
+    //         .Annotations(TableAnnotations.DurationAndDistance)
+    //         .Build();
+    //
+    //     Log.Information("Request prepared. Calling OSRMClient.GetMatrixAsync...");
+    //     Log.Information("Request: {Request}", request);
+    //     OsrmHttpApiResponse<TableResponse> response = await osrmClient.GetTableAsync(request);
+    //
+    //     Log.Information("{Response}", response);
+    //     if (!response.IsSuccess)
+    //     {
+    //         Log.Error("Invalid matrix response received.");
+    //         throw new InvalidDataException("Invalid matrix response");
+    //     }
+    //
+    //     Log.Information("Matrix response successfully received.");
+    //     Log.Information("Matrix Response: {Response}", response.Result);
+    //     return response.Result;
+    // }
 
     private async Task<OpenRouteMatrixResponse?> GetMatrixWithOpenRoute(
         LngLat[] sources,
@@ -450,4 +452,35 @@ public class GeocodingService(
         return response;
     }
 
+    // private static string LngLatToPolyline(LngLat[] coordinates)
+    // {
+    //     int num1 = 0, num2 = 0;
+    //     StringBuilder builder = StringBuilderPool.Obtain();
+    //     foreach (LngLat coordinate in coordinates)
+    //     {
+    //         int num3 = (int)(coordinate.Lat * 100000.0);
+    //         int num4 = (int)(coordinate.Lng * 100000.0);
+    //         EncodeNumber(num3 - num1);
+    //         EncodeNumber(num4 - num2);
+    //         num1 = num3;
+    //         num2 = num4;
+    //     }
+    //
+    //     return builder.ToPool();
+    //
+    //     void EncodeNumber(int num)
+    //     {
+    //         num <<= 1;
+    //         if (num < 0)
+    //             num = ~num;
+    //         
+    //         while (num >= 0x20) // 0x20 = 32
+    //         {
+    //             builder.Append((char)((num & 0x1F) + 0x3F)); // 0x1F = 31, 0x3F = 63
+    //             num >>= 5;
+    //         }
+    //
+    //         builder.Append((char)(num + 0x3F));
+    //     }
+    // }
 }

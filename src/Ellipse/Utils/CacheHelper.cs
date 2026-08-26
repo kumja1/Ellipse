@@ -56,7 +56,6 @@ public static class CacheHelper
             byte[] gZipBuffer = Convert.FromBase64String(compressedText);
             using MemoryStream memoryStream = new();
 
-            int dataLength = BitConverter.ToInt32(gZipBuffer, 0);
             memoryStream.Write(gZipBuffer, 4, gZipBuffer.Length - 4);
 
             memoryStream.Position = 0;
@@ -69,21 +68,5 @@ public static class CacheHelper
             Console.WriteLine($"[DecompressString] Failed to decompress string: {compressedText}");
             throw;
         }
-    }
-
-    public static string CreateCacheKey(params object[] values)
-    {
-        StringBuilder builder = StringBuilderPool.Obtain();
-        foreach (object value in values)
-        {
-            if (value is IEnumerable enumerable)
-                builder.AppendJoin("|", enumerable.Cast<object>());
-            else
-                builder.Append(value);
-
-            builder.Append('|');
-        }
-
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToPool())));
     }
 }
