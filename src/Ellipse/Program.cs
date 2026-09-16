@@ -74,7 +74,7 @@ public class Program
             options.HttpClientActions.Add(client => client.Timeout = TimeSpan.FromMinutes(10))
             
         );
-        
+
         builder.Configuration.AddDotNetEnv(options: LoadOptions.TraversePath());
         string? openRouteApiKey = builder.Configuration.GetValue<string?>("OPENROUTE_API_KEY");
         string? mapillaryApiKey = builder.Configuration.GetValue<string?>("MAPILLARY_API_KEY");

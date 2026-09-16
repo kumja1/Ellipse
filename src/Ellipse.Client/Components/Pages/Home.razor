@@ -11,8 +11,18 @@
 <div>
     <div class="h-screen">
         <div class="absolute inset-0 z-0">
-            <OpenStreetMap @ref="_map" Class="w-full h-full" MaxZoom="18"
-                           MinZoom="5" Center="new Coordinate(-78, 37)" OnDoubleClick="OnDoubleClicked"/>
+            
+            <Map @ref="_map" Class="w-full h-full" MaxZoom="18"
+                           MinZoom="5" Center="new Coordinate(-78, 37)" OnDoubleClick="OnDoubleClicked">
+                           <Layers>
+                            <Layer
+                            LayerType="LayerType.VectorTile"
+                            SourceType="SourceType.TileJSON"
+                            Url="https://api.maptiler.com/maps/openstreetmap/style.json?key=oNR4taxJ0rX3LX6CqnJd"
+                            />
+                           </Layers>
+                           </Map>
+                           
             
         </div>
         <div class="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
@@ -46,12 +56,6 @@
         <ListItem Context="marker">
             <div class="p-4 border-b hover:bg-gray-50 cursor-pointer transition-colors" @key="marker.MarkerName">
                 <div class="flex gap-4">
-                    @* @if (!string.IsNullOrEmpty(marker.Image256Url)) *@
-                    @* { *@
-                    @*     <div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 shadow-sm"> *@
-                    @*         $1$ <img src="@marker.Image256Url" class="w-full h-full object-cover" alt="Location preview"/> #1# *@
-                    @*     </div> *@
-                    @* } *@
                     <div class="grow min-w-0">
                         <div class="flex justify-between items-start mb-1">
                             <MudText Typo="Typo.subtitle1" Class="font-bold text-gray-900 leading-tight truncate">
@@ -80,24 +84,8 @@
 
         <SingleItem Context="marker">
             <MudStack Spacing="0">
-                <!-- Header with optional image -->
                 <div class="h-32 rounded-t-lg relative mb-4 overflow-hidden">
-                    @* @if (!string.IsNullOrEmpty(marker.Data["Image256Url"])) *@
-                    @* { *@
-                    @*     <!-- Header image --> *@
-                    @*     <img src="@(marker.Data["Image1024Url"])" *@
-                    @*          class="absolute inset-0 w-full h-full object-cover" *@
-                    @*          alt="Location preview"/> *@
-                    @* *@
-                    @*     <!-- Contrast overlay --> *@
-                    @*     <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent"></div> *@
-                    @* } *@
-                    @* else *@
-                    @* { *@
-                    <!-- Fallback gradient -->
                     <div class="absolute inset-0 bg-linear-to-br from-blue-500 to-blue-700"></div>
-                    @* } *@
-
                     <!-- Location icon -->
                     <div class="absolute -bottom-4 left-4 bg-white p-1 rounded-full shadow-lg z-10">
                         <MudIcon Icon="@Icons.Material.Filled.LocationOn"

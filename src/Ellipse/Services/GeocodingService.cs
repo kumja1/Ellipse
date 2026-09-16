@@ -313,7 +313,7 @@ public class GeocodingService(
                     cacheKey
                 );
 
-                return JsonSerializer.Deserialize<(float?[][], float?[][])>(CacheHelper.DecompressData(cachedMatrix));
+                return JsonSerializer.Deserialize<(float?[][], float?[][])>(cachedMatrix);
             }
         }
 
@@ -353,7 +353,7 @@ public class GeocodingService(
                 resultDurations = response.Durations;
                 await cache.SetStringAsync(
                     cacheKey,
-                    CacheHelper.CompressData(JsonSerializer.Serialize((resultDistances, resultDurations)))
+                    JsonSerializer.Serialize((resultDistances, resultDurations))
                 );
             }
             else
@@ -436,6 +436,7 @@ public class GeocodingService(
             Metrics = ["distance", "duration"],
             Units = "m",
             Profile = Profile.DrivingCar,
+            Optimized = true
         };
 
         Log.Information("Request prepared. Calling OpenRouteClient.GetMatrixAsync...");

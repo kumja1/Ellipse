@@ -42,8 +42,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
                     Log.Information(
                         "[ScrapeDivision] Cache hit for division {DivisionCode}",
                         divisionCode);
-                    string decompressed = CacheHelper.DecompressData(cachedData);
-                    return decompressed;
+                    return cachedData;
                 }
             }
 
@@ -57,8 +56,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
                 return string.Empty;
             }
 
-            string compressed = CacheHelper.CompressData(result);
-            await cache.SetStringAsync(cacheKey, compressed);
+            await cache.SetStringAsync(cacheKey, result);
 
             stopwatch.Stop();
             Log.Information("[ScrapeDivision] Completed scrape for division {DivisionCode} in {ElapsedMs}ms",
@@ -94,7 +92,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
         string url = $"{VIRGINIA_SCHOOLS_URL}?d={divisionCode}&w=true";
         string divisionName = "";
         IElement[] rows = await Retry
-            .RetryIfCollectionEmpty<IElement>(
+            .RetryIfCollectionEmpty(
                 func: async _ =>
                 {
                     Url? requestUrl = Url.Create(url);
@@ -144,13 +142,13 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
                 nullCount, results.Length, divisionCode);
         }
 
-        SchoolData[] validSchools = results.Where(s =>
+        SchoolData[] validSchools = [.. results.Where(s =>
         {
             if (s != null) return true;
 
             Log.Warning("[ParsePage] Failed to parse school in division {DivisionCode}", divisionCode);
             return false;
-        }).Cast<SchoolData>().DistinctBy(s => s.LngLat).ToArray();
+        }).Cast<SchoolData>().DistinctBy(s => s.LngLat)];
 
         Log.Information("[ParsePage] Completed parsing division {DivisionCode} with {ValidCount} valid schools",
             divisionCode, validSchools.Length);
@@ -191,7 +189,6 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
             }
         }
         
-        cache.
 
         Task<LngLat> task = Retry
             .RetryIfInvalid(

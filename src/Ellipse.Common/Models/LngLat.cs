@@ -25,4 +25,6 @@ public readonly record struct LngLat(double Lng, double Lat) : IComparable<LngLa
         int lonComparison = Lng.CompareTo(other.Lng);
         return lonComparison != 0 ? lonComparison : Lat.CompareTo(other.Lat);
     }
+
+    public static LngLat operator +(LngLat a, double b) => new(a.Lng + b, a.Lat + b);
 }

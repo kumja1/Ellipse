@@ -17,7 +17,7 @@ namespace Ellipse.Client.Components.Pages;
 partial class Home : ComponentBase, IDisposable
 {
     private Menu _menu;
-    private OpenStreetMap _map;
+    private Map _map;
 
     private SchoolData[]? _schools;
     private string _selectedRouteName = "Average";
@@ -41,18 +41,16 @@ partial class Home : ComponentBase, IDisposable
     {
         if (!firstRender)
             return;
-        
+
         await InvokeAsync(async () => _schools = await SchoolDivisionService.GetAllSchools());
-        
+
         if (_schools != null)
         {
-            BoundingBox bounds = new(_schools.Select(s => s.LngLat).ToList());
-            await GetMarkers(bounds);
+            await GetMarkers([.. _schools.Select(s => s.LngLat)]);
         }
     }
 
-
-    private async Task GetMarkers(BoundingBox box)
+    private async Task GetMarkers(LngLat[] points)
     {
         try
         {
@@ -85,12 +83,11 @@ partial class Home : ComponentBase, IDisposable
 
             TimeSpan closestDuration = TimeSpan.MaxValue;
             DateTime lastUpdate = DateTime.Now;
-            foreach (LngLat[] chunk in box
-                         .GetPoints(step).Where(point =>
-                             point.Lat > _virginiaMin.Latitude && point.Lat < _virginiaMax.Latitude &&
-                             point.Lng > _virginiaMin.Longitude && point.Lng < _virginiaMax.Longitude
-                         )
-                         .Chunk(2))
+            IEnumerable<LngLat[]> chunks = points
+            .Select(p => p += step)
+            .Where(p => p.Lng >= _virginiaMin.Longitude && p.Lng <= _virginiaMax.Longitude && p.Lat >= _virginiaMin.Latitude && p.Lat <= _virginiaMax.Latitude)
+            .Chunk(8);
+            foreach (LngLat[] chunk in chunks)
             {
                 Log.Information("GetMarkers: Processing chunk of {ChunkSize} points", chunk.Length);
                 if (_cts.IsCancellationRequested || DateTime.Now - lastUpdate >= TimeSpan.FromSeconds(600))
@@ -107,8 +104,8 @@ partial class Home : ComponentBase, IDisposable
                     continue;
                 }
 
-                List<MarkerResponse?>? responses =
-                    await httpResponse.Content.ReadFromJsonAsync<List<MarkerResponse?>>();
+                MarkerResponse?[]? responses =
+                    await httpResponse.Content.ReadFromJsonAsync<MarkerResponse?[]>();
 
                 if (responses == null)
                 {
@@ -116,19 +113,18 @@ partial class Home : ComponentBase, IDisposable
                     continue;
                 }
 
-                Log.Information("GetMarkers: Received {ResponseCount} responses", responses.Count);
-                Marker[] markers = ArrayPool<Marker>.Shared.Rent(responses.Count);
-                for (int i = 0; i < responses.Count; i++)
+                Log.Information("GetMarkers: Received {ResponseCount} responses", responses.Length);
+                Marker[] markers = ArrayPool<Marker>.Shared.Rent(responses.Length);
+                for (int i = 0; i < responses.Length; i++)
                 {
-                    Coordinate coord = new(chunk[i].Lng, chunk[i].Lat);
                     MarkerResponse? response = responses[i];
-
                     if (response == null)
                     {
-                        Log.Warning("MarkerResponse for ({Coord}) is null.", coord);
+                        Log.Warning("MarkerResponse at index {Index}.", i);
                         continue;
                     }
 
+                    Coordinate coord = new(response.LngLat.Lng, response.LngLat.Lat);
                     Log.Information("GetMarkers: Adding marker {MarkerAddress} at ({Lng}, {Lat})", response.Address,
                         coord.Longitude, coord.Latitude);
 
@@ -160,7 +156,7 @@ partial class Home : ComponentBase, IDisposable
                     lastUpdate = DateTime.Now;
                 }
 
-                layer.ShapesList.AddRange(markers.Take(responses.Count).Where(m => m != null));
+                layer.ShapesList.AddRange(markers.Take(responses.Length).Where(m => m != null));
                 ArrayPool<Marker>.Shared.Return(markers, clearArray: true);
             }
 
@@ -177,8 +173,10 @@ partial class Home : ComponentBase, IDisposable
             {
                 if (_cts.IsCancellationRequested)
                     return;
-
-                TimeSpan duration = marker.Properties["Routes"]["Average"].Duration;
+                
+                Dictionary<string, dynamic> properties = marker.Properties;
+                properties.Try
+                TimeSpan duration = marker.Properties["Routes"]
                 bool isNear = (duration - closestDuration).TotalMinutes <= 30;
                 if (!isNear || marker == _closestMarker)
                     continue;
@@ -197,7 +195,6 @@ partial class Home : ComponentBase, IDisposable
             StateHasChanged();
         }
     }
-
     private async Task RemoveLayer()
     {
         Log.Information("RemoveLayer: Removing layer {LayerIndex}", _currentLayerIndex);
@@ -233,11 +230,11 @@ partial class Home : ComponentBase, IDisposable
             _ => 1000
         };
 
-        BoundingBox box = new(new LngLat(coordinate.Longitude, coordinate.Latitude),
-            newRadius
-        );
+        // BoundingBox box = new(new LngLat(coordinate.Longitude, coordinate.Latitude),
+        //     newRadius
+        // );
 
-        await GetMarkers(box);
+        // await GetMarkers();
     }
 
     public void Dispose()
