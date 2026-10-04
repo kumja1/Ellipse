@@ -20,7 +20,7 @@ static class Program
 
     private static void ConfigureServices(WebAssemblyHostBuilder builder)
     {
-        Log.Logger = new LoggerConfiguration().Enrich.With(new CallerEnricher())
+        Log.Logger = new LoggerConfiguration()
             .WriteTo.BrowserConsole()
             .CreateLogger();
 

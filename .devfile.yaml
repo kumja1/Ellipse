@@ -1,0 +1,12 @@
+schemaVersion: 2.2.0
+metadata:
+  name: ellipse-ludy
+components:
+  - name: container-1
+    container:
+      image: 'quay.io/devfile/universal-developer-image:ubi10-latest'
+      mountSources: true
+      memoryRequest: 500Mi
+      memoryLimit: 6G
+      cpuRequest: 1000m
+      cpuLimit: 4000m

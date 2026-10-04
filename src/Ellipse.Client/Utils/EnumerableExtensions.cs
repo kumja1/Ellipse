@@ -1,5 +1,0 @@
-
-static class EnumerableExtensions
-{
-    
-}

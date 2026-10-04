@@ -6,10 +6,11 @@ using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Models;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 using Ellipse.Common.Models.Geocoding.OpenRoute;
+using Ellipse.Common.Models.Geocoding.Pelias;
 using Ellipse.Common.Models.Matrix.OpenRoute;
 using Ellipse.Utils;
-using Ellipse.Utils.Clients.Mapping;
-using Ellipse.Utils.Clients.Mapping.Geocoding;
+using Ellipse.Utils.Clients;
+using Ellipse.Utils.Clients.Geocoding;
 using Geo.Geometries;
 using Geo.IO.Google;
 using Microsoft.Extensions.Caching.Distributed;
@@ -19,10 +20,10 @@ using Coordinates = Osrm.HttpApiClient.Coordinates;
 
 namespace Ellipse.Services;
 
-public class GeocodingService(
+public class GeoService(
     CensusGeocoderClient censusGeocoder,
+    PeliasGeocoderClient peliasGeocoder,
     OpenRouteClient openRouteClient,
-    OsrmHttpApiClient osrmClient,
     IDistributedCache cache
 )
 {
@@ -62,7 +63,7 @@ public class GeocodingService(
 
         string address = await GetAddressWithCensus(longitude, latitude);
         if (string.IsNullOrEmpty(address))
-            address = await GetAddressWithOpenRoute(longitude, latitude);
+            address = await GetAddressWithPelias(longitude, latitude);
 
         Log.Information(
             "[GetAddressCached] Caching address for {Longitude}, {Latitude}: {Address}",
@@ -128,7 +129,7 @@ public class GeocodingService(
         }
     }
 
-    private async Task<string> GetAddressWithOpenRoute(
+    private async Task<string> GetAddressWithPelias(
         double longitude,
         double latitude
     )
@@ -140,8 +141,8 @@ public class GeocodingService(
         );
         Log.Information("[GetLatLng] Switching to Mapbox geocoder");
 
-        OpenRouteGeocodingResponse response = await openRouteClient.ReverseGeocode(
-            new OpenRouteReverseGeocodingRequest
+        PeliasGeocodingResponse response = await peliasGeocoder.ReverseGeocode(
+            new PeliasReverseGeocodingRequest
             {
                 Longitude = longitude,
                 Latitude = latitude,
@@ -192,7 +193,7 @@ public class GeocodingService(
 
         LngLat censusLngLat = await GetLatLngWithCensus(address);
         LngLat latLng = censusLngLat == LngLat.Zero
-            ? await GetLatLngWithOpenRoute(address)
+            ? await GetLatLngWithPelias(address)
             : censusLngLat;
 
         if (latLng == LngLat.Zero)
@@ -256,15 +257,15 @@ public class GeocodingService(
         }
     }
 
-    private async Task<LngLat> GetLatLngWithOpenRoute(string address)
+    private async Task<LngLat> GetLatLngWithPelias(string address)
     {
         try
         {
             Log.Information("[GetLatLng] No coordinates found for address: {Address}", address);
             Log.Information("[GetLatLng] Switching to Mapbox geocoder");
 
-            OpenRouteGeocodingResponse geocodeResponse = await openRouteClient.Geocode(
-                new OpenRouteGeocodingRequest { Query = address, Size = 10 }
+            PeliasGeocodingResponse geocodeResponse = await peliasGeocoder.Geocode(
+                new PeliasGeocodingRequest { Query = address, Size = 10 }
             );
 
             IEnumerable<Feature>? features = geocodeResponse
@@ -439,7 +440,7 @@ public class GeocodingService(
             Optimized = true
         };
 
-        Log.Information("Request prepared. Calling OpenRouteClient.GetMatrixAsync...");
+        Log.Information("Request prepared. Calling peliasClient.GetMatrixAsync...");
         OpenRouteMatrixResponse response = await openRouteClient.GetMatrix(request);
         Log.Information("{Response}", response);
 

@@ -37,11 +37,6 @@ public sealed class SchoolDivisionService(HttpClient httpClient)
         Log.Information("Completed school fetch. Current Count: {Length}. Removing duplicates…",
             schools.Length);
 
-        foreach (var school in schools)
-        {
-            Console.WriteLine(school);
-        }
-
         return [.. schools.DistinctBy(s => s.LngLat)];
     }
 
@@ -60,8 +55,6 @@ public sealed class SchoolDivisionService(HttpClient httpClient)
                 delayMs: 500
             );
             
-            
-
             if (result.Length == 0)
             {
                 Log.Warning("Failed to retrieve schools for {Division} ({Code})", divisionName, code);

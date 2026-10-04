@@ -12,16 +12,8 @@
     <div class="h-screen">
         <div class="absolute inset-0 z-0">
             
-            <Map @ref="_map" Class="w-full h-full" MaxZoom="18"
-                           MinZoom="5" Center="new Coordinate(-78, 37)" OnDoubleClick="OnDoubleClicked">
-                           <Layers>
-                            <Layer
-                            LayerType="LayerType.VectorTile"
-                            SourceType="SourceType.TileJSON"
-                            Url="https://api.maptiler.com/maps/openstreetmap/style.json?key=oNR4taxJ0rX3LX6CqnJd"
-                            />
-                           </Layers>
-                           </Map>
+            <OpenStreetMap @ref="_map" Class="w-full h-full" MaxZoom="18"
+                           MinZoom="5" Center="new Coordinate(-78, 37)" OnDoubleClick="OnDoubleClicked"/>
                            
             
         </div>

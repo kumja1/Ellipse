@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 
-namespace Ellipse.Common.Models.Geocoding.OpenRoute;
+namespace Ellipse.Common.Models.Geocoding.Pelias;
 
-public class OpenRouteGeocodingResponse
+public class PeliasGeocodingResponse
 {
     [JsonPropertyName("type")]
     public  string Type { get; set; }

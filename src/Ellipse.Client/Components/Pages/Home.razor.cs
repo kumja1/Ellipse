@@ -2,9 +2,11 @@ using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Ellipse.Client.Components.Layout;
 using Ellipse.Client.Services;
 using Ellipse.Common.Models;
+using Ellipse.Common.Models.Directions;
 using Ellipse.Common.Models.Markers;
 using Ellipse.Common.Utils;
 using Microsoft.AspNetCore.Components;
@@ -13,7 +15,6 @@ using Serilog;
 
 namespace Ellipse.Client.Components.Pages;
 
-[SuppressMessage("Usage", "BL0005:Component parameter should not be set outside of its component.")]
 partial class Home : ComponentBase, IDisposable
 {
     private Menu _menu;
@@ -23,9 +24,9 @@ partial class Home : ComponentBase, IDisposable
     private string _selectedRouteName = "Average";
 
     private int _currentLayerIndex;
+    private int _run;
     private readonly Layer?[] _layers = new Layer[3];
 
-    private Marker? _closestMarker;
     private readonly Coordinate _virginiaMin = new(-83.675395, 36.540738);
     private readonly Coordinate _virginiaMax = new(-75.242266, 39.466012);
 
@@ -66,36 +67,45 @@ partial class Home : ComponentBase, IDisposable
 
             double step = _currentLayerIndex switch
             {
-                0 => 0.11, // ~12 km - Division-wide search
-                1 => 0.02, // ~2 km - Zone-level search
-                2 => 0.005, // ~500 m - District-level search
-                _ => 0.001, // ~100 m - Site-level search (STOP HERE)
+                0 => 0.1,
+                1 => 0.11,
+                2 => 0.02,
+                3 => 0.005,
+                _ => 0.001,
             };
 
-            Log.Information("GetMarkers: Starting with step={Step}, currentLayerIndex={LayerIndex}", step,
+            Log.Debug("GetMarkers: Starting with step={Step}, currentLayerIndex={LayerIndex}", step,
                 _currentLayerIndex);
 
             _loading = true;
             StateHasChanged();
 
-            Layer layer = new();
+            Layer layer = new()
+            {
+                LayerType = LayerType.Vector
+            };
             await _map.AddLayer(layer);
+            StateHasChanged();
 
             TimeSpan closestDuration = TimeSpan.MaxValue;
-            DateTime lastUpdate = DateTime.Now;
-            IEnumerable<LngLat[]> chunks = points
-            .Select(p => p += step)
-            .Where(p => p.Lng >= _virginiaMin.Longitude && p.Lng <= _virginiaMax.Longitude && p.Lat >= _virginiaMin.Latitude && p.Lat <= _virginiaMax.Latitude)
+            Marker? closestMarker = null;
+
+            LngLat min = points.Min();
+            LngLat max = points.Max();
+
+            IEnumerable<LngLat[]> chunks = GetPointsWithin(min, max, step, _ => true)
             .Chunk(8);
+
             foreach (LngLat[] chunk in chunks)
             {
-                Log.Information("GetMarkers: Processing chunk of {ChunkSize} points", chunk.Length);
-                if (_cts.IsCancellationRequested || DateTime.Now - lastUpdate >= TimeSpan.FromSeconds(600))
+                Log.Debug("GetMarkers: Processing chunk of {ChunkSize} points", chunk.Length);
+                if (_cts.IsCancellationRequested)
                     break;
 
                 HttpResponseMessage? httpResponse = await Retry.RetryIfResponseFailed(async _ =>
                     await HttpClient
-                        .PostAsJsonAsync("http://localhost:5291/api/marker/batch", new BatchMarkerRequest(chunk, _schools!), _cts.Token)
+                        .PostAsJsonAsync("http://localhost:5291/api/marker/batch", new BatchMarkerRequest(chunk, _schools!), _cts.Token),
+                        maxRetries: 20
                 );
 
                 if (httpResponse == null)
@@ -104,8 +114,9 @@ partial class Home : ComponentBase, IDisposable
                     continue;
                 }
 
+                Log.Information("GetMarker: HttpResponse Content {ResponseContent}", await httpResponse.Content.ReadAsStringAsync());
                 MarkerResponse?[]? responses =
-                    await httpResponse.Content.ReadFromJsonAsync<MarkerResponse?[]>();
+                    await httpResponse.Content.ReadFromJsonAsync<MarkerResponse?[]>(cancellationToken: _cts.Token);
 
                 if (responses == null)
                 {
@@ -113,8 +124,8 @@ partial class Home : ComponentBase, IDisposable
                     continue;
                 }
 
-                Log.Information("GetMarkers: Received {ResponseCount} responses", responses.Length);
-                Marker[] markers = ArrayPool<Marker>.Shared.Rent(responses.Length);
+                Log.Debug("GetMarkers: Received {ResponseCount} responses", responses.Length);
+                List<Marker> markers =  new(responses.Length);
                 for (int i = 0; i < responses.Length; i++)
                 {
                     MarkerResponse? response = responses[i];
@@ -133,38 +144,44 @@ partial class Home : ComponentBase, IDisposable
                         Properties =
                         {
                             ["Routes"] = response.Routes.ToFrozenDictionary(),
-                            ["TotalDistance"] = response.TotalDistance,
                         }
                     };
 
-                    markers[i] = marker;
+                    markers.Add(marker);
                     TimeSpan duration = response.Routes["Average"].Duration;
                     if (duration < closestDuration)
                     {
-#if DEBUG
-                        Log.Information(
+                        Log.Debug(
                             "GetMarkers: New closest marker found - Duration: {Duration}, Previous: {PreviousDuration}",
                             duration, closestDuration);
-#endif
-                        _closestMarker?.PinColor = PinColor.Red;
+
+                        closestMarker?.PinColor = PinColor.Red;
+                        closestMarker?.UpdateShape();
                         marker.PinColor = PinColor.Green;
 
-                        _closestMarker = marker;
+                        closestMarker = marker;
                         closestDuration = duration;
                     }
+                }
 
-                    lastUpdate = DateTime.Now;
+                foreach (Marker? marker1 in markers)
+                {
+                    if (marker1 == null)
+                    {
+                        Log.Information("Marker is null");
+                        continue;
+                    }
+                    Log.Information("GetMarker: Marker at {MarkerCoord} is {MarkerColor}", marker1.Coordinate, marker1.PinColor);
                 }
 
                 layer.ShapesList.AddRange(markers.Take(responses.Length).Where(m => m != null));
-                ArrayPool<Marker>.Shared.Return(markers, clearArray: true);
+                Log.Information("GetMarkers: Layer {LayerId} contains {Count1}/{Count2}", _currentLayerIndex, layer.ShapesList.Count, markers.Count);
+
             }
 
-            if (_closestMarker == null)
+            if (closestMarker == null)
             {
-#if DEBUG
-                Log.Information("GetMarkers: No closest point found");
-#endif
+                Log.Information("GetMarkers: Closest marker could not be found");
                 return;
             }
 
@@ -173,21 +190,29 @@ partial class Home : ComponentBase, IDisposable
             {
                 if (_cts.IsCancellationRequested)
                     return;
-                
-                Dictionary<string, dynamic> properties = marker.Properties;
-                properties.Try
-                TimeSpan duration = marker.Properties["Routes"]
+
+                FrozenDictionary<string, SchoolRoute>? routes = marker.Properties.GetValueOrDefault("Routes");
+                if (routes == null)
+                {
+                    Log.Warning("'Routes' for {MarkerCoord} could not be found", marker.Coordinate);
+                    continue;
+                }
+
+                TimeSpan duration = routes["Average"].Duration;
                 bool isNear = (duration - closestDuration).TotalMinutes <= 30;
-                if (!isNear || marker == _closestMarker)
+                if (!isNear || marker == closestMarker)
                     continue;
 
-                Log.Information("Marker {MarkerText} is near the best route.", marker.Text);
+                Log.Information("Marker {MarkerCoord} is near the best route.", marker.Coordinate);
                 marker.PinColor = PinColor.Blue;
+                marker.UpdateShape();
             }
 
             _layers[_currentLayerIndex] = layer;
-            _currentLayerIndex++;
-            Log.Information("GetMarkers: Complete");
+        }
+        catch (Exception e)
+        {
+            Log.Error("An error occured: {Exception}", e);
         }
         finally
         {
@@ -195,18 +220,34 @@ partial class Home : ComponentBase, IDisposable
             StateHasChanged();
         }
     }
+
+    private IEnumerable<LngLat> GetPointsWithin(LngLat min, LngLat max, double step, Func<LngLat, bool> include)
+    {
+        for (double y = min.Lat; y <= max.Lat; y += step)
+            for (double x = min.Lng; x < max.Lng; x += step)
+            {
+                LngLat lngLat = new(x, y);
+                if (include(lngLat))
+                    yield return lngLat;
+            }
+    }
+
+
     private async Task RemoveLayer()
     {
         Log.Information("RemoveLayer: Removing layer {LayerIndex}", _currentLayerIndex);
         Layer? layer = _layers[_currentLayerIndex];
         if (layer == null)
+        {
+            Log.Information("Layer {LayerIndex} is null", _currentLayerIndex);
             return;
+        }
 
         await _map.RemoveLayer(layer);
         if (_currentLayerIndex > 0)
         {
-            _currentLayerIndex--;
-            Log.Information("RemoveLayer: Layer removed, new currentLayerIndex={LayerIndex}", _currentLayerIndex);
+            _layers[_currentLayerIndex--] = null;
+            Log.Debug("RemoveLayer: Layer removed, new currentLayerIndex={LayerIndex}", _currentLayerIndex);
         }
     }
 
@@ -230,6 +271,8 @@ partial class Home : ComponentBase, IDisposable
             _ => 1000
         };
 
+        _currentLayerIndex++;
+
         // BoundingBox box = new(new LngLat(coordinate.Longitude, coordinate.Latitude),
         //     newRadius
         // );
@@ -247,3 +290,4 @@ partial class Home : ComponentBase, IDisposable
         Log.Information("Dispose: Map disposal complete");
     }
 }
+

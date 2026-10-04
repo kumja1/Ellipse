@@ -7,7 +7,5 @@ public sealed record MarkerResponse(
     LngLat LngLat,
     // string Image256Url,
     // string Image1024Url,
-    double TotalDistance,
-    TimeSpan TotalDuration,
     Dictionary<string, SchoolRoute> Routes
 );

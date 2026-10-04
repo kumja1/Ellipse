@@ -13,7 +13,7 @@ using Serilog;
 
 namespace Ellipse.Services;
 
-public sealed class SchoolsScraperService(GeocodingService geoService, IDistributedCache cache)
+public sealed class DivisionScraperService(GeoService geoService, IDistributedCache cache)
     : IDisposable
 {
     private readonly ConcurrentDictionary<int, Task<string>> _tasks = new();
@@ -188,7 +188,7 @@ public sealed class SchoolsScraperService(GeocodingService geoService, IDistribu
                 phoneNumber = addressSegments[^1];
             }
         }
-        
+
 
         Task<LngLat> task = Retry
             .RetryIfInvalid(

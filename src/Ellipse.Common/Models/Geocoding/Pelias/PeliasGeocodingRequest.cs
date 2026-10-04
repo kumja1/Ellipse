@@ -1,6 +1,6 @@
 namespace Ellipse.Common.Models.Geocoding.OpenRoute;
 
-public record struct OpenRouteGeocodingRequest()
+public record struct PeliasGeocodingRequest()
 {
     /// <summary>
     /// Search query (address or place name).

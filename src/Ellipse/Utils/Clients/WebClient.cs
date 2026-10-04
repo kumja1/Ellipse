@@ -27,9 +27,8 @@ public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : 
         string paramValue = value switch
         {
             IEnumerable<string> enumerable => string.Join(',', enumerable),
-            _ when value is bool or string or int or long or double or float => string.Format(
+            _ => string.Format(
                 CultureInfo.InvariantCulture, "{0}", value),
-            _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
         };
 
         builder.Append(key).Append('=').Append(Uri.EscapeDataString(paramValue));
@@ -62,6 +61,8 @@ public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : 
         request ??= new HttpRequestMessage(HttpMethod.Get, baseUrl);
         if (!string.IsNullOrEmpty(apiKey))
             request.Headers.Add("Authorization", apiKey);
+        
+    
 
         Log.Information("Request: {Request}", request);
         Log.Information("Request URL: {Url}", request.RequestUri);
@@ -111,8 +112,8 @@ public class WebClient(HttpClient client, string baseUrl, string apiKey = "") : 
     {
         StringBuilder builder = StringBuilderPool.Obtain();
         buildParams(request, builder);
-        
-        return builder.ToPool(); 
+
+        return builder.ToPool();
     }
 
     private string BuildUrl(string[] paths, string parameters = "")

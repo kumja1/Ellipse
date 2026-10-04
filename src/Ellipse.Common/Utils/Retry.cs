@@ -5,7 +5,7 @@ namespace Ellipse.Common.Utils;
 
 public static class Retry
 {
-    public static async Task Default<TResult>(Func<int, Task<TResult>> func, int maxRetries = 5,
+    public static async Task RetryIfDefault<TResult>(Func<int, Task<TResult>> func, int maxRetries = 5,
         int delayMs = 100
     )
         => await RetryIfInvalid(null, func, default, maxRetries, delayMs);

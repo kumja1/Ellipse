@@ -4,8 +4,8 @@ using Ellipse.Client.Services;
 using Ellipse.Common.Utils.Logging;
 using Ellipse.Components;
 using Ellipse.Services;
-using Ellipse.Utils.Clients.Mapping;
-using Ellipse.Utils.Clients.Mapping.Geocoding;
+using Ellipse.Utils.Clients;
+using Ellipse.Utils.Clients.Geocoding;
 using Microsoft.Extensions.Http;
 using MudBlazor.Services;
 using Osrm.HttpApiClient;
@@ -75,14 +75,14 @@ public class Program
             
         );
 
-        builder.Configuration.AddDotNetEnv(options: LoadOptions.TraversePath());
-        string? openRouteApiKey = builder.Configuration.GetValue<string?>("OPENROUTE_API_KEY");
+        builder.Configuration.AddDotNetEnv( options: LoadOptions.TraversePath());
+        string? hegitApiKey = builder.Configuration.GetValue<string?>("HEGIT_API_KEY");
         string? mapillaryApiKey = builder.Configuration.GetValue<string?>("MAPILLARY_API_KEY");
         string? postgrestUrl = builder.Configuration.GetValue<string?>("PostgresCache:ConnectionString");
         string? postgrestSchema = builder.Configuration.GetValue<string?>("PostgresCache:SchemaName");
         string? postgrestTable = builder.Configuration.GetValue<string?>("PostgresCache:TableName");
 
-        ArgumentException.ThrowIfNullOrEmpty(openRouteApiKey);
+        ArgumentException.ThrowIfNullOrEmpty(hegitApiKey);
         ArgumentException.ThrowIfNullOrEmpty(mapillaryApiKey);
         ArgumentException.ThrowIfNullOrEmpty(postgrestUrl);
         ArgumentException.ThrowIfNullOrEmpty(postgrestSchema);
@@ -99,19 +99,19 @@ public class Program
         
         
         builder
-            .Services.AddMudServices().AddSingleton<PhotonGeocoderClient>()
+            .Services.AddMudServices()
             .AddSingleton<MarkerService>()
-            .AddSingleton<GeocodingService>()
+            .AddSingleton<GeoService>()
             .AddSingleton<CensusGeocoderClient>()
             .AddSingleton(sp => new OpenRouteClient(
                 sp.GetRequiredService<HttpClient>(),
-                openRouteApiKey
+                hegitApiKey
             ))
-            .AddSingleton(sp => new MapillaryClient(
+            .AddSingleton(sp => new PeliasGeocoderClient(
                 sp.GetRequiredService<HttpClient>(),
-                mapillaryApiKey
+                hegitApiKey
             ))
-            .AddSingleton<SchoolsScraperService>()
+            .AddSingleton<DivisionScraperService>()
             .AddHttpClient<OsrmHttpApiClient>(
                 "OsrmClient",
                 client => client.BaseAddress = new Uri("https://router.project-osrm.org/")

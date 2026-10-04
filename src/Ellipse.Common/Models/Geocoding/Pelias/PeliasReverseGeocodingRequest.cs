@@ -1,8 +1,8 @@
-namespace Ellipse.Common.Models.Geocoding.OpenRoute;
+namespace Ellipse.Common.Models.Geocoding.Pelias;
 
-public record struct OpenRouteReverseGeocodingRequest
+public record struct PeliasReverseGeocodingRequest
 {
-    public OpenRouteReverseGeocodingRequest() { }
+    public PeliasReverseGeocodingRequest() { }
 
     /// <summary>
     /// Longitude of the location.

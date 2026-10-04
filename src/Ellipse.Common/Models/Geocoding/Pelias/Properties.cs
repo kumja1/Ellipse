@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Ellipse.Common.Models.Geocoding.OpenRoute;
+namespace Ellipse.Common.Models.Geocoding.Pelias;
 
 public class Properties
 {

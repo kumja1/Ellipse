@@ -5,7 +5,7 @@ namespace Ellipse.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public sealed class SchoolsController(SchoolsScraperService scraperService) : ControllerBase
+public sealed class SchoolsController(DivisionScraperService scraperService) : ControllerBase
 {
     // GET api/schools
     [HttpGet]

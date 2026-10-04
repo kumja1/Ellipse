@@ -10,7 +10,7 @@ using Serilog;
 
 namespace Ellipse.Services;
 
-public class MarkerService(GeocodingService geocodingService, IDistributedCache cache)
+public class MarkerService(GeoService geoService, IDistributedCache cache)
     : IDisposable
 {
     private readonly ConcurrentDictionary<LngLat, Task<MarkerResponse?>> _tasks = [];
@@ -43,7 +43,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     {
         Dictionary<LngLat, MarkerResponse?> resultsMap = new(request.Points.Length);
         string[] addresses = await Task.WhenAll(
-            request.Points.Select(p => geocodingService.GetAddressCached(p.Lng, p.Lat))
+            request.Points.Select(p => geoService.GetAddressCached(p.Lng, p.Lat))
         );
 
         Dictionary<string, SchoolRoute>[] allRoutes =
@@ -83,7 +83,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         try
         {
             MarkerResponse? markerResponse = await _tasks
-                .GetOrAdd(request.Point, _ => GetMarkerInternal(request))
+                .GetOrAdd(request.Point, GetMarkerInternal(request))
                 .ConfigureAwait(false);
 
             if (markerResponse == null)
@@ -115,7 +115,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             return null;
         }
 
-        string address = await geocodingService
+        string address = await geoService
             .GetAddressCached(request.Point.Lng, request.Point.Lat)
             .ConfigureAwait(false);
 
@@ -160,9 +160,6 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
             return null;
         }
 
-        double totalDistance = routes.Sum(kvp => kvp.Value.Distance);
-        double totalDuration = routes.Sum(kvp => kvp.Value.Duration.TotalSeconds);
-
         double averageDuration = divisionMetrices.Average(x => x.TrimeanDuration);
         double averageDistance = divisionMetrices.Average(x => x.TrimeanDistance);
 
@@ -171,7 +168,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
         { Distance = averageDistance, Duration = TimeSpan.FromSeconds(averageDuration) };
 
 
-        return new MarkerResponse(address, point, totalDistance, TimeSpan.FromSeconds(totalDuration), routes);
+        return new MarkerResponse(address, point, routes);
 
     }
 
@@ -183,7 +180,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
     {
         Dictionary<string, SchoolRoute>[] results = [.. Enumerable.Range(0, sources.Length).Select(_ => new Dictionary<string, SchoolRoute>(schools.Length))];
 
-        await Retry.Default(
+        await Retry.RetryIfDefault(
             async attempt =>
             {
                 Log.Information("Attempt {Retry} for {Count} schools", attempt, schools.Length);
@@ -191,7 +188,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                 try
                 {
                     (float?[][]? distances, float?[][]? durations) =
-                        await geocodingService.GetMatrixCached(
+                        await geoService.GetMatrixCached(
                             sources,
                             [.. schools.Select(s => s.LngLat)]
                         );
@@ -201,6 +198,7 @@ public class MarkerService(GeocodingService geocodingService, IDistributedCache 
                         Log.Warning("Received empty matrix from GeocodingService. Retrying...");
                         return false;
                     }
+
                     for (int i = 0; i < sources.Length; i++)
                     {
                         Dictionary<string, SchoolRoute> currentDict = results[i];

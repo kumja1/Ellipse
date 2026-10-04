@@ -4,7 +4,7 @@ using Ellipse.Common.Enums.Geocoding;
 using Ellipse.Common.Interfaces;
 using Ellipse.Common.Models.Geocoding.CensusGeocoder;
 
-namespace Ellipse.Utils.Clients.Mapping.Geocoding;
+namespace Ellipse.Utils.Clients.Geocoding;
 
 public sealed class CensusGeocoderClient(HttpClient client)
     : WebClient(client, "https://geocoding.geo.census.gov/geocoder"),
